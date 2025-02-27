@@ -50,7 +50,7 @@
         <div :class="['literal-field', {'read-only': structure.propertyLabel=='Local identifier'}]">
 
           <template v-if="preferenceStore.returnValue('--b-edit-main-splitpane-edit-shortcode-display-mode') == false">
-            <div v-if="preferenceStore.returnValue('--b-edit-main-splitpane-edit-show-field-labels')"  class="lookup-fake-input-label">{{structure.propertyLabel}}</div>
+            <div v-if="preferenceStore.returnValue('--b-edit-main-splitpane-edit-show-field-labels')"  class="lookup-fake-input-label" :class="{'label-bold': preferenceStore.returnValue('--b-edit-main-splitpane-edit-show-field-labels-bold')}">{{structure.propertyLabel}}</div>
           </template>
           <form autocomplete="off" >
             <template v-if="preferenceStore.returnValue('--b-edit-main-splitpane-edit-shortcode-display-mode') == true">
@@ -59,7 +59,7 @@
                 <div class="bfcode-display-mode-holder-label" :title="structure.propertyLabel">{{profileStore.returnBfCodeLabel(structure)}}</div>
                 <div class="bfcode-display-mode-holder-value">
                   <textarea
-                    :class="['literal-textarea', 'can-select',{'bfcode-textarea': preferenceStore.returnValue('--b-edit-main-splitpane-edit-shortcode-display-mode')}]"
+                    :class="['literal-textarea', 'can-select',{'bfcode-textarea': preferenceStore.returnValue('--b-edit-main-splitpane-edit-shortcode-display-mode'), 'literal-bold': preferenceStore.returnValue('--b-edit-main-literal-bold-font')}]"
                     v-model="lValue.value"
                     v-on:keydown.enter.prevent="submitField"
                     autocomplete="off"
@@ -85,7 +85,7 @@
               </template>
               <template v-else>
                 <textarea
-                  :class="['literal-textarea', 'can-select',{}]"
+                  :class="['literal-textarea', 'can-select',{'literal-bold': preferenceStore.returnValue('--b-edit-main-literal-bold-font')}]"
                   v-model="lValue.value"
                   v-on:keydown.enter.prevent="submitField"
                   autocomplete="off"
@@ -134,7 +134,7 @@
         <!-- { "title": "knitter's handy book of patterns", "classNumber": "TT820", "cutterNumber": ".B877 2002", "titleNonSort": 4, "contributors": [ { "type": "PrimaryContribution", "label": "Budd, Ann, 1956-" } ], "firstSubject": "Knitting--Patterns" } -->
         <div style="display: flex;">
           <div style="flex:1">
-          <fieldset v-if="(lccFeatureData.contributors && lccFeatureData.contributors.length>0) || lccFeatureData.title" >
+          <fieldset v-if="(lccFeatureData.contributors && lccFeatureData.contributors.length>0) || lccFeatureData.title || lccFeatureData.firstSubject" >
             <legend>Cutter Calculator</legend>
             <template v-if="lccFeatureData.contributors">
 
@@ -777,96 +777,102 @@ export default {
 
       let useLang = event.target.dataset.lang
 
-      // this is used in CAMM mode you can add @en-latn language and script via text
-      if (/@[A-z-]{2,}$/.test(v)){
-        let foundLang = v.match(/@[A-z-]{2,}$/)
-        if (foundLang){
-          // pull it out of the regex match
-          foundLang = foundLang[0]
-          // remove it from the value
-          v = v.replace(foundLang,'')
-          useLang = foundLang.toLowerCase().replace("@",'')
+      if (this.preferenceStore.returnValue('--b-edit-main-splitpane-edit-inline-mode') == true){
+
+        // this is used in CAMM mode you can add @en-latn language and script via text
+        if (/@[A-z-]{2,}$/.test(v)){
+          let foundLang = v.match(/@[A-z-]{2,}$/)
+          if (foundLang){
+            // pull it out of the regex match
+            foundLang = foundLang[0]
+            // remove it from the value
+            v = v.replace(foundLang,'')
+            useLang = foundLang.toLowerCase().replace("@",'')
 
 
-        }
-      }else{
-        // there is no language now, but was there before? and they are removing it or there never was
-        for (let l of this.literalValues){
-          if (l['@guid'] == event.target.dataset.guid && l['@language'] !== null){
-            // they currently have a language on this string and are removing it
-            // set the value to the remove command so setValueLiteral knows to remove it
-            useLang = 'REMOVE_COMMAND'
           }
-        }
-      }
-
-      // double check that the language and script about to be added is acutally a valid lang tag
-      // this can be manually changed in camm mode, so if it itsn't set the error but don't stop them
-      if (useLang && useLang != 'REMOVE_COMMAND'){
-
-        let lang = useLang.split("-")[0]
-        let script = useLang.split("-")[1]
-
-        let validLang = false
-        let validScript = false
-        if (lang){
-          lang=lang.trim()
-          for (let l of isoLangLib.iso639_1){
-            if (lang == l.code){
-              validLang=true
-              break
+        }else{
+          // there is no language now, but was there before? and they are removing it or there never was
+          for (let l of this.literalValues){
+            if (l['@guid'] == event.target.dataset.guid && l['@language'] !== null){
+              // they currently have a language on this string and are removing it
+              // set the value to the remove command so setValueLiteral knows to remove it
+              useLang = 'REMOVE_COMMAND'
             }
           }
-          if (!validLang){
-              for (let l of isoLangLib.iso639_2){
-              if (lang == l.alpha_3){
+        }
+
+        // double check that the language and script about to be added is acutally a valid lang tag
+        // this can be manually changed in camm mode, so if it itsn't set the error but don't stop them
+        if (useLang && useLang != 'REMOVE_COMMAND'){
+
+          let lang = useLang.split("-")[0]
+          let script = useLang.split("-")[1]
+
+          let validLang = false
+          let validScript = false
+          if (lang){
+            lang=lang.trim()
+            for (let l of isoLangLib.iso639_1){
+              if (lang == l.code){
                 validLang=true
                 break
               }
-            }    
-          }   
-        } 
-        
-        
-        if (script){
-          script=script.trim().toLowerCase()
-          for (let l of isoLangLib.iso15924){
-            if (script == l.alpha_4.toLowerCase()){
-              validScript=true
-              break
+            }
+            if (!validLang){
+                for (let l of isoLangLib.iso639_2){
+                if (lang == l.alpha_3){
+                  validLang=true
+                  break
+                }
+              }
             }
           }
 
-          
-        }else{
-          // no script found, its fine then
-          validScript=true
+
+          if (script){
+            script=script.trim().toLowerCase()
+            for (let l of isoLangLib.iso15924){
+              if (script == l.alpha_4.toLowerCase()){
+                validScript=true
+                break
+              }
+            }
+
+
+          }else{
+            // no script found, its fine then
+            validScript=true
+          }
+
+          if (!validScript || !validLang){
+            // if they are typing it in we don't want to flash the warning with each keystroke, so wait
+            // until after they are done typing and trigger the validation warning if needed
+            window.clearTimeout(this.cammModeLangScriptValidationTimeout)
+            this.cammModeLangScriptValidationTimeout = window.setTimeout(()=>{
+              this.profileStore.addCammModeError(this.guid,'Invalid Language or Script code, needs to use ISO639 & ISO15924: ' + useLang )
+
+            },1000)
+
+          }else{
+            window.clearTimeout(this.cammModeLangScriptValidationTimeout)
+            this.profileStore.clearCammModeError(this.guid)
+          }
+
         }
-
-        if (!validScript || !validLang){
-          // if they are typing it in we don't want to flash the warning with each keystroke, so wait
-          // until after they are done typing and trigger the validation warning if needed
-          window.clearTimeout(this.cammModeLangScriptValidationTimeout)
-          this.cammModeLangScriptValidationTimeout = window.setTimeout(()=>{
-            this.profileStore.addCammModeError(this.guid,'Invalid Language or Script code, needs to use ISO639 & ISO15924: ' + useLang )
-
-          },1000)
-
-        }else{
-          window.clearTimeout(this.cammModeLangScriptValidationTimeout)
-          this.profileStore.clearCammModeError(this.guid)
-        }
-
       }
 
 
-      
+
       let currentPos = 0
       if (event.target.tagName === 'SPAN'){
         currentPos = this.getCaretCharOffset(event.target)
       }
       // console.log("3 v:",v)
       await this.profileStore.setValueLiteral(this.guid,event.target.dataset.guid,this.propertyPath,v,useLang)
+
+
+
 
       if (setFocus){
 
@@ -1181,7 +1187,6 @@ fieldset{
 
 
 .lang-display{
-
   border-radius: 1em;
   padding: 2px;
 
@@ -1189,11 +1194,6 @@ fieldset{
 
   background-color: v-bind("preferenceStore.returnValue('--c-edit-main-literal-lang-label-background-color')");
   color: v-bind("preferenceStore.returnValue('--c-edit-main-literal-lang-label-font-color')");
-
-
-
-
-
 }
 
 .inline-mode-editable-span-input{
@@ -1274,7 +1274,9 @@ fieldset{
 }
 
 
-
+.label-bold {
+  font-weight: bold;
+}
 .lookup-fake-input-label{
   position: absolute;
   font-size: v-bind("preferenceStore.returnValue('--n-edit-main-splitpane-edit-show-field-labels-size')");
@@ -1285,8 +1287,6 @@ fieldset{
   z-index: 1;
   top: -4px;
   left: 2px;
-
-
 }
 
 
@@ -1304,9 +1304,6 @@ textarea{
   font-size: v-bind("preferenceStore.returnValue('--n-edit-main-literal-font-size')");
   color: v-bind("preferenceStore.returnValue('--c-edit-main-literal-font-color')");
 
-
-
-
   height: 1.25em;
   line-height: 1.25em;
   margin-top: 0.5em;
@@ -1315,9 +1312,6 @@ textarea{
 .lookup-fake-input{
   min-height: 2em;
   /* background-color: transparent; */
-
-
-
 }
 
 textarea:focus-within{
@@ -1371,8 +1365,6 @@ textarea:hover{
   background-color: transparent;
   font-size: v-bind("preferenceStore.returnValue('--n-edit-main-literal-font-size')");
   color: v-bind("preferenceStore.returnValue('--c-edit-main-literal-font-color')");
-
-
 }
 .component .lookup-fake-input{
   border-top:solid 1px v-bind("preferenceStore.returnValue('--c-edit-main-splitpane-edit-field-border-color')") !important;
@@ -1384,6 +1376,9 @@ textarea:hover{
   cursor: no-drop;
 }
 
+.literal-bold{
+  font-weight: bold;
+}
 
 
 </style>
