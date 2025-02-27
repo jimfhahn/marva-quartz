@@ -46,6 +46,15 @@ const returnDOMParser = function(){
 	return p
 }
 
+// Add helper to wrap XML in a root element if needed
+function ensureRoot(xmlStr) {
+  // If xmlStr does not start with a tag (e.g. empty, whitespace, or fragment), wrap it.
+  if (!xmlStr.trim().match(/^<\w/)) {
+    return `<root>${xmlStr}</root>`;
+  }
+  return xmlStr;
+}
+
 const utilsExport = {
 
 
@@ -777,7 +786,7 @@ const utilsExport = {
 									continue
 								}else if (userValue[key1] && userValue[key1][0] && userValue[key1][0]['http://www.w3.org/2000/01/rdf-schema#label']){
 									let rdftype = this.createElByBestNS(key1)
-									rdftype.innerHTML=escapeHTML(userValue[key1][0]['http://www.w3.org/2000/01/rdf-schema#label'][0]['http://www.w3.org/2000/01/rdf-schema#label'])
+									rdftype.innerHTML=escapeHTML(userValue[key1][0]['http://www.w3.org/2000/01/rdf-schema#label'])
 									xmlLog.push(`This bnode just has a rdf:type and label : ${rdftype} setting it an continuing`)
 
                                     bnodeLvl1.appendChild(rdftype)
@@ -1468,13 +1477,15 @@ const utilsExport = {
 		}
 
 		let strXmlFormatted = (new XMLSerializer()).serializeToString(rdf)
-
+		strXmlFormatted = ensureRoot(strXmlFormatted);
 		strXmlFormatted = utilsMisc.prettifyXmlJS(strXmlFormatted, ' ')
 
 		rdfBasic.appendChild(datasetDescriptionEl)
 
 		let strXmlBasic = (new XMLSerializer()).serializeToString(rdfBasic)
+		strXmlBasic = ensureRoot(strXmlBasic);
 		let strXml = (new XMLSerializer()).serializeToString(rdf)
+		strXml = ensureRoot(strXml);
 		// console.log(strXml)
     /*
         kefo note

@@ -175,51 +175,24 @@
 
 
     mounted: function(){
-
-      console.log("Mounted called", this.$route.params.action, this.$route.params.recordId )
-      console.log(this.$route.params)
-      this.profileStore.resetLocalComponentCache()
-      if (this.profilesLoaded && this.activeProfile){
-
-        if (this.activeProfile.neweId){
-          // if they just created a new record then we should save the record to back end first thing so it is recorded
-          this.profileStore.saveRecord()
-          this.activeProfile.neweId = false
-        }else if( this.$route.params.action && this.$route.params.action == 'load' ){
-          // they are loading a record from the all record screen
-          this.profileStore.loadRecordFromBackend(this.$route.params.recordId)
-        }else{
-          console.log("Should load record from backend now",this.$route.params.recordId)
-          // otherwise they just got kicked over to the edit screen with an existing record id, load it from the back end to edit
-          this.profileStore.loadRecordFromBackend(this.$route.params.recordId)
+      const recordId = this.$route.params.recordId;
+      console.log("Mounted called", this.$route.params.action, recordId);
+      if (!recordId) {
+        console.error("recordId is undefined");
+        return;
+      }
+      this.profileStore.resetLocalComponentCache();
+      if (this.profilesLoaded && this.activeProfile) {
+        if (this.activeProfile.neweId) {
+          this.profileStore.saveRecord();
+          this.activeProfile.neweId = false;
+        } else if (this.$route.params.action === 'load') {
+          this.profileStore.loadRecordFromBackend(recordId);
+        } else {
+          console.log("Should load record from backend now", recordId);
+          this.profileStore.loadRecordFromBackend(recordId);
         }
       }
-
-
-
-
-
-
-      // this.profileLoadedTimer = window.setInterval(()=>{
-
-      //   if (this.activeProfile){
-      //     window.clearInterval(this.profileLoadedTimer)
-      //     if (this.activeProfile.neweId){
-      //       console.log("New record just created.")
-      //     }
-      //   }
-
-
-      // },100)
-
-      // if (this.profilesLoaded){
-      //   console.log('this.activeProfile', this.activeProfile)
-      //   this.profileStore.loadRecordFromBackend(this.$route.params.recordId)
-      // }else{
-      //   // console.error("Somehow profiles are not loaded at this point")
-      // }
-
-
 
     },
     created: function(){

@@ -2,7 +2,7 @@
   <div>
 
     <Teleport to="body">
-      <div id="nav-holder">
+      <div id="nav-holder" ref="navHolder">
         <vue-file-toolbar-menu :content="my_menu" />
       </div>
       <template v-if="showValidateModal==true">
@@ -706,9 +706,33 @@
         this.instances = [];
         this.profileStore.createItem(this.targetInstance);
       },
+      async fetchContent(url) {
+        const response = await fetch(url);
+        // Check the Content-Type before processing the response.
+        const contentType = response.headers.get("Content-Type") || "";
+        if (contentType.includes("text/html")) {
+          // Process as HTML
+          return await response.text();
+        } else {
+          // Process as XML
+          const text = await response.text();
+          if (!text.trim().startsWith("<")) {
+            return text;
+          }
+          const parser = new DOMParser();
+          return parser.parseFromString(text, "application/xml");
+        }
+      },
       
     },
-
+    mounted() {
+      this.$nextTick(() => {
+        const holder = this.$refs.navHolder;
+        if (holder && !holder._el) {
+          holder._el = holder;
+        }
+      });
+    },
     created() {
 
 

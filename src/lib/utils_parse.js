@@ -19,7 +19,25 @@ const unEscapeHTML = str => str.replace(/&amp;|&lt;|&gt;|&#39;|&quot;/g,
       '&quot;': '"'
     }[tag]));
 
-
+// Updated helper to ensure the input has a proper root element
+function ensureRoot(xmlStr) {
+  let trimmed = xmlStr.trim();
+  // If it does not start with '<', wrap the whole string
+  if (!trimmed.startsWith('<')) {
+    console.warn("Input is not XML. Wrapping content:", trimmed);
+    return `<root>${trimmed}</root>`;
+  }
+  // Remove XML declaration if present and trim again
+  if (trimmed.startsWith('<?xml')) {
+    trimmed = trimmed.replace(/^<\?xml.*?\?>/, '').trim();
+  }
+  // If after removing the declaration it still doesn't start with '<', wrap it
+  if (!trimmed.startsWith('<')) {
+    console.warn("After removing declaration, input is not XML. Wrapping content:", trimmed);
+    return `<root>${trimmed}</root>`;
+  }
+  return trimmed;
+}
 
 const utilsParse = {
 
@@ -191,69 +209,35 @@ const utilsParse = {
   * @param {string} xml - the XML payload
   * @return {void}
   */
-  parseXml: function(xml){
-
-    // if (!xml){
-    //   xml = this.testXml
-    // }
-
-    this.xmlSource = xml
-    // use the browser if we can, should be faster, fall back to the library if not running in the browser
-    if (window.DOMParser){
-      let parser = new DOMParser();
-
-
-      // this.activeDom = parser.parseFromString(xml, 'application/xml');
-      // var xsltDoc = new DOMParser().parseFromString([
-      //     // describes how we want to modify the XML - indent everything
-      //     '<xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" version="1.0">',
-      //     '  <xsl:strip-space elements="*"/>',
-      //     '  <xsl:template match="para[content-style][not(text())]">', // change to just text() to strip space in text nodes
-      //     '    <xsl:value-of select="normalize-space(.)"/>',
-      //     '  </xsl:template>',
-      //     '  <xsl:template match="node()|@*">',
-      //     '    <xsl:copy><xsl:apply-templates select="node()|@*"/></xsl:copy>',
-      //     '  </xsl:template>',
-      //     '  <xsl:output indent="yes"/>',
-      //     '</xsl:stylesheet>',
-      // ].join('\n'), 'application/xml');
-
-      // var xsltProcessor = new XSLTProcessor();
-      // xsltProcessor.importStylesheet(xsltDoc);
-      // var resultDoc = xsltProcessor.transformToDocument(this.activeDom);
-      // var resultXml = new XMLSerializer().serializeToString(resultDoc);
-      // xml = resultXml
-
-
-      // xml = xml.replace(/(<\/?.*?>)/g, '$1\n');
-
-      this.activeDom = parser.parseFromString(xml, 'application/xml');
-      this.testDom = parser.parseFromString(xml, 'application/xml');
-
-
-      let root = this.activeDom.getElementsByTagName('rdf:RDF')
-      if (root.length > 0){ root = root[0]}
-
-
-      this.hasInstance = 0
-      for (let rdfChild of root.children){
-        if (rdfChild.tagName == 'bf:Instance'){
-          this.hasInstance++
-        }
-      }
-
-      // test to see if there are any Items,
-      this.hasItem = this.activeDom.getElementsByTagName('bf:Item').length
-
-
-    // the library very much doesn't work on anything but chrome
-    // }else{
-    //  this.activeDom = new jsdom.JSDOM(xml, {
-    //    contentType: "text/xml",
-    //    storageQuota: 10000000
-    //  })
-    //  this.activeDom = this.dom.window.document
+  parseXml: function(xml) {
+    console.log("Raw XML payload:", xml);
+    // If the payload isn't valid XML, skip further processing.
+    if (!xml.trim().startsWith('<')) {
+      console.warn("Payload is not XML. Skipping XML parsing.");
+      return xml; // or handle as needed
     }
+    xml = ensureRoot(xml);
+    if (!xml.trim().startsWith('<')) {
+      console.error("The XML payload is still invalid:", xml);
+    }
+    let parser = new DOMParser();
+    this.activeDom = parser.parseFromString(xml, 'application/xml');
+    this.testDom = parser.parseFromString(xml, 'application/xml');
+
+    let root = this.activeDom.getElementsByTagName('rdf:RDF')
+    if (root.length > 0){ root = root[0]}
+
+
+    this.hasInstance = 0
+    for (let rdfChild of root.children){
+      if (rdfChild.tagName == 'bf:Instance'){
+        this.hasInstance++
+      }
+    }
+
+    // test to see if there are any Items,
+    this.hasItem = this.activeDom.getElementsByTagName('bf:Item').length
+
   },
 
   /**
@@ -1008,7 +992,7 @@ const utilsParse = {
 
                     
                     // if it a one liner Class w/ no children add it in as its own obj otherwise it is a
-                    // literal or something
+                    // literal or something like that
                     if (this.isClass(gChild.tagName)){
                       let gChildData = {'@guid': short.generate()}
                       userValue[gChildProperty].push(gChildData)
@@ -1076,35 +1060,13 @@ const utilsParse = {
 
                     for (let ggChild of gChild.children){
 
-
                       // if its a bnode then loop through the children,
                       if (this.isClass(ggChild.tagName)){
 
                         // mint a new one for this iteration, since there could be multiple classes nested
                         gChildData = {'@guid': short.generate()}
 
-                        // <bf:genreForm xmlns:bf="http://id.loc.gov/ontologies/bibframe/">
-                        //   <bf:GenreForm xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" rdf:about="https://id.loc.gov/authorities/genreForms/gf2014026639">
-                        //     <rdf:type rdf:resource="http://www.loc.gov/mads/rdf/v1#Topic"/>
-                        //     <rdfs:label xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#">Art music.</rdfs:label>
-                        //     <madsrdf:authoritativeLabel xmlns:madsrdf="http://www.loc.gov/mads/rdf/v1#">Art music.</madsrdf:authoritativeLabel>
-                        //     <bf:source>
-                        //       <bf:Source rdf:about="http://id.loc.gov/vocabulary/genreFormSchemes/fast">
-                        //         <bf:code>fast</bf:code>
-                        //       </bf:Source>
-                        //     </bf:source>
-                        //     <bf:identifiedBy>
-                        //       <bf:Identifier> ~~~~~~~~~~~~~YOU ARE HERE ~~~~~~~~~~~~
-                        //         <rdf:value>fst01920007</rdf:value>
-                        //         <bf:source>
-                        //           <bf:Source>
-                        //             <bf:code>OCoLC</bf:code>
-                        //           </bf:Source>
-                        //         </bf:source>
-                        //       </bf:Identifier>
-                        //     </bf:identifiedBy>
-                        //   </bf:GenreForm>
-                        // </bf:genreForm>
+                
 
 
 
@@ -1221,7 +1183,7 @@ const utilsParse = {
                                 //       <bf:Identifier>
                                 //         <rdf:value>fst01920007</rdf:value>
                                 //         <bf:source>
-                                //           <bf:Source> ~~~~~~~~~~~~~YOU ARE HERE ~~~~~~~~~~~~
+                                //           <bf:Source>
                                 //             <bf:code>OCoLC</bf:code>
                                 //           </bf:Source>
                                 //         </bf:source>
