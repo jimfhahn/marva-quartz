@@ -1685,94 +1685,129 @@
           {
             "id": "lc:RT:bf2:Monograph:Item",
             "propertyTemplates": [
-              {
-                "propertyLabel": "URL of Item",
-                "propertyURI": "http://id.loc.gov/ontologies/bibframe/electronicLocator",
-                "resourceTemplates": [],
-                "valueConstraint": {
-                  "valueTemplateRefs": [
-                    "lc:RT:bf2:URL"
-                  ],
-                  "useValuesFrom": [],
-                  "valueDataType": {},
-                  "defaults": []
+                {
+                    "propertyLabel": "Storing or shelving location",
+                    "propertyURI": "http://id.loc.gov/ontologies/bibframe/physicalLocation",
+                    "resourceTemplates": [],
+                    "valueConstraint": {
+                        "valueTemplateRefs": [],
+                        "useValuesFrom": [],
+                        "valueDataType": "http://www.w3.org/2001/XMLSchema#string",
+                        "defaults": []
+                    },
+                    "mandatory": "false",
+                    "repeatable": "true",
+                    "type": "literal"
                 },
-                "mandatory": "false",
-                "repeatable": "true",
-                "type": "resource",
-                "remark": "http://access.rdatoolkit.org/4.6.html"
-              },
-              {
-                "mandatory": "false",
-                "repeatable": "true",
-                "type": "resource",
-                "resourceTemplates": [],
-                "valueConstraint": {
-                  "valueTemplateRefs": [
-                    "lc:RT:bf2:Agents:bfContribution"
-                  ],
-                  "useValuesFrom": [],
-                  "defaults": [],
-                  "valueDataType": {
-                    "dataTypeURI": "http://id.loc.gov/ontologies/bibframe/Contribution"
-                  }
+                {
+                    "propertyLabel": "Held in sublocation",
+                    "propertyURI": "http://id.loc.gov/ontologies/bibframe/sublocation",
+                    "resourceTemplates": [],
+                    "valueConstraint": {
+                        "valueTemplateRefs": ["lc:RT:bf2:Item:Location"],
+                        "useValuesFrom": [],
+                        "valueDataType": "http://www.w3.org/2001/XMLSchema#string",
+                        "defaults": []
+                    },
+                    "mandatory": "false",
+                    "repeatable": "true",
+                    "type": "resource"
                 },
-                "propertyURI": "http://id.loc.gov/ontologies/bibframe/contribution",
-                "propertyLabel": "Collection"
-              },
-              {
-                "propertyLabel": "Notes about the Item",
-                "propertyURI": "http://id.loc.gov/ontologies/bibframe/note",
-                "resourceTemplates": [],
-                "valueConstraint": {
-                  "valueTemplateRefs": [
-                    "lc:RT:bf2:NoteLc"
-                  ],
-                  "useValuesFrom": [],
-                  "valueDataType": {},
-                  "defaults": []
+                {
+                    "propertyLabel": "URL of Item",
+                    "propertyURI": "http://id.loc.gov/ontologies/bibframe/electronicLocator",
+                    "resourceTemplates": [],
+                    "valueConstraint": {
+                        "valueTemplateRefs": ["lc:RT:bf2:URL"],
+                        "useValuesFrom": [],
+                        "valueDataType": "",
+                        "defaults": []
+                    },
+                    "mandatory": "false",
+                    "repeatable": "true",
+                    "type": "resource",
+                    "remark": "http://access.rdatoolkit.org/4.6.html"
                 },
-                "mandatory": "false",
-                "repeatable": "true",
-                "type": "resource"
-              },
-              {
-                "mandatory": "false",
-                "repeatable": "true",
-                "type": "resource",
-                "resourceTemplates": [],
-                "valueConstraint": {
-                  "valueTemplateRefs": [
-                    "lc:RT:bf2:Item:Enumeration",
-                    "lc:RT:bf2:Item:Chronology"
-                  ],
-                  "useValuesFrom": [],
-                  "valueDataType": {},
-                  "defaults": []
+                {
+                    "mandatory": "false",
+                    "repeatable": "true",
+                    "type": "resource",
+                    "resourceTemplates": [],
+                    "valueConstraint": {
+                        "valueTemplateRefs": ["lc:RT:bf2:Agents:bfContribution"],
+                        "useValuesFrom": [],
+                        "defaults": [],
+                        "valueDataType": {"dataTypeURI": "http://id.loc.gov/ontologies/bibframe/Contribution"}
+                    },
+                    "propertyURI": "http://id.loc.gov/ontologies/bibframe/contribution",
+                    "propertyLabel": "Contributor"
                 },
-                "propertyLabel": "Enumeration and chronology of Item",
-                "propertyURI": "http://id.loc.gov/ontologies/bibframe/enumerationAndChronology"
-              },
-              {
-                "mandatory": "false",
-                "repeatable": "true",
-                "type": "resource",
-                "resourceTemplates": [],
-                "valueConstraint": {
-                  "valueTemplateRefs": [
-                    "lc:RT:bf2:ImmAcqSource"
-                  ],
-                  "useValuesFrom": [],
-                  "defaults": [],
-                  "valueDataType": {}
+                {
+                    "propertyLabel": "Notes about the Item",
+                    "propertyURI": "http://id.loc.gov/ontologies/bibframe/note",
+                    "resourceTemplates": [],
+                    "valueConstraint": {
+                        "valueTemplateRefs": ["lc:RT:bf2:NoteLc"],
+                        "useValuesFrom": [],
+                        "valueDataType": "",
+                        "defaults": []
+                    },
+                    "mandatory": "false",
+                    "repeatable": "true",
+                    "type": "resource"
                 },
-                "propertyURI": "http://id.loc.gov/ontologies/bibframe/immediateAcquisition",
-                "propertyLabel": "Immediate source of acquisition"
-              }
+                {
+                    "mandatory": "false",
+                    "repeatable": "true",
+                    "type": "resource",
+                    "resourceTemplates": [],
+                    "valueConstraint": {
+                        "valueTemplateRefs": [
+                            "lc:RT:bf2:Item:Enumeration",
+                            "lc:RT:bf2:Item:Chronology"
+                        ],
+                        "useValuesFrom": [],
+                        "valueDataType": "",
+                        "defaults": []
+                    },
+                    "propertyLabel": "Enumeration and chronology of Item",
+                    "propertyURI": "http://id.loc.gov/ontologies/bibframe/enumerationAndChronology"
+                },
+                {
+                    "mandatory": "false",
+                    "repeatable": "true",
+                    "type": "resource",
+                    "resourceTemplates": [],
+                    "valueConstraint": {
+                        "valueTemplateRefs": [
+                            "lc:RT:bf2:Item:Enumeration",
+                            "lc:RT:bf2:Item:Chronology"
+                        ],
+                        "useValuesFrom": [],
+                        "valueDataType": "",
+                        "defaults": []
+                    },
+                    "propertyLabel": "Enumeration and chronology of Item",
+                    "propertyURI": "http://id.loc.gov/ontologies/bibframe/enumerationAndChronology"
+                },
+                {
+                    "mandatory": "false",
+                    "repeatable": "true",
+                    "type": "resource",
+                    "resourceTemplates": [],
+                    "valueConstraint": {
+                        "valueTemplateRefs": ["lc:RT:bf2:ImmAcqSource"],
+                        "useValuesFrom": [],
+                        "defaults": [],
+                        "valueDataType": ""
+                    },
+                    "propertyURI": "http://id.loc.gov/ontologies/bibframe/immediateAcquisition",
+                    "propertyLabel": "Immediate source of acquisition"
+                }
             ],
             "resourceLabel": "BIBFRAME Item",
             "resourceURI": "http://id.loc.gov/ontologies/bibframe/Item"
-          },
+      },
           {
             "propertyTemplates": [
               {
