@@ -1,7 +1,9 @@
 <script>
   import { useProfileStore } from '@/stores/profile'
   import { useConfigStore } from '@/stores/config'
-  import { mapStores, mapWritableState } from 'pinia'
+
+
+  import {  mapStores, mapState, mapWritableState } from 'pinia'
   import { VueFinalModal } from 'vue-final-modal'
   import utilsExport from '@/lib/utils_export'
 
@@ -18,6 +20,8 @@
         left: 0,
         postResults: {},
         posting: false,
+
+
         initalHeight: 400,
         initalLeft: (window.innerWidth / 2) - 450,
       }
@@ -254,7 +258,7 @@
   }
   .login-modal {
     background-color: white;
-    -webkit-box-shadow: 0px 10px 13px -7px #000000, 5px 5px 15px 5px rgba(0,0,0,0.27); 
+    -webkit-box-shadow: 0px 10px 13px -7px #000000, 5px 5px 15px 5px rgba(0,0,0,0.27);
     box-shadow: 0px 10px 13px -7px #000000, 5px 5px 15px 5px rgba(0,0,0,0.27);
     border-radius: 1em;
     padding: 1em;
