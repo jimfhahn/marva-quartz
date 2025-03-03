@@ -433,6 +433,8 @@ const utilsNetwork = {
               url = url.replace('https://preprod-8080.id.loc.gov','https://id.loc.gov')
               url = url.replace('https://preprod-8080.id.loc.gov','https://id.loc.gov')
               url = url.replace('https://preprod-8288.id.loc.gov','https://id.loc.gov')
+            } else { // if it's not dev or public make sure we're using 8080
+              url = url.replace('https://id.loc.gov', 'https://preprod-8080.id.loc.gov')
             }
 
 
@@ -563,6 +565,7 @@ const utilsNetwork = {
     * @return {array} - An array of {@link contextResult} results
     */
     returnContext: async function(uri){
+      let returnUrls = useConfigStore().returnUrls
       let results
       let d
       try {
@@ -609,7 +612,8 @@ const utilsNetwork = {
 
 
           //if we are in production use preprod
-          if (returnUrls.env == 'production'){
+          // if (returnUrls.env == 'production' && jsonuri.includes("authorities/names")){
+            if (returnUrls.env == 'production'){
             jsonuri = jsonuri.replace('http://id.', 'https://preprod-8080.id.')
             jsonuri = jsonuri.replace('https://id.', 'https://preprod-8080.id.')
           }
@@ -648,7 +652,7 @@ const utilsNetwork = {
           }
 
 
-          jsonuri = jsonuri.replace('http://id.loc.gov','https://id.loc.gov')
+          jsonuri = jsonuri.replace('http://','https://')
 
           
           try{
@@ -840,6 +844,8 @@ const utilsNetwork = {
     * @return {array} - An array of {@link contextResult} results
     */
     extractContextData: function(data){
+      data.uri = data.uri.replace("https://preprod-8080.", "http://id.loc.gov/")
+
           var results = {
             contextValue: true,
             source: [],

@@ -348,6 +348,12 @@
                 this.layoutActiveFilter=null
                 this.layoutHash=null
                 this.createLayoutMode=false
+
+                //if ad hoc mode is on cycle on/off, otherwise an initially hidden component will remain hidden
+                if (this.preferenceStore.returnValue('--c-general-ad-hoc')){
+                  this.showAllElements()
+                  this.hideAllElements()
+                }
               }
             }
           )
@@ -975,7 +981,7 @@
       position: absolute !important;
       right: 0;
     }
-    .record-posted{
+    .record-posted .icon{
       color: green !important;
     }
     .save-not-saved span{
