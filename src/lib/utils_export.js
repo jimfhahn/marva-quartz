@@ -474,6 +474,8 @@ const utilsExport = {
 		Hub:{}
 	}
 
+	const configStore = useConfigStore();
+
 		for (let rt of profile.rtOrder){
 
 			xmlLog.push(`Processing rt: ${rt}`)
@@ -516,7 +518,7 @@ const utilsExport = {
 
 
 			if (profile.rt[rt].URI){
-				rootEl.setAttributeNS(this.namespace.rdf, 'rdf:about', profile.rt[rt].URI)
+				rootEl.setAttributeNS(this.namespace.rdf, 'rdf:about', configStore.convertToRegionUrl(profile.rt[rt].URI))
 				xmlLog.push(`Setting URI for this resource rdf:about to: ${profile.rt[rt].URI}`)
 				xmlVoidExternalID.push(profile.rt[rt].URI)
 			}
@@ -1471,8 +1473,9 @@ const utilsExport = {
 
 
 		for (let x of xmlVoidExternalID){
-			el = document.createElementNS(this.namespace.lclocal, 'lclocal:externalid')
-			el.innerHTML = escapeHTML(x)
+			el = document.createElementNS(this.namespace.lclocal, 'lclocal:externalid');
+			// Convert external ID URL before setting
+			el.innerHTML = escapeHTML(useConfigStore().convertToRegionUrl(x));
 			datasetDescriptionEl.appendChild(el)
 		}
 

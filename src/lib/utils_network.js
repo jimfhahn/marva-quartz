@@ -15,11 +15,8 @@ const utilsNetwork = {
         'http://www.w3.org/2000/01/rdf-schema#label'
     ],
 
-
-    // a cache to keep previosuly requested vocabularies and lookups in memory for use again
     lookupLibrary : {},
 
-    //Controllers to manage searches
     controllers: {
       "controllerNames": new AbortController(),
       "controllerNamesSubdivision": new AbortController(),
@@ -88,7 +85,6 @@ const utilsNetwork = {
         let dataProcessed = {
 
 
-            // all the URIs will live here but also the metadata obj about the uris
             metadata : {
                 uri: parentURI,
                 values: {}
@@ -97,15 +93,10 @@ const utilsNetwork = {
         }
 
         if (Array.isArray(data)){
-            // basic ID simple Lookup response
-            // assume anything in this array is a possible value except
-            // something that has the parent URI
 
             data.forEach((d)=>{
                 let label = null
-                let labelData = null                // it has a URI and that URI is not the parent uri
-                // assume it is one of the values we want
-                // also skip any blank nodes
+                let labelData = null                
                 if (d['@id'] && d['@id'] != parentURI && !d['@id'].includes('_:') ){
 
                     this.possibleLabelURIs.forEach((labelURI)=>{
@@ -400,9 +391,6 @@ const utilsNetwork = {
 
         let urlTemplate = searchPayload.url
 
-        // console.log("######################################")
-        // console.log("url ", urlTemplate)
-
         if (!Array.isArray(urlTemplate)){
             urlTemplate=[urlTemplate]
         }
@@ -427,14 +415,14 @@ const utilsNetwork = {
 
             // kind of hack, change to the public endpoint if we are in dev or public mode
             if (returnUrls.dev || returnUrls.publicEndpoints){
-              url = url.replace('http://preprod.id.','https://id.')
-              url = url.replace('https://preprod-8230.id.loc.gov','https://id.loc.gov')
+              url = url.replace('http://id.','https://id.')
+              url = url.replace('https://id.loc.gov','https://id.loc.gov')
               url = url.replace('https://test-8080.id.lctl.gov','https://id.loc.gov')
-              url = url.replace('https://preprod-8080.id.loc.gov','https://id.loc.gov')
-              url = url.replace('https://preprod-8080.id.loc.gov','https://id.loc.gov')
-              url = url.replace('https://preprod-8288.id.loc.gov','https://id.loc.gov')
+              url = url.replace('https://id.loc.gov','https://id.loc.gov')
+              url = url.replace('https://id.loc.gov','https://id.loc.gov')
+              url = url.replace('https://id.loc.gov','https://id.loc.gov')
             } else { // if it's not dev or public make sure we're using 8080
-              url = url.replace('https://id.loc.gov', 'https://preprod-8080.id.loc.gov')
+              url = url.replace('https://id.loc.gov', 'https://id.loc.gov')
             }
 
 
@@ -492,21 +480,6 @@ const utilsNetwork = {
                 }
 
 
-                // Old suggest service below
-
-                // let labels = r[1]
-                // let uris = r[3]
-                // for (let i = 0; i <= labels.length; i++) {
-                //   if (uris[i]!= undefined){
-                //       results.push({
-                //         label: labels[i],
-                //         uri: uris[i],
-                //         extra: ''
-
-                //       })
-                //   }
-                // }
-
             }else if (r.search && searchPayload.processor == 'wikidataAPI'){
 
                 for (let hit of r.search){
@@ -521,9 +494,6 @@ const utilsNetwork = {
 
         }
 
-        // always add in the literal they searched for at the end
-        // if it is not a hub or work
-
         if (!searchPayload.url[0].includes('/works/') && !searchPayload.url[0].includes('/hubs/')){
           results.push({
             label: searchPayload.searchValue,
@@ -533,13 +503,9 @@ const utilsNetwork = {
           })
         }
 
-        // console.log(results,"<results")
         return results
 
     },
-
-
-
 
     /**
     * What is returned from the context request
@@ -614,8 +580,8 @@ const utilsNetwork = {
           //if we are in production use preprod
           // if (returnUrls.env == 'production' && jsonuri.includes("authorities/names")){
             if (returnUrls.env == 'production'){
-            jsonuri = jsonuri.replace('http://id.', 'https://preprod-8080.id.')
-            jsonuri = jsonuri.replace('https://id.', 'https://preprod-8080.id.')
+            jsonuri = jsonuri.replace('http://id.', 'https://id.')
+            jsonuri = jsonuri.replace('https://id.', 'https://id.')
           }
 
           // rewrite the url to the config if we are using staging
@@ -636,11 +602,11 @@ const utilsNetwork = {
           // unless we are in a dev or public mode
 
           if (returnUrls.dev || returnUrls.publicEndpoints){
-            jsonuri = jsonuri.replace('http://preprod.id.','https://id.')
-            jsonuri = jsonuri.replace('https://preprod-8230.id.loc.gov','https://id.loc.gov')
+            jsonuri = jsonuri.replace('http://id.','https://id.')
+            jsonuri = jsonuri.replace('https://id.loc.gov','https://id.loc.gov')
             jsonuri = jsonuri.replace('https://test-8080.id.lctl.gov','https://id.loc.gov')
-            jsonuri = jsonuri.replace('https://preprod-8080.id.loc.gov','https://id.loc.gov')
-            jsonuri = jsonuri.replace('https://preprod-8288.id.loc.gov','https://id.loc.gov')
+            jsonuri = jsonuri.replace('https://id.loc.gov','https://id.loc.gov')
+            jsonuri = jsonuri.replace('https://id.loc.gov','https://id.loc.gov')
           }
 
 
@@ -648,12 +614,14 @@ const utilsNetwork = {
           if (jsonuri.includes('gpo_') && jsonuri.includes('preprod') ){
             jsonuri = jsonuri.replace('8080','8295')
             jsonuri = jsonuri.replace('8230','8295')
-            jsonuri = jsonuri.replace('https://id.','https://preprod-8295.id.')
+            jsonuri = jsonuri.replace('https://id.','https://id.')
           }
 
 
           jsonuri = jsonuri.replace('http://','https://')
 
+          // wrap the URL with the conversion function
+          jsonuri = this.convertToRegionUrl ? this.convertToRegionUrl(jsonuri) : jsonuri;
           
           try{
             let response = await fetch(jsonuri);
@@ -663,7 +631,6 @@ const utilsNetwork = {
           }catch(err){
             console.error(err);
 
-            // Handle errors here
           }
 
 
@@ -688,15 +655,6 @@ const utilsNetwork = {
         results.type = 'Hub'
         results.typeFull='http://id.loc.gov/ontologies/bibframe/Hub'
       }
-
-
-
-
-      // let nodeLookup = {}
-
-      // for (let key in data){
-
-      // }
 
 
       let instances = []
@@ -736,24 +694,24 @@ const utilsNetwork = {
                   let url = i['@id']
 
                   if (url.includes('gpo_')  ){
-                    url = url.replace('https://id.','https://preprod-8295.id.')
-                    url = url.replace('http://id.','http://preprod-8295.id.')
+                    url = url.replace('https://id.','https://id.')
+                    url = url.replace('http://id.','http://id.')
                   }
 
                   if (url.includes('/instances/') || url.includes('/works/') || url.includes('/hubs/')){
                     if (returnUrls.env === 'production'){
-                      url = url.replace('https://id.','https://preprod-8080.id.')
-                      url = url.replace('http://id.','http://preprod-8080.id.')
+                      url = url.replace('https://id.','https://id.')
+                      url = url.replace('http://id.','http://id.')
                     }
                   }
 
                   if (returnUrls.dev || returnUrls.publicEndpoints){
-                    url = url.replace('http://preprod.id.','https://id.')
-                    url = url.replace('https://preprod-8230.id.loc.gov','https://id.loc.gov')
+                    url = url.replace('http://id.','https://id.')
+                    url = url.replace('https://id.loc.gov','https://id.loc.gov')
                     url = url.replace('https://test-8080.id.lctl.gov','https://id.loc.gov')
-                    url = url.replace('https://preprod-8080.id.loc.gov','https://id.loc.gov')
-                    url = url.replace('http://preprod-8080.id.loc.gov','https://id.loc.gov')
-                    url = url.replace('https://preprod-8288.id.loc.gov','https://id.loc.gov')
+                    url = url.replace('https://id.loc.gov','https://id.loc.gov')
+                    url = url.replace('http://id.loc.gov','https://id.loc.gov')
+                    url = url.replace('https://id.loc.gov','https://id.loc.gov')
                   }
 
 
@@ -788,7 +746,6 @@ const utilsNetwork = {
 
 
 
-                  // https://id.loc.gov/resources/instances/18109312.nt
 
                 }
 
@@ -844,7 +801,7 @@ const utilsNetwork = {
     * @return {array} - An array of {@link contextResult} results
     */
     extractContextData: function(data){
-      data.uri = data.uri.replace("https://preprod-8080.", "http://id.loc.gov/")
+      data.uri = data.uri.replace("https://id.loc.gov", "http://id.loc.gov/")
 
           var results = {
             contextValue: true,
@@ -1051,7 +1008,6 @@ const utilsNetwork = {
 
                   }else if (uri.includes('id.loc.gov')){
 
-                    // just add the uri slug if it is a ID uri, we don't want to look up in real time
                     let slug = uri.split('/').slice(-1)[0]
                     if (results.nodeMap[k].indexOf(slug)==-1){
                       results.nodeMap[k].push(slug)
@@ -1060,7 +1016,6 @@ const utilsNetwork = {
                 })
               })
             })
-            //Make sure to maintain the source order
             let sourceOrder = []
             data.forEach((n) => {
               if (n["http://www.loc.gov/mads/rdf/v1#hasSource"]){
@@ -1069,7 +1024,6 @@ const utilsNetwork = {
             })
 
             results.source = sourceOrder
-            // populate with the sourceOrder, this will allow .splice() to insert citation in the right place
 
             data.forEach((n)=>{
               var variant = '';
@@ -1104,29 +1058,15 @@ const utilsNetwork = {
                 sourceId = n["@id"]
               }
 
-
-
               if (n['http://www.loc.gov/mads/rdf/v1#variantLabel']) {
                 variant = variant + n['http://www.loc.gov/mads/rdf/v1#variantLabel'].map(function (v) { return v['@value'] + ' '; })
               }
 
-              // if (n['http://www.w3.org/2000/01/rdf-schema#seeAlso']) {
-              //   seeAlso = seeAlso + n['http://www.w3.org/2000/01/rdf-schema#seeAlso'].map(function (v) { return v['@value'] + ' '; })
-              // }
-
-
-
-
               if (n['@id'] && n['@id'] == data.uri && n['http://www.loc.gov/mads/rdf/v1#authoritativeLabel']){
-                // don't mush them together anymore add them along with their lang value
-                // title = title + n['http://www.loc.gov/mads/rdf/v1#authoritativeLabel'].map(function (v) { return v['@value'] + ' '; })
-                // console.log(n['http://www.loc.gov/mads/rdf/v1#authoritativeLabel'])
+            
                 title = JSON.parse(JSON.stringify(n['http://www.loc.gov/mads/rdf/v1#authoritativeLabel']))
               }
               if (n['@id'] && n['@id'] == data.uri && n['http://id.loc.gov/ontologies/bflc/marcKey']){
-                // don't mush them together anymore add them along with their lang value
-                // title = title + n['http://www.loc.gov/mads/rdf/v1#authoritativeLabel'].map(function (v) { return v['@value'] + ' '; })
-                // console.log(n['http://www.loc.gov/mads/rdf/v1#authoritativeLabel'])
                 marcKey = JSON.parse(JSON.stringify(n['http://id.loc.gov/ontologies/bflc/marcKey']))
               }
 
@@ -1241,16 +1181,6 @@ const utilsNetwork = {
       }else if (type == 'http://id.loc.gov/ontologies/bibframe/Instance') {
         rdftype = 'Instance';
       }
-
-
-
-
-
-
-
-
-
-
       return rdftype;
     },
 
@@ -1277,7 +1207,6 @@ const utilsNetwork = {
         }
         return r
     },
-
 
 
     /**
@@ -1456,7 +1385,6 @@ const utilsNetwork = {
 
       }
 
-      // the complex heading is just xyz--abc--mnl used to see if the full heading is already authorized
       let complexHeading = headings.map((r)=>{ return r.label }).join('--')
       let subjectUrlComplex = useConfigStore().lookupConfig['http://id.loc.gov/authorities/subjects'].modes[0]['LCSH All'].url.replace('<QUERY>',complexHeading).replace('&count=25','&count=5').replace("<OFFSET>", "1")+'&rdftype=ComplexType'
       let searchPayloadSubjectsComplex = {
@@ -1468,7 +1396,6 @@ const utilsNetwork = {
       for (let heading of headings){
 
         let foundHeading = false
-        // console.log("---------------------\n",heading,"\n------------------------\n")
 
         // if after the first loop looking at the piramry if it hits a full authorized complex stop looping
         if (result && result.resultType && result.resultType=='COMPLEX'){
@@ -1481,22 +1408,22 @@ const utilsNetwork = {
 
         // we'll define all this for each one but not nessisarly use all of them
 
-        let namesUrl = useConfigStore().lookupConfig['http://preprod.id.loc.gov/authorities/names'].modes[0]['NAF All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")
-        let namesUrlSubdivision = useConfigStore().lookupConfig['http://preprod.id.loc.gov/authorities/names'].modes[0]['NAF All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")+'&memberOf=http://id.loc.gov/authorities/subjects/collection_Subdivisions'
+        let namesUrl = useConfigStore().lookupConfig['http://id.loc.gov/authorities/names'].modes[0]['NAF All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")
+        let namesUrlSubdivision = useConfigStore().lookupConfig['http://id.loc.gov/authorities/names'].modes[0]['NAF All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")+'&memberOf=http://id.loc.gov/authorities/subjects/collection_Subdivisions'
 
         let subjectUrlSimple = useConfigStore().lookupConfig['http://id.loc.gov/authorities/subjects'].modes[0]['LCSH All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")+'&rdftype=SimpleType'
         let subjectUrlSimpleSubdivison = useConfigStore().lookupConfig['http://id.loc.gov/authorities/subjects'].modes[0]['LCSH All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")+'&rdftype=SimpleType&memberOf=http://id.loc.gov/authorities/subjects/collection_Subdivisions'
         let subjectUrlTemporal = useConfigStore().lookupConfig['http://id.loc.gov/authorities/subjects'].modes[0]['LCSH All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")+'&memberOf=http://id.loc.gov/authorities/subjects/collection_TemporalSubdivisions'
         let subjectUrlGenre = useConfigStore().lookupConfig['http://id.loc.gov/authorities/subjects'].modes[0]['LCSH All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")+'&rdftype=GenreForm'
 
-        let worksUrlAnchored = useConfigStore().lookupConfig['https://preprod-8080.id.loc.gov/resources/works'].modes[0]['Works - Left Anchored'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")
-        let hubsUrlAnchored = useConfigStore().lookupConfig['https://preprod-8080.id.loc.gov/resources/works'].modes[0]['Hubs - Left Anchored'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")
+        let worksUrlAnchored = useConfigStore().lookupConfig['https://id.loc.gov/resources/works'].modes[0]['Works - Left Anchored'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")
+        let hubsUrlAnchored = useConfigStore().lookupConfig['https://id.loc.gov/resources/works'].modes[0]['Hubs - Left Anchored'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")
 
         let subjectUrlHierarchicalGeographic = useConfigStore().lookupConfig['HierarchicalGeographic'].modes[0]['All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")
         let subjectUrlHierarchicalGeographicLCSH = useConfigStore().lookupConfig['http://id.loc.gov/authorities/subjects'].modes[0]['LCSH All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")+ '&rdftype=HierarchicalGeographic'
 
         let subjectUrlGeographicLCSH = useConfigStore().lookupConfig['http://id.loc.gov/authorities/subjects'].modes[0]['LCSH All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")+'&rdftype=Geographic&memberOf=http://id.loc.gov/authorities/subjects/collection_Subdivisions'
-        let subjectUrlGeographicLCNAF = useConfigStore().lookupConfig['http://preprod.id.loc.gov/authorities/names'].modes[0]['NAF All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")+'&rdftype=Geographic&memberOf=http://id.loc.gov/authorities/subjects/collection_Subdivisions'
+        let subjectUrlGeographicLCNAF = useConfigStore().lookupConfig['http://id.loc.gov/authorities/names'].modes[0]['NAF All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")+'&rdftype=Geographic&memberOf=http://id.loc.gov/authorities/subjects/collection_Subdivisions'
 
         let subjectChildren = useConfigStore().lookupConfig['http://id.loc.gov/authorities/childrensSubjects'].modes[0]['LCSHAC All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")
         let childrenSubjectSubdivision = useConfigStore().lookupConfig['http://id.loc.gov/authorities/childrensSubjects'].modes[0]['LCSHAC All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=4').replace("<OFFSET>", "1")+'&memberOf=http://id.loc.gov/authorities/subjects/collection_Subdivisions'
@@ -1679,18 +1606,6 @@ const utilsNetwork = {
           resultsExactName = resultsExactName.filter((term) =>  Object.keys(term).includes("suggestLabel") )
           resultsExactSubject = resultsExactSubject.filter((term) =>  Object.keys(term).includes("suggestLabel") )
 
-          // console.log("Yeeth")
-          // console.log("resultsNames",resultsNames)
-          // console.log("resultsSubjectsSimple",resultsSubjectsSimple)
-          // console.log("resultsPayloadSubjectsSimpleSubdivision",resultsPayloadSubjectsSimpleSubdivision)
-          // console.log("resultsSubjectsComplex",resultsSubjectsComplex)
-          // console.log("resultsHierarchicalGeographic",resultsHierarchicalGeographic)
-          // console.log("resultsWorksAnchored",resultsWorksAnchored)
-          // console.log("resultsHubsAnchored",resultsHubsAnchored)
-
-          // first see if we matched the whole thing
-          // console.log("resultsSubjectsComplex",resultsSubjectsComplex)
-          // console.log("heading",heading)
           if (resultsSubjectsComplex.length>0){
             for (let r of resultsSubjectsComplex){
               // console.log("r ",r)
@@ -1705,18 +1620,6 @@ const utilsNetwork = {
             }
             if (foundHeading){ break }
           }
-
-
-          // // if not see if we matched a LCNAF for the first part
-          // if (resultsNames.length>0){
-          //   for (let r of resultsNames){
-          //     if (heading.label.toLowerCase().trim() == r.label.toLowerCase().trim()){
-          //       result.resultType = 'PRECOORD-LCNAF'
-          //       result.hit = r
-          //     }
-          //   }
-          //   if (result.resultType=='COMPLEX'){ break }
-          // }
 
 
           // remove any sub divisions from the main one
@@ -2260,8 +2163,8 @@ const utilsNetwork = {
 
 
       this.subjectSearchActive = true
-      let namesUrl = useConfigStore().lookupConfig['http://preprod.id.loc.gov/authorities/names'].modes[0]['NAF All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count='+numResultsNames).replace("<OFFSET>", "1")+'&memberOf=http://id.loc.gov/authorities/names/collection_NamesAuthorizedHeadings'
-      let namesUrlSubdivision = useConfigStore().lookupConfig['http://preprod.id.loc.gov/authorities/names'].modes[0]['NAF All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")+'&memberOf=http://id.loc.gov/authorities/subjects/collection_Subdivisions'
+      let namesUrl = useConfigStore().lookupConfig['http://id.loc.gov/authorities/names'].modes[0]['NAF All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count='+numResultsNames).replace("<OFFSET>", "1")+'&memberOf=http://id.loc.gov/authorities/names/collection_NamesAuthorizedHeadings'
+      let namesUrlSubdivision = useConfigStore().lookupConfig['http://id.loc.gov/authorities/names'].modes[0]['NAF All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")+'&memberOf=http://id.loc.gov/authorities/subjects/collection_Subdivisions'
 
       let subjectUrlComplex = useConfigStore().lookupConfig['http://id.loc.gov/authorities/subjects'].modes[0]['LCSH All'].url.replace('<QUERY>',complexVal).replace('&count=25','&count='+numResultsComplex).replace("<OFFSET>", "1")+'&rdftype=ComplexType'+'&memberOf=http://id.loc.gov/authorities/subjects/collection_LCSHAuthorizedHeadings'
       let subjectUrlSimple = useConfigStore().lookupConfig['http://id.loc.gov/authorities/subjects'].modes[0]['LCSH All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count='+numResultsSimple).replace("<OFFSET>", "1")+'&rdftype=SimpleType'+'&memberOf=http://id.loc.gov/authorities/subjects/collection_LCSHAuthorizedHeadings'
@@ -2269,11 +2172,11 @@ const utilsNetwork = {
       let subjectUrlTemporal = useConfigStore().lookupConfig['http://id.loc.gov/authorities/subjects'].modes[0]['LCSH All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")+'&memberOf=http://id.loc.gov/authorities/subjects/collection_TemporalSubdivisions'
       let subjectUrlGenre = useConfigStore().lookupConfig['http://id.loc.gov/authorities/subjects'].modes[0]['LCSH All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")+'&rdftype=GenreForm'
 
-      let worksUrlKeyword = useConfigStore().lookupConfig['https://preprod-8080.id.loc.gov/resources/works'].modes[0]['Works - Keyword'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")
-      let worksUrlAnchored = useConfigStore().lookupConfig['https://preprod-8080.id.loc.gov/resources/works'].modes[0]['Works - Left Anchored'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")
+      let worksUrlKeyword = useConfigStore().lookupConfig['https://id.loc.gov/resources/works'].modes[0]['Works - Keyword'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")
+      let worksUrlAnchored = useConfigStore().lookupConfig['https://id.loc.gov/resources/works'].modes[0]['Works - Left Anchored'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")
 
-      let hubsUrlKeyword = useConfigStore().lookupConfig['https://preprod-8080.id.loc.gov/resources/works'].modes[0]['Hubs - Keyword'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")
-      let hubsUrlAnchored = useConfigStore().lookupConfig['https://preprod-8080.id.loc.gov/resources/works'].modes[0]['Hubs - Left Anchored'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")
+      let hubsUrlKeyword = useConfigStore().lookupConfig['https://id.loc.gov/resources/works'].modes[0]['Hubs - Keyword'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")
+      let hubsUrlAnchored = useConfigStore().lookupConfig['https://id.loc.gov/resources/works'].modes[0]['Hubs - Left Anchored'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")
 
       let childrenSubject = useConfigStore().lookupConfig['http://id.loc.gov/authorities/childrensSubjects'].modes[0]['LCSHAC All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count='+numResultsCyac).replace("<OFFSET>", "1")+'&-memberOf=http://id.loc.gov/authorities/subjects/collection_Subdivisions'
       let childrenSubjectComplex = useConfigStore().lookupConfig['http://id.loc.gov/authorities/childrensSubjects'].modes[0]['LCSHAC All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count='+numResultsCyac).replace("<OFFSET>", "1")+'&rdftype=ComplexType'
@@ -2517,16 +2420,6 @@ const utilsNetwork = {
         }
       }
       resultsHierarchicalGeographic = newresultsHierarchicalGeographic
-      // resultsHierarchicalGeographic = [{
-      //     "label": "Ohio--Cleveland",
-      //     "suggestLabel": "Ohio--Cleveland",
-      //     "uri": "http://id.loc.gov/authorities/names/n79086863",
-      //     "literal": false,
-      //     "extra": "",
-      //     "labelOrginal": "Ohio--Cleveland",
-      //     "picked": false
-      // }]
-
 
       if (mode == "WORKS"){
         // over write the subjects if we are doing a work search
@@ -2610,10 +2503,10 @@ const utilsNetwork = {
       })
       // .then(data => console.log(data)) // Manipulate the data retrieved back, if we want to do something with it
       .catch((err) => {
-       console.log(err, " => ", url)
-       alert("Error: Could not save the record!", err)
+        console.log(err, " => ", url)
+        alert("Error: Could not save the record!", err)
       }) // Do something with the error
-     },
+      },
 
     /**
     * Retrive the UNPOSTED record from the back end
@@ -2624,29 +2517,29 @@ const utilsNetwork = {
     */
     loadSavedRecord: async function(id) {
 
-       let url = useConfigStore().returnUrls.ldpjs +'ldp/' + id
+      let url = useConfigStore().returnUrls.ldpjs +'ldp/' + id
 
        // let options = {}
        // if (json){
        //   options = {headers: {'Content-Type': 'application/json', 'Accept': 'application/json'}, mode: "cors"}
        // }
        // console.log('options:',options)
-       try{
-         let response = await fetch(url);
+      try{
+        let response = await fetch(url);
 
-         let data =  await response.text()
+        let data =  await response.text()
 
-         return  data;
+        return  data;
 
-       }catch(err){
+      }catch(err){
          //alert("There was an error retriving the record from:",url)
-         console.error(err);
+        console.error(err);
 
          // Handle errors here
-       }
-     },
+      }
+    },
 
-     searchSavedRecords: async function(user,search){
+    searchSavedRecords: async function(user,search){
 
       let utilUrl = useConfigStore().returnUrls.util
       let utilPath = useConfigStore().returnUrls.env
@@ -2739,6 +2632,12 @@ const utilsNetwork = {
     if (!profile || !profile.eId) {
       throw new Error('Profile or EID is not defined');
     }
+    
+    // If the eId starts with "e", override publishUrl to quartz domain
+    if (profile.eId.startsWith('e')) {
+      publishUrl = "https://quartz.bibframe.app/api-staging/ldp/" + profile.eId;
+    }
+    
     let uuid = translator.toUUID(translator.new());
     const rawResponse = await fetch(publishUrl, {
       method: 'POST',
@@ -2772,208 +2671,62 @@ const utilsNetwork = {
     searchInstanceByLCCN: async function(lccn){
       lccn = lccn.replaceAll(' ','')
 
-      // ID needs the lccn to have a space between letters and the numbers
-      // If there isn't one, make the adjustment
-      const re = /^[a-z]{2}/g          // not sure if it's only every 2 characters
+      // Ensure a space between letters and numbers
+      const re = /^[a-z]{2}/g
       const found = lccn.match(re)
       if (found != null){
         lccn = lccn.slice(0,2) + " " + lccn.slice(2)
       }
 
       try{
-        let req = await fetch(useConfigStore().returnUrls.id + `resources/instances/suggest2?q=${lccn}&searchtype=keyword&nocache=${Date.now()}` )
-        let results = await req.json()
-
-        let returnVal = []
-
+        let req = await fetch(useConfigStore().returnUrls.id + 
+          `resources/instances/suggest2?q=${lccn}&searchtype=keyword&nocache=${Date.now()}`);
+        let results = await req.json();
+        let returnVal = [];
         for (let r of results.hits){
-
-          let bfdbPackageURL = useConfigStore().returnUrls.bfdb + r.uri.split('id.loc.gov/')[1] + '.convertedit-pkg.xml'
-
-          if (useConfigStore().returnUrls.publicEndpoints){
-            bfdbPackageURL = useConfigStore().returnUrls.id + r.uri.split('id.loc.gov/')[1] + '.cbd.rdf'
-          }
-
+          let idPart = r.uri.split('id.loc.gov/')[1];
+          // If the idPart starts with "e", use the quartz endpoint
+          let resourceURL = idPart.startsWith('e')
+            ? useConfigStore().returnUrls.bfdb + idPart
+            : useConfigStore().returnUrls.id + idPart;
+          let bfdbPackageURL = useConfigStore().returnUrls.bfdb + idPart + '.convertedit-pkg.xml';
           returnVal.push({
             lccn: lccn,
             label: r.aLabel,
-            bfdbURL: useConfigStore().returnUrls.bfdb + r.uri.split('id.loc.gov/')[1],
-            idURL: useConfigStore().returnUrls.id + r.uri.split('id.loc.gov/')[1],
+            bfdbURL: useConfigStore().returnUrls.bfdb + idPart,
+            idURL: resourceURL,
+            resourceURL: resourceURL, // new property to use downstream
             bfdbPackageURL: bfdbPackageURL
-          })
-
+          });
         }
-
-
-        return returnVal
-
-
+        return returnVal;
       }catch{
-        return ["Error searching LCCN"]
+        return ["Error searching LCCN"];
       }
-
     },
-
     /**
-    * Request string transliteration via the backend scriptshifter API
-    * @async
-    * @param {string} lang - The scriptshifter language code
-    * @param {string} text - The string to send to scriptshifter
-    * @param {boolean} capitalize - ask to caplitalize all the words
-    * @param {string} t_dir - s2r or r2s, not both directions are supported for all languages
-    * @return {object|false} - the response from the service
+    * Take a url and rewrites it to match the url pattern for the current environment.
+    * If the identifier part (or eID) starts with "e" it will use the quartz domain.
+    * @param {string} url - the url to modify
+    * @return {string} - the modified url
     */
-    scriptShifterRequestTrans: async function(lang,text,capitalize,t_dir){
-
-            let url = useConfigStore().returnUrls.scriptshifter + 'trans'
-
-      let r = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json, text/plain, */*',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          lang: lang,
-          text:text,
-          capitalize:capitalize,
-          t_dir:t_dir
-        })
-
-      })
-
-      let results =  await r.text()
-      if (r.status !== 200){
-        alert(results)
-        return false
-      }else{
-
-        results = JSON.parse(results)
-
-        // capitalize the first char if that preference is set true
-        if (results.output){
-          if (usePreferenceStore().returnValue('--b-scriptshifter-capitalize-first-letter')){
-            results.output = results.output.charAt(0).toUpperCase() + results.output.slice(1);
-          }
+    convertToRegionUrl(url) {
+      let urls = this.returnUrls;
+      // Check if the url contains either http or https for id.loc.gov
+      if ((url.includes('/works/') || url.includes('/instances/') || url.includes('/items/') || url.includes('/hubs/')) &&
+          (url.includes('http://id.loc.gov') || url.includes('https://id.loc.gov'))) {
+        // Normalize to http for consistent processing
+        url = url.replace('https://', 'http://');
+        let idPart = url.split('id.loc.gov/')[1] || "";
+        if (idPart.startsWith('e')) {
+          // New records get the quartz domain (keeping https)
+          url = url.replace('http://id.loc.gov/', 'https://quartz.bibframe.app/');
+        } else {
+          // Otherwise, use the configured id domain.
+          url = url.replace('http://id.loc.gov/', urls.id);
         }
-        return results
       }
-
-
-    },
-
-
-    /**
-    * Do Shelflisting search against BFDB
-    *
-    * @param {string} search - the call number to search for
-    * @param {details} contributor - the data for contributor, title, subject, and date
-    * @param {string} dir - asc or desc
-    * @return {array} - results from API
-    */
-    searchShelfList: async function(search, details, dir){
-      if (!dir){
-        dir ='ascending'
-      }
-
-      let urlSearch = "lds/browse.xqy?bq=" + search +"&browse-order=" + dir + "&browse=class" + details + "&mime=json"
-
-      // try{
-        //let req = await fetch(useConfigStore().returnUrls.shelfListing + `browse/class/${dir}/${search}.json` )
-        let req = await fetch(useConfigStore().returnUrls.shelfListing + urlSearch )
-        let results = await req.json()
-
-        // let results = [{"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TF148%20C66%202016", "term":"TF148 C66 2016", "frequency":"", "creator":"", "title":"Trains", "pubdate":"2016", "subject":"Railroad trains--Juvenile literature", "altsubject":"Railroad trains"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TF148%20.A46%202021", "term":"TF148 .A46 2021", "frequency":"", "creator":"", "title":"Listen up!", "pubdate":"2021", "subject":"Railroad trains--Juvenile literature", "altsubject":"Trains--Ouvrages pour la jeunesse"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TF148%20.A47%201983", "term":"TF148 .A47 1983", "frequency":"", "creator":"", "title":"Going on a train", "pubdate":"1983", "subject":"Railroads--Juvenile literature", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TF148%20.A5%201993", "term":"TF148 .A5 1993", "frequency":"", "creator":"", "title":"Trains at work", "pubdate":"1993", "subject":"Railroads--Juvenile literature", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TF148%20.B24%201999", "term":"TF148 .B24 1999", "frequency":"", "creator":"", "title":"The best book of trains", "pubdate":"1999", "subject":"Railroad trains--Juvenile literature", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TF148%20.B26%201998", "term":"TF148 .B26 1998", "frequency":"", "creator":"", "title":"Amazing trains", "pubdate":"1998", "subject":"Railroads--Juvenile literature", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TF148%20.B27%201986", "term":"TF148 .B27 1986", "frequency":"", "creator":"", "title":"Trains", "pubdate":"1986", "subject":"Railroads--Juvenile literature", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TF148%20.B3%201949", "term":"TF148 .B3 1949", "frequency":"", "creator":"", "title":"A book of trains", "pubdate":"1949", "subject":"Railroads--Juvenile literature", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TF148%20.B45%201984", "term":"TF148 .B45 1984", "frequency":"", "creator":"", "title":"Amazing trains of the world", "pubdate":"1984", "subject":"Railroads--Juvenile literature", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TF148%20.B4594%202018", "term":"TF148 .B4594 2018", "frequency":"", "creator":"", "title":"Trains", "pubdate":"2017", "subject":"Railroad trains--Juvenile literature", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TF148%20.B48%201990", "term":"TF148 .B48 1990", "frequency":"", "creator":"", "title":"The train book", "pubdate":"1990", "subject":"Railroads--Juvenile literature", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TF148%20.B49%201998", "term":"TF148 .B49 1998", "frequency":"", "creator":"", "title":"Big book of trains", "pubdate":"1998", "subject":"Railroad trains--Juvenile literature", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TF148%20.B49%202016", "term":"TF148 .B49 2016", "frequency":"", "creator":"", "title":"The big book of trains", "pubdate":"2016", "subject":"Locomotives--Juvenile literature", "altsubject":"Railroad trains--Juvenile literature"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TF148%20.B55", "term":"TF148 .B55", "frequency":"", "creator":"", "title":"Great trains of the world", "pubdate":"1953", "subject":"Railroads--Juvenile literature", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TF148%20.B69%201995", "term":"TF148 .B69 1995", "frequency":"", "creator":"", "title":"Trains", "pubdate":"1995", "subject":"Railroads--Juvenile literature", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TF148%20.B692%202017", "term":"TF148 .B692 2017", "frequency":"", "creator":"", "title":"Trains", "pubdate":"2017", "subject":"Railroad trains--Juvenile literature", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TF148%20.B693%202003", "term":"TF148 .B693 2003", "frequency":"", "creator":"", "title":"Railroading", "pubdate":"2003", "subject":"Railroads--Juvenile literature", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TF148%20.B696%201996", "term":"TF148 .B696 1996", "frequency":"", "creator":"", "title":"Freight trains", "pubdate":"1996", "subject":"Railroads--Juvenile literature", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TF148%20.B7", "term":"TF148 .B7", "frequency":"", "creator":"", "title":"Richard learns about railroading", "pubdate":"1969", "subject":"Railroads--Juvenile literature", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TF148%20.B717%202016", "term":"TF148 .B717 2016", "frequency":"", "creator":"", "title":"Rolling down the Avenue", "pubdate":"2016", "subject":"Street-railroads--Juvenile literature", "altsubject":""}]
-        // results = [{"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TT820%20H316%202005", "term":"TT820 H316 2005", "frequency":"", "creator":"", "title":"Decorative knitting", "pubdate":"2005", "subject":"Knitting", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TT820%20H813145%202008", "term":"TT820 H813145 2008", "frequency":"", "creator":"", "title":"Knit aid", "pubdate":"2008", "subject":"Knitting", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TT820%20.A115%201991", "term":"TT820 .A115 1991", "frequency":"", "creator":"", "title":"42 favorite crochet motifs", "pubdate":"1992", "subject":"Crocheting--Patterns", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TT820%20.A1155%202023", "term":"TT820 .A1155 2023", "frequency":"", "creator":"", "title":"60 quick crochet projects for beginners", "pubdate":"2023", "subject":"Crocheting--Patterns", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TT820%20.A1156%202024", "term":"TT820 .A1156 2024", "frequency":"", "creator":"", "title":"60 quick granny squares", "pubdate":"2024", "subject":"Crocheting--Patterns", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TT820%20.A1158%202012", "term":"TT820 .A1158 2012", "frequency":"", "creator":"", "title":"101 crochet stitch patterns & edgings", "pubdate":"2012", "subject":"Crocheting", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TT820%20.A116%202002", "term":"TT820 .A116 2002", "frequency":"", "creator":"", "title":"101 double-ended hook stitches", "pubdate":"2002", "subject":"Crocheting--Patterns", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TT820%20.A117%201996", "term":"TT820 .A117 1996", "frequency":"", "creator":"", "title":"101 fun-to-crochet projects", "pubdate":"1996", "subject":"Crocheting--Patterns", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TT820%20.A119%201995", "term":"TT820 .A119 1995", "frequency":"", "creator":"", "title":"150 favorite crochet designs", "pubdate":"1995", "subject":"Crocheting--Patterns", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TT820%20.A11912%202017", "term":"TT820 .A11912 2017", "frequency":"", "creator":"", "title":"200 fun things to crochet", "pubdate":"2017", "subject":"Crocheting--Patterns", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TT820%20.A11913%202017", "term":"TT820 .A11913 2017", "frequency":"", "creator":"", "title":"200 fun things to knit", "pubdate":"2017", "subject":"Knitting--Patterns", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TT820%20.A1194%202015", "term":"TT820 .A1194 2015", "frequency":"", "creator":"", "title":"500 crochet stitches", "pubdate":"2015", "subject":"Crocheting--Technique", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TT820%20.A1196%202008", "term":"TT820 .A1196 2008", "frequency":"", "creator":"", "title":"A to Z of crochet", "pubdate":"2008", "subject":"Crocheting", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TT820%20.A11968%202009", "term":"TT820 .A11968 2009", "frequency":"", "creator":"", "title":"A to Z of knitting", "pubdate":"2009", "subject":"Knitting--Handbooks, manuals, etc.", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TT820%20.A1197%202020", "term":"TT820 .A1197 2020", "frequency":"", "creator":"", "title":"A-Z of knitting", "pubdate":"2020", "subject":"Knitting", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TT820%20.A19", "term":"TT820 .A19", "frequency":"", "creator":"", "title":"The complete book of knitting", "pubdate":"1971", "subject":"Knitting", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TT820%20.A33%202019", "term":"TT820 .A33 2019", "frequency":"", "creator":"", "title":"Fair Isle mittens", "pubdate":"2019", "subject":"Crocheting", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TT820%20.A42%202007", "term":"TT820 .A42 2007", "frequency":"", "creator":"", "title":"The natural knitter", "pubdate":"2007", "subject":"Knitting", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TT820%20.A48", "term":"TT820 .A48", "frequency":"", "creator":"", "title":"Le Tricot", "pubdate":"1977", "subject":"Knitting", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TT820%20.A5149%202020", "term":"TT820 .A5149 2020", "frequency":"", "creator":"", "title":"Knitting & crocheting all-in-one", "pubdate":"2020", "subject":"Knitting--Patterns", "altsubject":""}]
-        // let results = [{"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=G3762.B495%201998%20.U5", "term":"G3762.B495 1998 .U5", "frequency":"", "creator":"", "title":"Blackstone River Valley National Heritage Corridor, Massachusetts/Rhode Island", "pubdate":"1998", "subject":"John H. Chafee Blackstone River Valley National Heritage Corridor (Mass. and R.I.)--Maps", "altsubject":"", "bibid":"5568980"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=G3762.B495%201999%20.U5", "term":"G3762.B495 1999 .U5", "frequency":"", "creator":"", "title":"Blackstone River Valley National Heritage Corridor, Massachusetts/Rhode Island", "pubdate":"1999", "subject":"John H. Chafee Blackstone River Valley National Heritage Corridor (Mass. and R.I.)--Maps", "altsubject":"", "bibid":"11797321"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=G3762.B495%202000%20.U5", "term":"G3762.B495 2000 .U5", "frequency":"", "creator":"", "title":"Blackstone River Valley National Heritage Corridor, Massachusetts, Rhode Island", "pubdate":"2000", "subject":"John H. Chafee Blackstone River Valley National Heritage Corridor (Mass. and R.I.)--Maps", "altsubject":"", "bibid":"19660525"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=G3762.B495%202003%20.U5", "term":"G3762.B495 2003 .U5", "frequency":"", "creator":"", "title":"Blackstone River Valley", "pubdate":"2003", "subject":"John H. Chafee Blackstone River Valley National Heritage Corridor (Mass. and R.I.)--Maps", "altsubject":"", "bibid":"19664821"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=G3762.B495%202004%20.U5", "term":"G3762.B495 2004 .U5", "frequency":"", "creator":"", "title":"Blackstone River Valley National Heritage Corridor, Massachusetts, Rhode Island", "pubdate":"2004", "subject":"John H. Chafee Blackstone River Valley National Heritage Corridor (Mass and R.I.)--Maps", "altsubject":"", "bibid":"19658722"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=G3762.B495%202006%20.U5", "term":"G3762.B495 2006 .U5", "frequency":"", "creator":"", "title":"Blackstone River Valley National Heritage Corridor, Massachusetts, Rhode Island", "pubdate":"2006", "subject":"John H. Chafee Blackstone River Valley National Heritage Corridor (Mass and R.I.)--Maps", "altsubject":"", "bibid":"19658918"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=G3762.B49P2%202004%20.A7", "term":"G3762.B49P2 2004 .A7", "frequency":"", "creator":"", "title":"Blackstone Valley, Massachusetts, street map", "pubdate":"2004", "subject":"Roads--Blackstone River Valley (Mass. and R.I.)--Maps", "altsubject":"", "bibid":"14274188"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=G3762.B4A5%201990%20.C3", "term":"G3762.B4A5 1990 .C3", "frequency":"", "creator":"", "title":"The Berkshires", "pubdate":"1990", "subject":"Berkshire Hills (Mass.)--Maps.", "altsubject":"", "bibid":"12770913"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=G3762.B4E63%201997%20.R8", "term":"G3762.B4E63 1997 .R8", "frequency":"", "creator":"", "title":"Western Massachusetts bicycle and road map, bed & breakfast guide", "pubdate":"1997", "subject":"Bicycle trails--Massachusetts--Berkshire Hills--Maps", "altsubject":"", "bibid":"5569084"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=G3762.B4E63%202004%20.R8", "term":"G3762.B4E63 2004 .R8", "frequency":"", "creator":"", "title":"Western Massachusetts road and bicycle map, bed & breakfast guide", "pubdate":"2004", "subject":"Bicycle trails--Massachusetts--Berkshire Hills--Maps", "altsubject":"", "bibid":"14637168"}, {"selected":"selected", "lookup":"", "term":"G3762.B4E635 1975 .G7", "frequency":"", "creator":"", "title":"The Berkshires", "pubdate":"1975", "subject":"Berkshire Hills (Mass.)--Maps.", "altsubject":"", "bibid":"5428687"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=G3762.B4E635%201978%20.G7", "term":"G3762.B4E635 1978 .G7", "frequency":"", "creator":"", "title":"Circle tours, the Berkshires", "pubdate":"1978", "subject":"Berkshire Hills, Mass.--Maps.", "altsubject":"", "bibid":"5445127"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=G3762.B4E635%201981%20.G7", "term":"G3762.B4E635 1981 .G7", "frequency":"", "creator":"", "title":"The Berkshires", "pubdate":"1981", "subject":"Berkshire Hills (Mass.)--Maps.", "altsubject":"", "bibid":"5463162"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=G3762.B4E635%202001%20.R4", "term":"G3762.B4E635 2001 .R4", "frequency":"", "creator":"", "title":"The best of Berkshires, Massachusetts, north County featuring Adams, North Adams, Pittsfield,...", "pubdate":"2000", "subject":"Berkshire Hills (Mass.)--Maps.", "altsubject":"", "bibid":"13816560"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=G3762.B4E635%202002%20.R4", "term":"G3762.B4E635 2002 .R4", "frequency":"", "creator":"", "title":"The best of Berkshires, Massachusetts, 2002", "pubdate":"2001", "subject":"Berkshire Hills (Mass.)--Maps.", "altsubject":"", "bibid":"13816576"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=G3762.B4E635%202004%20.R4", "term":"G3762.B4E635 2004 .R4", "frequency":"", "creator":"", "title":"The best of the Berkshires, Massachusetts, 2004", "pubdate":"2003", "subject":"Berkshire Hills (Mass.)--Maps.", "altsubject":"", "bibid":"13816614"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=G3762.B4E635%202005%20.R4", "term":"G3762.B4E635 2005 .R4", "frequency":"", "creator":"", "title":"The best of the Berkshires, Massachusetts, 2005", "pubdate":"2004", "subject":"Berkshire Hills (Mass.)--Maps.", "altsubject":"", "bibid":"13900397"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=G3762.B4E635%202006%20.R4", "term":"G3762.B4E635 2006 .R4", "frequency":"", "creator":"", "title":"The best of the Berkshires, Massachusetts, 2006", "pubdate":"2005", "subject":"Berkshire Hills (Mass.)--Maps.", "altsubject":"", "bibid":"14527448"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=G3762.B4E635%202007%20.R4", "term":"G3762.B4E635 2007 .R4", "frequency":"", "creator":"", "title":"The best of the Berkshires, Massachusetts, 2007", "pubdate":"2006", "subject":"Berkshire Hills (Mass.)--Maps.", "altsubject":"", "bibid":"15065556"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=G3762.B4E635%202009%20.R4", "term":"G3762.B4E635 2009 .R4", "frequency":"", "creator":"", "title":"The best of the Berkshires, Massachusetts, 2009", "pubdate":"2008", "subject":"Berkshire Hills (Mass.)--Maps.", "altsubject":"", "bibid":"15684452"}]
-
-        let selectedIndex = -1
-        let c = 0
-        for (let r of results){
-          r['lookup'] = useConfigStore().returnUrls.shelfListing.slice(0, -1) + r['lookup']
-          if (r.selected){
-            selectedIndex = c
-          }
-          c++
-        }
-        // selectedIndex = selectedIndex - 1
-        // if (selectedIndex > -1){
-        //   results.splice(selectedIndex, 0, {
-        //     term:'-----',
-        //     title:'Would Appear Here',
-        //     creator:'',
-        //     pubdate:"------",
-        //     lookup:'#'
-        //   })
-        // }
-
-
-
-
-
-        return results
-
-    },
-
-    sendErrorReportLog: function(log,filename,profileAsJson){
-
-      let url = useConfigStore().returnUrls.util + 'errorlog/'
-
-
-      fetch(url, {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          log: log,
-          filename:filename,
-          profile: profileAsJson
-        })
-      });
-
-
-    },
-
-
-
-    checkVersionOutOfDate: async function(){
-
-
-      let versionPath = (useConfigStore().returnUrls.env === 'production') ? 'version/editor' : 'version/editor/stage'
-
-      let url = useConfigStore().returnUrls.util + versionPath + "?blastdacache=" + Date.now()
-      let content
-
-      try{
-
-
-        const rawResponse = await fetch(url, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          },
-
-        });
-        content = await rawResponse.json();
-      }catch{
-        // if sometihng network goes wrong just say were not out of date
-        return false
-
-      }
-
-      let ourVer = useConfigStore().versionMajor + (useConfigStore().versionMinor * 0.1) + (useConfigStore().versionPatch* 0.01)
-      let curVer = content.major + (content.minor* 0.1) + (content.patch* 0.01)
-      console.log("ourVer:",ourVer,"curVer:",curVer)
-      if (ourVer < curVer){
-        return true
-      }else{
-        return false
-      }
-
-    },}
-
-
+      return url;
+    }
+};
 export default utilsNetwork;

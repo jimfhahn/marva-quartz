@@ -1,6 +1,10 @@
 import { defineStore } from 'pinia'
 import utilsNetwork from '@/lib/utils_network';
 
+function convertToRegionUrl(url) {
+    // Example conversion logic; adjust as needed
+    return url.replace("id.loc.gov", "region.loc.gov");
+}
 
 export const useConfigStore = defineStore('config', {
   state: () => ({
@@ -20,11 +24,11 @@ export const useConfigStore = defineStore('config', {
         publish: "https://quartz.bibframe.app/util/publish/staging",
         workpublish: "https://quartz.bibframe.app/util/publish/staging/work",
         instancepublish: "https://quartz.bibframe.app/util/publish/staging/instance",
-        bfdb: "https://id.loc.gov/",
+        bfdb: "https://quartz.bibframe.app/ldp/api-staging/",
         validate: 'https://bibframe.org/marva/util/validate',
-        profiles : 'profiles.json',
+        profiles : 'http://127.0.0.1:5173/profiles.json',
         starting : 'https://bibframe.org/marva/util/profiles/starting/prod',
-        id: 'https://id.loc.gov/',
+        id: convertToRegionUrl('https://id.loc.gov/'),
         env: "staging",
         publicEndpoints: true,
         displayLCOnlyFeatures: false
@@ -38,13 +42,10 @@ export const useConfigStore = defineStore('config', {
         scriptshifter: 'https://editor.id.loc.gov/bfe2/scriptshifter/',
         validate: 'https://preprod-3001.id.loc.gov/bfe2/util/validate',
         shelfListing: 'https://preprod-8230.id.loc.gov/',
-        // bfdb : 'https://preprod-8210.id.loc.gov/',
         bfdb : 'https://preprod-8300.id.loc.gov/',
         profiles : '/bfe2/util/profiles/profile/stage',
-        // profiles : '/bfe2/util/profiles/profile/prod',
-        // profiles: 'https://preprod-3001.id.loc.gov/api/listconfigs?where=index.resourceType:profile',
         starting : '/bfe2/util/profiles/starting/stage',
-        id: 'https://preprod-8288.id.loc.gov/',
+        id: convertToRegionUrl('https://preprod-8288.id.loc.gov/'),
         env : 'staging',
         displayLCOnlyFeatures: true,
 
@@ -60,12 +61,10 @@ export const useConfigStore = defineStore('config', {
         validate: 'https://editor.id.loc.gov/bfe2/util/validate',
         bfdb : 'https://preprod-8230.id.loc.gov/',
         bfdbGPO : 'https://preprod-8210.id.loc.gov/',
-        // profiles : 'https://editor.id.loc.gov/api/listconfigs?where=index.resourceType:profile',
-        // starting : 'https://editor.id.loc.gov/api/listconfigs?where=index.resourceType:startingPoints&where=index.label:config',
         profiles : '/bfe2/util/profiles/profile/prod',
         starting : '/bfe2/util/profiles/starting/prod',
 
-        id: 'https://preprod-8080.id.loc.gov/',
+        id: convertToRegionUrl('https://preprod-8080.id.loc.gov/'),
         env : 'production',
         displayLCOnlyFeatures: true,
       },
@@ -80,7 +79,7 @@ export const useConfigStore = defineStore('config', {
         bfdb : 'https://id.loc.gov/',
         profiles : 'https://bibframe.org/marva/util/profiles/profile/prod',
         starting : 'https://bibframe.org/marva/util/profiles/starting/prod',
-        id: 'https://id.loc.gov/',
+        id: convertToRegionUrl('https://id.loc.gov/'),
         env : 'production',
         publicEndpoints:true,
         displayLCOnlyFeatures: false
@@ -94,10 +93,10 @@ export const useConfigStore = defineStore('config', {
         publish: "https://quartz.bibframe.app/util/publish/staging",
         workpublish: "https://quartz.bibframe.app/util/publish/staging/work",
         instancepublish: "https://quartz.bibframe.app/util/publish/staging/instance",
-        bfdb: "https://id.loc.gov/",
+        bfdb: 'https://quartz.bibframe.app/ldp/api-staging/',
         profiles: "https://quartz.bibframe.app/assets/profiles.json",
         starting: "https://quartz.bibframe.app/assets/starting.json",
-        id: 'https://id.loc.gov/',
+        id: convertToRegionUrl('https://id.loc.gov/'),
         env: "staging",
         publicEndpoints: true,
         displayLCOnlyFeatures: true
@@ -119,11 +118,12 @@ export const useConfigStore = defineStore('config', {
   validTopLevelInstance: ':Instance',
   validTopLevelHub: ':Hub',
 
-  // the base URLS, used when building URIs for new resources
-  baseURIWork: 'http://id.loc.gov/resources/works/',
-  baseURIInstance: 'http://id.loc.gov/resources/instances/',
-  baseURIItem: 'http://id.loc.gov/resources/items/',
-  baseURIHub: 'http://id.loc.gov/resources/hubs/',
+// the base URLS, used when building URIs for new resources
+// Update these base URIs with the quartz.bibframe.app domain
+baseURIWork: 'https://quartz.bibframe.app/ldp/api-staging/works/',
+baseURIInstance: 'https://quartz.bibframe.app/ldp/api-staging/instances/',
+baseURIItem: 'https://quartz.bibframe.app/ldp/api-staging/items/',
+baseURIHub: 'https://quartz.bibframe.app/ldp/api-staging/hubs/',
 
 
   // this value goes into the admin metadata to tell BFDB what type of action to take, this value is when a new work instance is being created
@@ -1057,17 +1057,45 @@ export const useConfigStore = defineStore('config', {
   },
   actions: {
 
-    /**
-    * Take a url and rewrites it to match the url pattern of the current enviornment
-    * @param {string} url - the url to modfidfy
-    * @return {string} - the url modified to the match the env
-    */
+    // Updated conversion function: if the id part is purely numeric, assume imported and leave as id.loc.gov; otherwise, convert.
     convertToRegionUrl(url) {
-      let urls = this.returnUrls
-      if ((url.includes('/works/') || url.includes('/instances/') || url.includes('/items/') || url.includes('/hubs/') ) && url.includes('http://id.loc.gov') ){
-        url = url.replace('http://id.loc.gov/',urls.bfdb)
+      // If URL is already converted, return as is.
+      if (url.startsWith("https://quartz.bibframe.app")) {
+        return url;
       }
-      return url
+      let stripped = url.replace(/^https?:\/\//, "");
+      if (stripped.startsWith("id.loc.gov/resources/works/")) {
+        let idPart = stripped.replace("id.loc.gov/resources/works/", "");
+        if (/^\d+$/.test(idPart)) {
+          // Imported Work: return original id.loc.gov URL.
+          return "https://id.loc.gov/resources/works/" + idPart;
+        } else {
+          // New Work: if identifier starts with a digit, prepend "e" then convert.
+          if (/^\d/.test(idPart)) {
+            idPart = "e" + idPart;
+          }
+          return "https://quartz.bibframe.app/ldp/api-staging/works/" + idPart;
+        }
+      }
+      if (stripped.startsWith("id.loc.gov/resources/instances/")) {
+        let idPart = stripped.replace("id.loc.gov/resources/instances/", "");
+        if (/^\d+$/.test(idPart)) {
+          // Imported Instance: return original id.loc.gov URL.
+          return "https://id.loc.gov/resources/instances/" + idPart;
+        } else {
+          return "https://quartz.bibframe.app/ldp/api-staging/instances/" + idPart;
+        }
+      }
+      if (stripped.startsWith("id.loc.gov/resources/items/")) {
+        let idPart = stripped.replace("id.loc.gov/resources/items/", "");
+        return "https://quartz.bibframe.app/ldp/api-staging/items/" + idPart;
+      }
+      if (stripped.startsWith("id.loc.gov/resources/hubs/")) {
+        let idPart = stripped.replace("id.loc.gov/resources/hubs/", "");
+        return "https://quartz.bibframe.app/ldp/api-staging/hubs/" + idPart;
+      }
+      // Fallback: return original URL if no match.
+      return url;
     },
 
     /**
@@ -1107,3 +1135,5 @@ export const useConfigStore = defineStore('config', {
 
   },
 })
+
+export default useConfigStore;
