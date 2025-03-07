@@ -1922,10 +1922,13 @@ const utilsExport = {
 		field005.innerHTML = dateValue
 		rootEl.appendChild(field005)
 
-		console.log(dateValue)
+
 		let field008 = document.createElementNS(marcNamespace,"marcxml:controlfield");
 		field008.setAttribute( 'tag', '008')
-		field008.innerHTML = dateValue.slice(0,5) + 'n| azannaabn' + " ".repeat(10) + '|n aaa' + " ".repeat(6)
+		let year2Digits = dateValue.slice(2,4)
+		let month2Digits = dateValue.slice(4,6)
+		let day2Digits = dateValue.slice(6,8)
+		field008.innerHTML = `${year2Digits}${month2Digits}${day2Digits}`  + 'n| azannaabn' + " ".repeat(10) + '|n aaa' + " ".repeat(6)
 		rootEl.appendChild(field008)
 
 		let field010 = document.createElementNS(marcNamespace,"marcxml:datafield");
@@ -1941,7 +1944,7 @@ const utilsExport = {
 
 
 		let field040 = document.createElementNS(marcNamespace,"marcxml:datafield");
-		field040.setAttribute( 'tag', '010')
+		field040.setAttribute( 'tag', '040')
 		field040.setAttribute( 'ind1', ' ')
 		field040.setAttribute( 'ind2', ' ')
 		let field040a = document.createElementNS(marcNamespace,"marcxml:subfield");
@@ -1964,8 +1967,29 @@ const utilsExport = {
 		field040c.innerHTML = 'DLC'
 		field040.appendChild(field040c)	
 
-
+		
 		rootEl.appendChild(field040)
+
+
+		// ---- 985
+		let field985 = document.createElementNS(marcNamespace,"marcxml:datafield");
+		field985.setAttribute( 'tag', '985')
+		field985.setAttribute( 'ind1', ' ')
+		field985.setAttribute( 'ind2', ' ')		
+		
+		let field985e = document.createElementNS(marcNamespace,"marcxml:subfield");
+		field985e.setAttribute( 'code', 'e')
+		field985e.innerHTML = 'MARVA-NAR'
+		field985.appendChild(field985e)
+
+		let field985d = document.createElementNS(marcNamespace,"marcxml:subfield");
+		field985d.setAttribute( 'code', 'd')
+		field985d.innerHTML = `${date.getFullYear().toString()}-${pad2(date.getMonth() + 1)}-${pad2( date.getDate())}`
+	
+		field985.appendChild(field985d)
+		
+		rootEl.appendChild(field985)
+
 
 
 		let fieldName = document.createElementNS(marcNamespace,"marcxml:datafield");

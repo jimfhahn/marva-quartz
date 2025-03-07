@@ -7,6 +7,7 @@
   import { VueFinalModal } from 'vue-final-modal'
   import utilsExport from '@/lib/utils_export'
 
+
   export default {
     components: {
       VueFinalModal
