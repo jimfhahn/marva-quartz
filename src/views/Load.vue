@@ -188,15 +188,18 @@
                 <span style="font-size: 1.25em; vertical-align: bottom; margin-right: 3px;"  class="material-icons">edit_document</span>
                 <span>Create New Description</span></h1>
                 <div style="padding:5px;">
-                  Use these blank templates to create a new description. Note that in Alma the Work must exist first, then an instance can be exported.
+                  Note that in Alma the Work must exist first, then an instance can be exported.
                 </div>
-                <div>
-                  <div class="load-buttons">
-                    <button class="load-button" @click="loadUrl(s.instance)" v-for="s in startingPointsFiltered">{{s.name}}</button>
+                <details>
+                  <summary><span style="text-decoration: underline;">Click Here</span> to access blank record templates.</summary>
+                  <div>
+                    <div class="load-buttons">
+                      <button class="load-button" @click="loadUrl(s.instance)" v-for="s in startingPointsFiltered">{{s.name}}</button>
 
 
+                    </div>
                   </div>
-                </div>
+                </details>
 
 
 
@@ -285,10 +288,10 @@
       ...mapState(usePreferenceStore, ['styleDefault','panelDisplay']),
       ...mapState(useConfigStore, ['testData']),
       ...mapState(useProfileStore, ['startingPoints','profiles']),
-      ...mapWritableState(useProfileStore, ['activeProfile', 'emptyComponents']),
+      ...mapWritableState(useProfileStore, ['activeProfile', 'emptyComponents','activeProfilePosted','activeProfilePostedTimestamp']),
 
 
-
+      
 
 
       // // gives read access to this.count and this.double
@@ -464,6 +467,9 @@
             useProfile = JSON.parse(JSON.stringify(this.profiles[key]))
           }
         }
+
+        this.activeProfilePosted = false
+        this.activeProfilePostedTimestamp = false
 
         // check if the input field is empty
         if (this.urlToLoad == "" && useProfile===null){

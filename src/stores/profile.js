@@ -13,7 +13,6 @@ import utilsExport from '@/lib/utils_export';
 import shortCodesOverrides from "@/lib/shortCodesOverrides.json"
 import defaultComponents from "@/lib/defaults/default_components.json"
 
-
 import utilsProfile from '../lib/utils_profile'
 import {unescape} from 'html-escaper';
 import short from 'short-uuid'
@@ -69,6 +68,7 @@ export const useProfileStore = defineStore('profile', {
 
     activeProfileSaved: true,
     activeProfilePosted: false,
+    activeProfilePostedTimestamp: false,
 
     showPostModal: false,
     showRecoveryModal: false,
@@ -80,9 +80,10 @@ export const useProfileStore = defineStore('profile', {
     showItemInstanceSelection: false,
     activeHubStubData:{
     },
-    activeHubStubComponent:{
+    activeHubStubComponent:{},
+    
+    activeNARStubComponent:{},
 
-    },
     showShelfListingModal: false,
     activeShelfListData:{
       class:null,
@@ -197,12 +198,28 @@ export const useProfileStore = defineStore('profile', {
       }
     },
 
+    returnComponentByPropertyLabel: (state) => {
+      return (label, profile) => {
+        for (let rt in state.activeProfile.rt){
+          for (let pt in state.activeProfile.rt[rt].pt){
+            if (state.activeProfile.rt[rt].pt[pt]['propertyLabel'].toLowerCase() === label.toLowerCase()){
+              if (profile && rt.includes(profile)){
+                return state.activeProfile.rt[rt].pt[pt]
+              } else if (!profile){
+                return state.activeProfile.rt[rt].pt[pt]
+              }
+            }
+          }
+        }
+      }
+    },
 
-    /** Groups the library components into a array ready to render
+
+     /** Groups the library components into a array ready to render
      *
      * @return {array}
      */
-    returnComponentLibrary: (state) => {
+     returnComponentLibrary: (state) => {
       // limit to the current profiles being used
       // console.log(state.activeProfile)
       // console.log(state.componentLibrary)
@@ -2164,14 +2181,8 @@ export const useProfileStore = defineStore('profile', {
 
       if (!type && URI && !lastProperty.includes("intendedAudience")){
         // I regretfully inform you we will need to look this up
-        if (URI.indexOf('id.loc.gov/resources/hubs/') > -1){
-          type = 'http://id.loc.gov/ontologies/bibframe/Hub'
-        } else{
-          let context = await utilsNetwork.returnContext(URI)
-          type = context.typeFull
-        }
-
-
+        let context = await utilsNetwork.returnContext(URI)
+        type = context.typeFull
 
       }
       // literals don't have a type or a URI & intendedAudience has extra considerations
@@ -4694,7 +4705,6 @@ export const useProfileStore = defineStore('profile', {
       let xml = await utilsExport.createHubStubXML(hubCreatorObj,title,langObj,catCode)
 
       console.log(xml)
-      console.log("hubCreatorObj",hubCreatorObj)
       let eid = 'e' + decimalTranslator.new()
       eid = eid.substring(0,8)
 
@@ -4708,13 +4718,43 @@ export const useProfileStore = defineStore('profile', {
         alert("There was an error creating your Hub. Please report this issue.")
       }
 
-      if (pubResuts){
-        // get the URI used for this one and overwrite whatever the server sent to us
-        let hubUri = await utilsExport.creatHubStubURI(hubCreatorObj,title)
-        pubResuts.postLocation = hubUri
+      // pubResuts = {'postLocation': 'https://id.loc.gov/resources/hubs/a07eefde-6522-9b99-e760-5c92f7d396eb'}
+
+
+      return pubResuts
+
+
+
+    },
+
+  /**
+    * Builds and posts a Hub Stub
+    *
+    * @param {object} hubCreatorObj - obj with creator label, uri,marcKey
+    * @param {string} title - title string
+    * @param {string} langObj - {uri:"",label:""}
+    * @return {String}
+    */
+    async buildPostHubStub(hubCreatorObj,title,langObj,catCode){
+
+      // console.log("hubCreatorObj",hubCreatorObj)
+      let xml = await utilsExport.createHubStubXML(hubCreatorObj,title,langObj,catCode)
+
+      console.log(xml)
+      let eid = 'e' + decimalTranslator.new()
+      eid = eid.substring(0,8)
+
+      // pass a fake activeprofile with id == Hub to trigger hub protocols
+      let pubResuts
+      try{
+        pubResuts = await utilsNetwork.publish(xml, eid, {id: 'Hub'})
+
+      }catch (error){
+        console.log(error)
+        alert("There was an error creating your Hub. Please report this issue.")
       }
 
-      // pubResuts = {'postLocation': 'https://id.loc.gov/resources/hubs/a07eefde-6522-9b99-xxxx-5c92f7d396eb'}
+      // pubResuts = {'postLocation': 'https://id.loc.gov/resources/hubs/a07eefde-6522-9b99-e760-5c92f7d396eb'}
 
 
       return pubResuts
@@ -4782,9 +4822,27 @@ export const useProfileStore = defineStore('profile', {
 
       let xml = await utilsExport.createNacoStubXML(oneXX,fourXX,mainTitle,lccn,workURI)
 
-      return xml
-      
-      
+      let pubResuts
+      try{
+        pubResuts = await utilsNetwork.publishNar(xml)
+      }catch (error){
+        console.log(error)
+        alert("There was an error creating your NAR. Please report this issue.")
+      }
+
+      // pubResuts = {'postLocation': 'https://id.loc.gov/resources/hubs/a07eefde-6522-9b99-e760-5c92f7d396eb'}
+
+      console.log('pubResuts')
+      console.log(pubResuts)
+
+
+      return {
+        xml: xml,
+        pubResuts: pubResuts,
+        lccn: lccn
+      }
+
+
 
 
 
@@ -4871,6 +4929,7 @@ export const useProfileStore = defineStore('profile', {
      * @param {string} guid - The GUID of the component
      */
     addToComponentLibrary: async function(guid){
+
       let structure = JSON.parse(JSON.stringify(this.returnStructureByComponentGuid(guid)))
 
       // clean up component property values for storage
@@ -4944,7 +5003,6 @@ export const useProfileStore = defineStore('profile', {
         defaultLibrary = defaultComponents.DefaultComponentLibrary.profiles
         this.componentLibrary.profiles = Object.assign({}, this.componentLibrary.profiles, defaultLibrary)
       }
-
       for (let key in this.componentLibrary.profiles){
         for (let group of this.componentLibrary.profiles[key].groups){
           if (group.id == id){
@@ -4952,6 +5010,7 @@ export const useProfileStore = defineStore('profile', {
             // we are adding a sigle one here so groups are individual (group of 1) in this case
             console.log("Adding thisone",group)
             let component = JSON.parse(JSON.stringify(group.structure))
+
 
             // see if we can find its counter part in the acutal profile
             if (this.activeProfile.rt[component.parentId]){
@@ -5065,7 +5124,6 @@ export const useProfileStore = defineStore('profile', {
 
               if (ptObjFound != false){
                 console.log("Found orignal here:",ptObjFound)
-                // let structureCopy = JSON.parse(JSON.stringify(ptObjFound))
 
                 if (ptObjFound.hashCode == component.hashCode){
 
