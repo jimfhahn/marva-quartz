@@ -356,14 +356,6 @@
       buildNacoStub(){
         console.log(this.guid)
         
-        this.profileStore.activeNARStubComponent = {
-          type: this.type,
-          guid: this.guid,
-          fieldGuid: this.fieldGuid,
-          structure: this.structure,
-          type: this.type,
-          propertyPath:this.propertyPath
-        }        
         this.profileStore.showNacoStubCreateModal = true
       },
 
@@ -940,13 +932,7 @@
         this.profileStore.addToAdHocMode(structure.parentId, structure.id)
       },
 
-      isStaging(){       
-        console.log(useConfigStore().returnUrls.dev)
-        console.log(useConfigStore().returnUrls)
-        if (useConfigStore().returnUrls.dev){
-          return true
-        }
-
+      isStaging(){        
         if (useConfigStore().returnUrls.env == "staging"){
           return true
         }else{

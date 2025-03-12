@@ -398,9 +398,7 @@ const utilsProfile = {
 
       if (isLocator){
         // deleting this avoids the creation of a "rdf:Resource" tag for "URL of Instance"
-        if (pointer[0]["@type"] != 'http://id.loc.gov/ontologies/bibframe/SupplementaryContent'){
-          delete pointer[0]["@type"]
-        }
+        delete pointer[0]["@type"]
       }
 
       return pointer

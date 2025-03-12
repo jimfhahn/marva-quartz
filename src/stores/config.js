@@ -11,7 +11,7 @@ export const useConfigStore = defineStore('config', {
 
     versionMajor: 0,
     versionMinor: 18,
-    versionPatch: 14,
+    versionPatch: 11,
 
     regionUrls: {
 
@@ -40,8 +40,6 @@ export const useConfigStore = defineStore('config', {
         util  :  'https://preprod-3001.id.loc.gov/bfe2/util/',
         utilLang  :  'https://editor.id.loc.gov/bfe2/util-lang/',
         scriptshifter: 'https://editor.id.loc.gov/bfe2/scriptshifter/',
-        publish: 'https://preprod-3001.id.loc.gov/bfe2/util/publish/staging',
-        publishNar: 'https://preprod-3001.id.loc.gov/bfe2/util/nacostub/staging',
         validate: 'https://preprod-3001.id.loc.gov/bfe2/util/validate',
         shelfListing: 'https://preprod-8230.id.loc.gov/',
         bfdb : 'https://preprod-8300.id.loc.gov/',
@@ -330,7 +328,7 @@ baseURIHub: 'https://quartz.bibframe.app/ldp/api-staging/hubs/',
 
     {lccn:'2025363067',label:"test4", idUrl:'https://id.loc.gov/resources/instances/2025363067.html', profile:'Monograph',profileId:'lc:RT:bf2:Monograph:Instance'},
 
-
+    
 
 
   ],
