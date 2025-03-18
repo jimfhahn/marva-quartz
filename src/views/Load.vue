@@ -116,19 +116,7 @@
 
 
                   </ol>
-                <div v-if="(!urlToLoadIsHttp && !lccnLoadSelected)" style="font-weight: bold; margin-bottom: 1em;">
-                  First Enter the URL or identifier for a resource above, then select a profile.
-                </div>
-
-              <h3>Load with profile:</h3>
-
-
-              <div class="load-buttons">
-                <button class="load-button" @click="loadUrl(s.instance)" :disabled="(urlToLoadIsHttp || lccnLoadSelected ) ? false : true"  v-for="s in startingPointsFiltered">{{s.name}}</button>
-
-
-              </div>
-              <hr>
+                <hr>
 
 
 
