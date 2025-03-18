@@ -19,3 +19,6 @@ npm run dev
 ```sh
 npm run build
 ```
+## Acknowledgements
+
+This fork of the Marva Quartz editor was developed with the help of [GitHub Copilot](https://github.com/features/copilot), an AI pair programmer that assisted with code suggestions.
