@@ -13,7 +13,6 @@ import utilsExport from '@/lib/utils_export';
 import shortCodesOverrides from "@/lib/shortCodesOverrides.json"
 import defaultComponents from "@/lib/defaults/default_components.json"
 
-
 import utilsProfile from '../lib/utils_profile'
 import {unescape} from 'html-escaper';
 import short from 'short-uuid'
@@ -69,6 +68,7 @@ export const useProfileStore = defineStore('profile', {
 
     activeProfileSaved: true,
     activeProfilePosted: false,
+    activeProfilePostedTimestamp: false,
 
     showPostModal: false,
     showRecoveryModal: false,
@@ -80,9 +80,10 @@ export const useProfileStore = defineStore('profile', {
     showItemInstanceSelection: false,
     activeHubStubData:{
     },
-    activeHubStubComponent:{
+    activeHubStubComponent:{},
 
-    },
+    activeNARStubComponent:{},
+
     showShelfListingModal: false,
     activeShelfListData:{
       class:null,
@@ -114,6 +115,10 @@ export const useProfileStore = defineStore('profile', {
 
     mostCommonNonLatinScript: null,
     nonLatinScriptAgents: {},
+
+
+
+    // bf:title component/predicate for example, value will be the structure object for this component
 
     activeComponent: null,
 
@@ -197,12 +202,28 @@ export const useProfileStore = defineStore('profile', {
       }
     },
 
+    returnComponentByPropertyLabel: (state) => {
+      return (label, profile) => {
+        for (let rt in state.activeProfile.rt){
+          for (let pt in state.activeProfile.rt[rt].pt){
+            if (state.activeProfile.rt[rt].pt[pt]['propertyLabel'].toLowerCase() === label.toLowerCase()){
+              if (profile && rt.includes(profile)){
+                return state.activeProfile.rt[rt].pt[pt]
+              } else if (!profile){
+                return state.activeProfile.rt[rt].pt[pt]
+              }
+            }
+          }
+        }
+      }
+    },
 
-    /** Groups the library components into a array ready to render
+
+     /** Groups the library components into a array ready to render
      *
      * @return {array}
      */
-    returnComponentLibrary: (state) => {
+     returnComponentLibrary: (state) => {
       // limit to the current profiles being used
       // console.log(state.activeProfile)
       // console.log(state.componentLibrary)
@@ -2154,7 +2175,8 @@ export const useProfileStore = defineStore('profile', {
     * @return {void}
     */
     setValueComplex: async function(componentGuid, fieldGuid, propertyPath, URI, label, type, nodeMap=null, marcKey=null ){
-
+      // TODO: reconcile this to how the profiles are built, or dont..
+      // remove the sameAs from this property path, which will be the last one, we don't need it
       propertyPath = propertyPath.filter((v)=> { return (v.propertyURI!=='http://www.w3.org/2002/07/owl#sameAs')  })
 
       let lastProperty = propertyPath.at(-1).propertyURI
@@ -2164,16 +2186,20 @@ export const useProfileStore = defineStore('profile', {
 
       if (!type && URI && !lastProperty.includes("intendedAudience")){
         // I regretfully inform you we will need to look this up
-        if (URI.indexOf('id.loc.gov/resources/hubs/') > -1){
-          type = 'http://id.loc.gov/ontologies/bibframe/Hub'
-        } else{
-          let context = await utilsNetwork.returnContext(URI)
-          type = context.typeFull
+        let context = await utilsNetwork.returnContext(URI)
+        type = context.typeFull
+        if (!marcKey){
+          marcKey = context.marcKey
         }
-
-
-
       }
+
+      if (['Work', 'Hub'].includes(type)){
+        type = "http://id.loc.gov/ontologies/bibframe/" + type
+      }
+      if (type && !type.startsWith("http")){
+        type = "http://www.loc.gov/mads/rdf/v1#" + type // Works and Hubs should be `BF:` not madsrdf.
+      }
+
       // literals don't have a type or a URI & intendedAudience has extra considerations
       // namely that the rdf:Type in BF is bf:Authority
       if ((!type && !URI) || lastProperty.includes("intendedAudience")){
@@ -2247,14 +2273,14 @@ export const useProfileStore = defineStore('profile', {
           }
 
           //Add gacs code to user data
-          if (nodeMap["GAC(s)"]){
+          if (nodeMap["gacs"]){
             blankNode["http://www.loc.gov/mads/rdf/v1#code"] = []
-            for (let code in nodeMap["GAC(s)"]){
+            for (let code in nodeMap["gacs"]){
                 blankNode["http://www.loc.gov/mads/rdf/v1#code"].push(
                   {
                     '@guid': short.generate(),
                     "@gacs": "http://id.loc.gov/datatypes/codes/gac",
-                    'http://www.loc.gov/mads/rdf/v1#code': nodeMap["GAC(s)"][code]
+                    'http://www.loc.gov/mads/rdf/v1#code': nodeMap["gacs"][code]
                   }
                 )
             }
@@ -2338,8 +2364,6 @@ export const useProfileStore = defineStore('profile', {
     */
     setValueSubject: async function(componentGuid,subjectComponents,propertyPath){
         // we're just going to overwrite the whole userValue with the constructed headings
-
-
         let pt = utilsProfile.returnPt(this.activeProfile,componentGuid)
 
 
@@ -2618,7 +2642,6 @@ export const useProfileStore = defineStore('profile', {
               }
 
             }
-
 
             // double check the @type of the resource we want to be as specific as possible
             if (currentUserValuePos['@type'] == 'http://www.w3.org/2000/01/rdf-schema#Resource'){
@@ -3837,7 +3860,7 @@ export const useProfileStore = defineStore('profile', {
     * @param {string} componentGuid - the guid of the component (the parent of all fields)
     * @param {object} structure - structure of the component(?)s
     * @param {object} incomingUserValue - the incoming userValue to set
-    * @return {string} the id ofthe newPropertyId
+    * @return {array} the id and guid of the newPropertyId
     */
     duplicateComponentGetId: async function(componentGuid, structure, profileName, predecessor){
       let createEmpty = true
@@ -3944,7 +3967,7 @@ export const useProfileStore = defineStore('profile', {
         // they changed something
         this.dataChanged()
 
-        return newPropertyId
+        return [newPropertyId, newPt['@guid']]
 
       }else{
         console.error('duplicateComponent: Cannot locate the component by guid', componentGuid, this.activeProfile)
@@ -4536,6 +4559,7 @@ export const useProfileStore = defineStore('profile', {
                     if (!current.deleted && current.propertyURI.trim() == targetURI.trim() && current.propertyLabel.trim() == targetLabel.trim()){
                         let currentPos = order.indexOf(current.id)
                         let newPos = order.indexOf(newComponent.id)
+
                         // if (Object.keys(current.userValue).length == 1){
                         if (this.isEmptyComponent(current)){
                             current.userValue = newComponent.userValue
@@ -4545,7 +4569,7 @@ export const useProfileStore = defineStore('profile', {
                             let structure = this.returnStructureByComponentGuid(guid)
 
                             let newPt
-                            if (sourceRt && sourceRt != targetRt){
+                            if ((sourceRt && sourceRt != targetRt) || (!sourceRt && !incomingTargetRt)){
                               newPt = await this.duplicateComponentGetId(guid, structure, rt, "last")
                             } else {
                               if (newPos < 0){
@@ -4554,6 +4578,8 @@ export const useProfileStore = defineStore('profile', {
                                 newPt = await this.duplicateComponentGetId(guid, structure, rt, newComponent.id)
                               }
                             }
+
+                            newPt = newPt[0]
 
                             profile["rt"][rt]["pt"][newPt].userValue = newComponent.userValue
                             profile["rt"][rt]["pt"][newPt].userModified = true
@@ -4566,25 +4592,23 @@ export const useProfileStore = defineStore('profile', {
     },
 
     pasteSelected: async function(){
-        let data
-        const clipboardContents = await navigator.clipboard.read();
+      let data
+      const clipboardContents = await navigator.clipboard.read();
 
-        for (let item of clipboardContents){
-
-              if (!item.types.includes("text/plain")) {
-                throw new Error("Clipboard does not contain text data.");
-              }
-
-              let blob = await item.getType("text/plain")
-              const incomingValue = await blob.text()
-
-              data = incomingValue.split(";;;")
-            }
-
-        for (let item of data){
-          const dataJson = JSON.parse(item)
-          this.parseActiveInsert(JSON.parse(JSON.stringify(dataJson)))
+      for (let item of clipboardContents){
+        if (!item.types.includes("text/plain")) {
+          throw new Error("Clipboard does not contain text data.");
         }
+
+        let blob = await item.getType("text/plain")
+        const incomingValue = await blob.text()
+
+        data = incomingValue.split(";;;")
+      }
+      for (let item of data){
+        const dataJson = JSON.parse(item)
+        this.parseActiveInsert(JSON.parse(JSON.stringify(dataJson)))
+      }
     },
 
 
@@ -4694,7 +4718,6 @@ export const useProfileStore = defineStore('profile', {
       let xml = await utilsExport.createHubStubXML(hubCreatorObj,title,langObj,catCode)
 
       console.log(xml)
-      console.log("hubCreatorObj",hubCreatorObj)
       let eid = 'e' + decimalTranslator.new()
       eid = eid.substring(0,8)
 
@@ -4708,13 +4731,43 @@ export const useProfileStore = defineStore('profile', {
         alert("There was an error creating your Hub. Please report this issue.")
       }
 
-      if (pubResuts){
-        // get the URI used for this one and overwrite whatever the server sent to us
-        let hubUri = await utilsExport.creatHubStubURI(hubCreatorObj,title)
-        pubResuts.postLocation = hubUri
+      // pubResuts = {'postLocation': 'https://id.loc.gov/resources/hubs/a07eefde-6522-9b99-e760-5c92f7d396eb'}
+
+
+      return pubResuts
+
+
+
+    },
+
+  /**
+    * Builds and posts a Hub Stub
+    *
+    * @param {object} hubCreatorObj - obj with creator label, uri,marcKey
+    * @param {string} title - title string
+    * @param {string} langObj - {uri:"",label:""}
+    * @return {String}
+    */
+    async buildPostHubStub(hubCreatorObj,title,langObj,catCode){
+
+      // console.log("hubCreatorObj",hubCreatorObj)
+      let xml = await utilsExport.createHubStubXML(hubCreatorObj,title,langObj,catCode)
+
+      console.log(xml)
+      let eid = 'e' + decimalTranslator.new()
+      eid = eid.substring(0,8)
+
+      // pass a fake activeprofile with id == Hub to trigger hub protocols
+      let pubResuts
+      try{
+        pubResuts = await utilsNetwork.publish(xml, eid, {id: 'Hub'})
+
+      }catch (error){
+        console.log(error)
+        alert("There was an error creating your Hub. Please report this issue.")
       }
 
-      // pubResuts = {'postLocation': 'https://id.loc.gov/resources/hubs/a07eefde-6522-9b99-xxxx-5c92f7d396eb'}
+      // pubResuts = {'postLocation': 'https://id.loc.gov/resources/hubs/a07eefde-6522-9b99-e760-5c92f7d396eb'}
 
 
       return pubResuts
@@ -4782,9 +4835,27 @@ export const useProfileStore = defineStore('profile', {
 
       let xml = await utilsExport.createNacoStubXML(oneXX,fourXX,mainTitle,lccn,workURI)
 
-      return xml
-      
-      
+      let pubResuts
+      try{
+        pubResuts = await utilsNetwork.publishNar(xml)
+      }catch (error){
+        console.log(error)
+        alert("There was an error creating your NAR. Please report this issue.")
+      }
+
+      // pubResuts = {'postLocation': 'https://id.loc.gov/resources/hubs/a07eefde-6522-9b99-e760-5c92f7d396eb'}
+
+      console.log('pubResuts')
+      console.log(pubResuts)
+
+
+      return {
+        xml: xml,
+        pubResuts: pubResuts,
+        lccn: lccn
+      }
+
+
 
 
 
@@ -4825,7 +4896,7 @@ export const useProfileStore = defineStore('profile', {
 
       // if no empty ddc, create one
       if (!hasEmptyDDC){
-        newDDC = await this.duplicateComponentGetId(this.returnStructureByComponentGuid(guid)['@guid'], structure, "lc:RT:bf2:Monograph:Work", lastClassifiction)
+        newDDC = await this.duplicateComponentGetId(this.returnStructureByComponentGuid(guid)['@guid'], structure, "lc:RT:bf2:Monograph:Work", lastClassifiction)[0]
         ddcComponent = activeProfile.rt["lc:RT:bf2:Monograph:Work"].pt[newDDC]
       }
 
@@ -4871,6 +4942,7 @@ export const useProfileStore = defineStore('profile', {
      * @param {string} guid - The GUID of the component
      */
     addToComponentLibrary: async function(guid){
+
       let structure = JSON.parse(JSON.stringify(this.returnStructureByComponentGuid(guid)))
 
       // clean up component property values for storage
@@ -4944,7 +5016,6 @@ export const useProfileStore = defineStore('profile', {
         defaultLibrary = defaultComponents.DefaultComponentLibrary.profiles
         this.componentLibrary.profiles = Object.assign({}, this.componentLibrary.profiles, defaultLibrary)
       }
-
       for (let key in this.componentLibrary.profiles){
         for (let group of this.componentLibrary.profiles[key].groups){
           if (group.id == id){
@@ -4952,6 +5023,7 @@ export const useProfileStore = defineStore('profile', {
             // we are adding a sigle one here so groups are individual (group of 1) in this case
             console.log("Adding thisone",group)
             let component = JSON.parse(JSON.stringify(group.structure))
+
 
             // see if we can find its counter part in the acutal profile
             if (this.activeProfile.rt[component.parentId]){
@@ -5065,7 +5137,6 @@ export const useProfileStore = defineStore('profile', {
 
               if (ptObjFound != false){
                 console.log("Found orignal here:",ptObjFound)
-                // let structureCopy = JSON.parse(JSON.stringify(ptObjFound))
 
                 if (ptObjFound.hashCode == component.hashCode){
 

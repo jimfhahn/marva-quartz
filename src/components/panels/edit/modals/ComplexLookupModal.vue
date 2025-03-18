@@ -49,13 +49,29 @@
         offsetStep: 25,
         currentPage: 1,
         maxPage: 0,
-
         activeContext: null,
-
-
         nextInputIsVoyagerModeDiacritics: false,
-
 		    searchType: "left",
+
+
+        labelMap: {
+          "notes": "Notes",
+          "nonlatinLabels": "Non-Latin Authoritative Labels",
+          "variantLabels": "Variants",
+          "birthdates": "Date of Birth",
+          "birthplaces": "Place of Birth",
+          "locales": "Associated Locales",
+          "activityfields": "Fields of Activity",
+          "occupations": "Occupations",
+          "languages": "Associated Languages",
+          "lcclasss": "LC Classification",
+          "broaders": "Has Broader Authority",
+          "gacs": "GAC(s)",
+          "collections": "MADS Collections",
+          "sources": "Sources",
+          "marcKey": "MARC Key",
+        },
+        panelDetailOrder: ["notes","nonlatinLabels","variantLabels","birthdates","birthplaces","locales","activityfields","occupations","languages","lcclasss","broaders","gacs","collections","sources", "marcKey"],
       }
     },
     computed: {
@@ -126,6 +142,13 @@
     },
 
     methods: {
+      truncate: function(string){
+        let stg = string
+        if (string.length > 80){
+          stg = stg.slice(0, 80) + "..."
+        }
+        return string
+      },
       // Reset stored values
       // This is for when the modal is closed, we want to reset things so nothing is preloaded
       // and the user starts from zero
@@ -623,6 +646,8 @@
 
         console.log("toLoad: ", toLoad)
 
+        if (!toLoad){ return false }
+
         this.activeContext = {
             "contextValue": true,
             "source": [],
@@ -637,6 +662,8 @@
             "precoordinated" : false,
             "literal": (toLoad && toLoad.literal) ? true : false,
             "loading":true,
+            "extra": toLoad.extra ? toLoad.extra : {},
+            "gacs": toLoad.extra ? toLoad.extra.gacs : [],
           }
 
         if (toLoad && toLoad.literal){
@@ -644,12 +671,23 @@
         }
 
         let results = null
-        try {
-            results = await utilsNetwork.returnContext(toLoad.uri)
-            results.loading = false
-        } catch(err) {
-            results = this.activeContext
+        results = this.activeContext
+        // results = await utilsNetwork.returnContext(toLoad.uri)
+
+        if (toLoad.uri.includes('/works/')){
+          results.type = 'Work'
+          results.typeFull='http://id.loc.gov/ontologies/bibframe/Work'
+        } else if (toLoad.uri.includes('/hubs/')){
+          results.type = 'Hub'
+          results.typeFull='http://id.loc.gov/ontologies/bibframe/Hub'
         }
+        // try {
+        //   let r = await utilsNetwork.returnContext(toLoad.uri)
+        //   // r = this.activeContext
+        // } catch(err) {
+        //     // r = this.activeContext
+        // }
+        results.loading = false
 
         // if this happens it means they selected something else very quickly
         // so don't go on and set it to this context, because its no longer the one they have selected
@@ -660,7 +698,6 @@
         } catch(err){
 
         }
-
 
         this.activeContext = results
       },
@@ -854,7 +891,7 @@
       :lock-scroll="true"
       class="complex-lookup-modal"
       content-class="complex-lookup-modal-content"
-      @before-close="reset();"
+      @before-close="$emit('hideComplexModal'); reset();"
       >
 
       <div ref="complexLookupModalContainer" class="complex-lookup-modal-container" :style="`${this.preferenceStore.styleModalBackgroundColor()}`">
@@ -905,7 +942,7 @@
               <button @click="forceSearch()">Search</button>
 
               <!-- REMOVE v-if BEFORE PROD USAGE -->
-              <button @click="loadNacoStubModal" style="float: right;" v-if="isStaging() == true">Create NACO Stub</button>
+              <button @click="loadNacoStubModal" style="float: right;" v-if="isStaging() == true">Create NAR Stub</button>
 
               <hr style="margin-top: 5px;">
               <div>
@@ -916,7 +953,13 @@
                     <option v-if="activeComplexSearchInProgress == true">
                       Searching...
                     </option>
-
+                    <template v-if="!isSimpleLookup()">
+                      <option v-for="(r,idx) in activeComplexSearch" :data-label="r.label" :value="r.uri" v-bind:key="idx" :style="(r.depreciated || r.undifferentiated) ? 'color:red' : ''" class="complex-lookup-result">
+                        <div class="option-text">
+                          {{ (!r.literal ? r.suggestLabel : r.label) + ((r.literal) ? ' [Literal]' : '') }}
+                        </div>
+                      </option>
+                    </template>
                     <template v-else-if="activeSimpleLookup && Object.keys(activeSimpleLookup).length > 0">
                       <option 
                         v-for="(r, idx) in activeSimpleLookup"
@@ -941,17 +984,24 @@
 
             <div ref="complexLookupModalDisplay" class="complex-lookup-modal-display" :style="`${this.preferenceStore.styleModalTextColor()};`">
 
-              <template v-if="activeContext !== null">
-                  <h3><span class="modal-context-icon simptip-position-top" :data-tooltip="'Type: ' + activeContext.type"><AuthTypeIcon v-if="activeContext.type" :type="activeContext.type"></AuthTypeIcon></span>{{returnContextTitle(activeContext.title)}}</h3>
-
-
+              <template v-if="activeContext !== null && Object.keys(activeContext.extra).length > 0">
+                  <h3>
+                    <span class="modal-context-icon simptip-position-top" :data-tooltip="'Type: ' + activeContext.extra.rdftypes.includes('Hub') ? 'Hub' : activeContext.extra.rdftypes[0] ">
+                      <AuthTypeIcon v-if="activeContext.extra.rdftypes" :type="activeContext.extra.rdftypes.includes('Hub') ? 'Hub' : activeContext.extra.rdftypes[0]">
+                      </AuthTypeIcon>
+                    </span>
+                    {{ activeContext.title }}
+                  </h3>
                   <div class="complex-lookup-modal-display-type-buttons">
                     <div>
-                        <div class="modal-context-data-title">{{activeContext.type}}</div>
+                        <div class="modal-context-data-title">{{activeContext.extra.rdftypes.includes('Hub') ? 'Hub' : activeContext.extra.rdftypes[0]}}</div>
                         <div v-if="activeContext.depreciated" style="background: pink;">
                           DEPRECIATED AUTHORITY
                         </div>
-                        <a style="color:#2c3e50; float: none;    border: none;border-radius: 0;background-color: transparent;font-size: 1em;padding: 0;" v-if="activeContext.type!='Literal Value'" :href="rewriteURI(activeContext.uri)" target="_blank">view online</a>
+                        <div v-if="activeContext.extra.collections && activeContext.extra.collections.includes('http://id.loc.gov/authorities/names/collection_NamesUndifferentiated')" style="background: pink;">
+                          THIS 1XX FIELD CANNOT BE USED UNDER RDA UNTIL THIS UNDIFFERENTIATED RECORD HAS BEEN HANDLED FOLLOWING THE GUIDELINES IN <a href="https://www.loc.gov/aba/pcc/rda/PCC%20RDA%20guidelines/Z01%20008%2032%202014rfeb.pdf" target="_blank">DCM Z1 008/32</a>.
+                        </div>
+                        <a style="color:#2c3e50; float: none;    border: none;border-radius: 0;background-color: transparent;font-size: 1em;padding: 0;" v-if="activeContext.type!='Literal Value'" :href="rewriteURI(activeContext.uri)" target="_blank" :style="`${this.preferenceStore.styleModalTextColor()}`">view on id.loc.gov</a>
 
                     </div>
                     <div class="complex-lookup-modal-display-buttons">
@@ -964,36 +1014,60 @@
 
                   </div>
 
-                  <div v-if="returnNonLatinAuthLabels(activeContext.title).length>0">
-                    <div class="modal-context-data-title modal-context-data-title-add-gap">Non-Latin Authoritative Labels:</div>
-                    <ul>
-                      <li class="modal-context-data-li" v-for="(v,idx) in returnNonLatinAuthLabels(activeContext.title)" v-bind:key="'auth' + idx">{{v}}</li>
-                    </ul>
-                  </div>
-
-                  <div v-if="activeContext.variant && activeContext.variant.length>0">
-                    <div class="modal-context-data-title modal-context-data-title-add-gap">Variants:</div>
-                    <ul>
-                      <li class="modal-context-data-li" v-for="(v,idx) in activeContext.variant" v-bind:key="'var' + idx">{{v}}</li>
-                    </ul>
-                  </div>
-
-                  <div v-for="key in Object.keys(activeContext.nodeMap)" :key="key">
-                    <div class="modal-context-data-title modal-context-data-title-add-gap">{{key}}:</div>
+                  <template v-for="key in panelDetailOrder">
+                    <div v-if="activeContext.extra[key] && activeContext.extra[key].length>0">
+                      <div class="modal-context-data-title modal-context-data-title-add-gap">{{ this.labelMap[key] }}:</div>
                       <ul>
-                        <li class="modal-context-data-li" v-for="(v,idx) in activeContext.nodeMap[key]" v-bind:key="key+idx">{{v}}</li>
+                        <li class="modal-context-data-li" v-if="Array.isArray(activeContext.extra[key])" v-for="(v, idx) in activeContext.extra[key] " v-bind:key="'var' + idx">
+                          <template v-if="v.startsWith('http')">
+                            <a target="_blank" :href="v">{{ v.split("/").at(-1).split("_").at(-1) }}</a>
+                          </template>
+                          <template v-else-if="key == 'lcclasss'">
+                            <a :href="'https://classweb.org/min/minaret?app=Class&mod=Search&table=schedules&table=tables&tid=1&menu=/Menu/&iname=span&ilabel=Class%20number&iterm='+v" target="_blank">{{v}}</a>
+                            <!-- <a :href="'https://id.loc.gov/authorities/classification/'+v" target="_blank">{{v}}</a> -->
+                          </template>
+                          <template v-else-if="key == 'broaders'">
+                            <a target="_blank" :href="'https://id.loc.gov/authorities/label/'+v">{{v}}</a>
+                          </template>
+                          <template v-else>
+                            {{v}}
+                          </template>
+                        </li>
+                        <li class="modal-context-data-li" v-else v-bind:key="'var' + key">{{ activeContext.extra[key] }}</li>
                       </ul>
+                    </div>
+                  </template>
+              </template>
+
+              <template v-else-if="activeContext !== null">
+                <h3>
+                  {{ Array.isArray(activeContext.title) ? activeContext.title[0] : activeContext.title }}
+                  <span v-if="activeContext.literal">[Literal]</span>
+                </h3>
+
+                <a style="color:#2c3e50; float: none;    border: none;border-radius: 0;background-color: transparent;font-size: 1em;padding: 0;" v-if="activeContext.type!='Literal Value'" :href="rewriteURI(activeContext.uri)" target="_blank" :style="`${this.preferenceStore.styleModalTextColor()}`">view on id.loc.gov</a>
+
+                <br>
+
+                <div v-if="activeContext.uri">
+                  <div class="modal-context-data-title modal-context-data-title-add-gap">MADS Collections:</div>
+                  <ul>
+                    <li class="modal-context-data-li">
+                     <a :href="activeContext.uri" target="_blank">
+                      {{ activeContext.uri.split("/").at(-2) }}
+                     </a>
+                    </li>
+                  </ul>
+                </div>
+
+                <div class="complex-lookup-modal-display-type-buttons">
+                  <div class="complex-lookup-modal-display-type-buttons">
+                    <div class="complex-lookup-modal-display-buttons">
+                      <button @click="$emit('emitComplexValue', activeContext)">Add [Shift+Enter]</button>
+                      <button @click=" reset(); $emit('hideComplexModal')">Cancel [ESC]</button>
+                    </div>
                   </div>
-
-
-                  <div v-if="activeContext.source && activeContext.source.length>0">
-                    <div class="modal-context-data-title modal-context-data-title-add-gap">Sources:</div>
-                    <ul>
-                      <li class="modal-context-data-li" v-for="(v,idx) in activeContext.source" v-bind:key="'sources-'+idx">{{v}}</li>
-                    </ul>
-
-
-                  </div>
+                </div>
 
               </template>
 
@@ -1294,7 +1368,10 @@
   top: 5px;
   position: absolute;
   z-index: 100000;
+}
 
+.option-text {
+  text-wrap: wrap;
 }
 
 </style>

@@ -372,8 +372,11 @@ const utilsNetwork = {
      */
     searchExact: async function(searchPayload){
       let urlTemplate = searchPayload.url
-      let r = await this.fetchExactLookup(urlTemplate[0], searchPayload.signal)
-      return r
+      if (searchPayload.searchValue.length >= 3){
+        let r = await this.fetchExactLookup(urlTemplate[0], searchPayload.signal)
+        return r
+      }
+      return []
     },
 
 
@@ -460,26 +463,18 @@ const utilsNetwork = {
                 // console.log("URL",url)
                 // console.log("r",r)
                 for (let hit of r.hits){
-                  let context = null
-                  // we only need the context for the subject search to have collection information in the output
-                  if(searchPayload.subjectSearch == true){
-                    context = await this.returnContext(hit.uri)
-                  }
-
                   let hitAdd = {
-                    collections: context ? context.nodeMap["MADS Collection"] : [],
+                    collections: hit.more.collections ? hit.more.collections : [],
                     label: hit.aLabel,
                     vlabel: hit.vLabel,
                     suggestLabel: hit.suggestLabel,
                     uri: hit.uri,
                     literal:false,
                     depreciated: false,
-                    extra: '',
+                    extra: hit.more,
                     total: r.count,
                     undifferentiated: false
                   }
-
-
 
                   if (hitAdd.label=='' && hitAdd.suggestLabel.includes('DEPRECATED')){
                     hitAdd.label  = hitAdd.suggestLabel.split('(DEPRECATED')[0] + ' DEPRECATED'
@@ -1321,7 +1316,12 @@ const utilsNetwork = {
         result.msg = 'REGEX Error: That value doesn\'t look like a valid MARC encoded LCSH string (not string)'
       }
 
-      lcsh=lcsh.replace(/\$c/g,'').replace(/\$d/g,'').replace(/\|c/g,'').replace(/\|d/g,'').replace(/‡c/g,'').replace(/‡d/g,'').replace(/\s{2,}/g, ' ')
+      lcsh=lcsh.replace(/[\|\$\‡]{1}[bcd]{1}/g, ' ').replace(/\s{2,}/g, ' ')
+
+      // .replace(/\$b/g,' ').replace(/\|b/g,' ').replace(/‡b/g,' ')
+      //          .replace(/\$c/g,'').replace(/\|c/g,'').replace(/‡c/g,'')
+      //          .replace(/\$d/g,'').replace(/\|d/g,'').replace(/‡d/g,'')
+      //          .replace(/\s{2,}/g, ' ')
 
       // if it doesn't have a $a or ‡a in the start of the string add it
       // often times copying from a system they dont include the $a
@@ -1503,7 +1503,7 @@ const utilsNetwork = {
 
         searchVal = decodeURIComponent(searchVal)
 
-        const exactUri = 'https://id.loc.gov/authorities/<SCHEME>/label/' + searchVal
+        const exactUri = 'https://preprod-8080.id.loc.gov/authorities/<SCHEME>/label/' + searchVal
         let exactName = exactUri.replace('<SCHEME>', 'names')
         let exactSubject = exactUri.replace('<SCHEME>', 'subjects')
 
@@ -2269,11 +2269,11 @@ const utilsNetwork = {
       let subjectUrlTemporal = useConfigStore().lookupConfig['http://id.loc.gov/authorities/subjects'].modes[0]['LCSH All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")+'&memberOf=http://id.loc.gov/authorities/subjects/collection_TemporalSubdivisions'
       let subjectUrlGenre = useConfigStore().lookupConfig['http://id.loc.gov/authorities/subjects'].modes[0]['LCSH All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")+'&rdftype=GenreForm'
 
-      let worksUrlKeyword = useConfigStore().lookupConfig['https://preprod-8080.id.loc.gov/resources/works'].modes[0]['Works - Keyword'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")
-      let worksUrlAnchored = useConfigStore().lookupConfig['https://preprod-8080.id.loc.gov/resources/works'].modes[0]['Works - Left Anchored'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")
+      let worksUrlKeyword = useConfigStore().lookupConfig['https://preprod-8080.id.loc.gov/resources/works'].modes[0]['Works - Keyword'].url.replace('<QUERY>',searchVal).replace('&count=25','&count='+numResultsSimple).replace("<OFFSET>", "1")
+      let worksUrlAnchored = useConfigStore().lookupConfig['https://preprod-8080.id.loc.gov/resources/works'].modes[0]['Works - Left Anchored'].url.replace('<QUERY>',searchVal).replace('&count=25','&count='+numResultsSimple).replace("<OFFSET>", "1")
 
-      let hubsUrlKeyword = useConfigStore().lookupConfig['https://preprod-8080.id.loc.gov/resources/works'].modes[0]['Hubs - Keyword'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")
-      let hubsUrlAnchored = useConfigStore().lookupConfig['https://preprod-8080.id.loc.gov/resources/works'].modes[0]['Hubs - Left Anchored'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")
+      let hubsUrlKeyword = useConfigStore().lookupConfig['https://preprod-8080.id.loc.gov/resources/works'].modes[0]['Hubs - Keyword'].url.replace('<QUERY>',searchVal).replace('&count=25','&count='+numResultsSimple).replace("<OFFSET>", "1")
+      let hubsUrlAnchored = useConfigStore().lookupConfig['https://preprod-8080.id.loc.gov/resources/works'].modes[0]['Hubs - Left Anchored'].url.replace('<QUERY>',searchVal).replace('&count=25','&count='+numResultsSimple).replace("<OFFSET>", "1")
 
       let childrenSubject = useConfigStore().lookupConfig['http://id.loc.gov/authorities/childrensSubjects'].modes[0]['LCSHAC All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count='+numResultsCyac).replace("<OFFSET>", "1")+'&-memberOf=http://id.loc.gov/authorities/subjects/collection_Subdivisions'
       let childrenSubjectComplex = useConfigStore().lookupConfig['http://id.loc.gov/authorities/childrensSubjects'].modes[0]['LCSHAC All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count='+numResultsCyac).replace("<OFFSET>", "1")+'&rdftype=ComplexType'
@@ -2283,7 +2283,7 @@ const utilsNetwork = {
 
       let subjectUrlHierarchicalGeographic = useConfigStore().lookupConfig['HierarchicalGeographic'].modes[0]['All'].url.replace('<QUERY>',searchValHierarchicalGeographic).replace('&count=25','&count='+numResultsComplex).replace("<OFFSET>", "1")
 
-      const exactUri = 'https://id.loc.gov/authorities/<SCHEME>/label/' + searchVal
+      const exactUri = 'https://preprod-8080.id.loc.gov/authorities/<SCHEME>/label/' + searchVal
       let exactName = exactUri.replace('<SCHEME>', 'names')
       let exactSubject = exactUri.replace('<SCHEME>', 'subjects')
       //children's subjects is supported by known-label lookup?
@@ -2543,10 +2543,10 @@ const utilsNetwork = {
       let searchPieces = complexVal.split("--")
       let pos = searchPieces.indexOf(searchVal)
 
-      if (resultsExactName){
+      if (resultsExactName && resultsExactName.length > 0){
         resultsExactName = resultsExactName.filter((term) =>  Object.keys(term).includes("suggestLabel") )
       }
-      if (resultsExactSubject){
+      if (resultsExactSubject && resultsExactSubject.length > 0){
         resultsExactSubject = resultsExactSubject.filter((term) =>  Object.keys(term).includes("suggestLabel") )
       }
 
@@ -2702,6 +2702,50 @@ const utilsNetwork = {
     return content
 
   },
+
+
+
+
+  /**
+  * Publish the NAR
+  * @async
+  * @param {string} xml - The xml string
+  * @return {obj} - {status:false, msg: ""}
+  */
+
+  publishNar: async function(xml){
+
+
+    let url = useConfigStore().returnUrls.publishNar
+
+    let uuid = translator.toUUID(translator.new())
+
+    const rawResponse = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({marcxml:xml})
+    });
+    const content = await rawResponse.json();
+
+    // console.log(content);
+
+    if (content && content.publish && content.publish.status && content.publish.status == 'published'){
+
+      return {status:true, postLocation: (content.postLocation) ? content.postLocation : null }
+
+    }else{
+
+      // alert("Did not post, please report this error--" + JSON.stringify(content.publish,null,2))
+
+
+      return {status:false, postLocation: (content.postLocation) ? content.postLocation : null, msg: JSON.stringify(content.publish,null,2), msgObj: content.publish}
+    }
+  },
+
+
 
   /**
   * Send off a rdf bibframe xml files in the format <rdf:RDF><bf:Work/><bf:Instance/>...etc...</rdf:RDF>

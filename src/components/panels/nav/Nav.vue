@@ -46,6 +46,13 @@
   import ItemInstanceSelectionModal from "@/components/panels/nav/ItemInstanceSelectionModal.vue";
   import AdHocModal from "@/components/panels/nav/AdHocModal.vue";
   import GenericSelectionModal from '../edit/modals/GenericSelectionModal.vue'
+  
+  import TimeAgo from 'javascript-time-ago'
+  import en from 'javascript-time-ago/locale/en'
+  if (TimeAgo.getDefaultLocale() != 'en'){TimeAgo.addDefaultLocale(en)}
+  const timeAgo = new TimeAgo('en-US')
+
+
 
 
   export default {
@@ -73,11 +80,11 @@
 
       ...mapStores(useProfileStore,usePreferenceStore),
 
-      ...mapState(useProfileStore, ['profilesLoaded','activeProfile','rtLookup', 'activeProfileSaved', 'isEmptyComponent', 'activeProfilePosted']),
+      ...mapState(useProfileStore, ['profilesLoaded','activeProfile','rtLookup', 'activeProfileSaved', 'isEmptyComponent']),
       ...mapState(usePreferenceStore, ['styleDefault', 'showPrefModal', 'panelDisplay', 'customLayouts', 'createLayoutMode']),
       ...mapState(useConfigStore, ['layouts']),
       ...mapWritableState(usePreferenceStore, ['showLoginModal','showScriptshifterConfigModal','showDiacriticConfigModal','showTextMacroModal','layoutActiveFilter','layoutActive','showFieldColorsModal', 'customLayouts', 'createLayoutMode']),
-      ...mapWritableState(useProfileStore, ['showPostModal', 'showShelfListingModal', 'activeShelfListData','showValidateModal', 'showRecoveryModal', 'showAutoDeweyModal', 'showItemInstanceSelection', 'showAdHocModal', 'emptyComponents']),
+      ...mapWritableState(useProfileStore, ['showPostModal', 'showShelfListingModal', 'activeShelfListData','showValidateModal', 'showRecoveryModal', 'showAutoDeweyModal', 'showItemInstanceSelection', 'showAdHocModal', 'emptyComponents', 'activeProfilePosted','activeProfilePostedTimestamp']),
       ...mapWritableState(useConfigStore, ['showNonLatinBulkModal','showNonLatinAgentModal']),
 
 
@@ -480,33 +487,19 @@
           menu.push(
             {
               text: "Post",
-              icon: "sailing",
-              menu: [
-                { text: "Work + Instance", click: () => { 
-                  this.showPostModal = true;
-                  this.$nextTick(()=>{
-                    this.$refs.postmodal.post();
-                    this.profileStore.saveRecord()
-                  })
-                } },
-                { text: "Work Only", click: () => {
-                  this.showPostModal = true;
-                  this.$nextTick(()=>{
-                    this.$refs.postmodal.postwork();
-                    this.profileStore.saveRecord()
-                  })
-                } },
-                { text: "Instance Only", click: () => {
-                  this.showPostModal = true;
-                  this.$nextTick(()=>{
-                    this.$refs.postmodal.postinstance();
-                    this.profileStore.saveRecord()
-                  })
-                } },
-
-              ]
+              icon: (this.activeProfilePosted) ? "mark_email_read" : "sailing",
+              click: () => {
+                this.showPostModal = true;
+                this.$nextTick(()=>{
+                  this.$refs.postmodal.post();
+                  this.profileStore.saveRecord()
+                  this.activeProfilePosted = true
+                })
+              },
+              class: (this.activeProfilePosted) ? "record-posted" : "record-unposted",
             }
           )
+
 
           if (this.preferenceStore.copyMode){
               menu.push({ is: "separator" })
@@ -559,11 +552,12 @@
           }
         }
 
-        if (this.activeProfile.id){
+        if (this.activeProfile.id && this.$route.name == 'Edit'){
           menu.push(
             {
               text: "Profile: " + this.activeProfile.id,
-              class: "current-profile"
+              class: "current-profile",
+              
             }
           )
           }
