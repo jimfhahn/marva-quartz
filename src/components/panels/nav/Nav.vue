@@ -485,6 +485,41 @@
           }
           )
           menu.push(
+
+ 
+
+            {
+ 
+
+              text: "Validate",
+ 
+
+              icon: "check",
+ 
+
+              click: () => {
+ 
+
+                this.showValidateModal = true;
+ 
+
+                this.$nextTick(()=>{
+ 
+
+                  this.$refs.validatemodal.post()
+ 
+
+                })
+ 
+
+              }
+ 
+
+            }
+ 
+
+          )
+          menu.push(
             {
               text: "Post",
               icon: (this.activeProfilePosted) ? "mark_email_read" : "sailing",

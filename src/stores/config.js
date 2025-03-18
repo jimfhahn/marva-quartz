@@ -21,7 +21,7 @@ export const useConfigStore = defineStore('config', {
         workpublish: "https://quartz.bibframe.app/util/publish/staging/work",
         instancepublish: "https://quartz.bibframe.app/util/publish/staging/instance",
         bfdb: "https://id.loc.gov/",
-        validate: 'https://bibframe.org/marva/util/validate',
+        validate: 'http://localhost:5000/validate',
         profiles : 'profiles.json',
         starting : 'https://bibframe.org/marva/util/profiles/starting/prod',
         id: 'https://id.loc.gov/',

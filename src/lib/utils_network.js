@@ -2680,31 +2680,35 @@ const utilsNetwork = {
   },
 
   /**
-   * Validate a record send to backend
+   * Validate a record sent to backend
    */
   validate: async function(xml){
-    //console.log(">> Validating", xml)
-
-    let url = useConfigStore().returnUrls.validate
-
-    const rawResponse = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      },
-      //signal: AbortSignal.timeout(5000),
-      body: JSON.stringify({rdfxml: xml})
-    });
-
-    const content = await rawResponse.json();
-
-    return content
-
+    // dynamically use template from activeProfile, defaulting to 'monograph'
+    const templateValue = (useConfigStore().activeProfile && useConfigStore().activeProfile.templateType) || 'monograph';
+    let url = useConfigStore().returnUrls.validate + "?template=" + templateValue;
+    try {
+      const rawResponse = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/rdf+xml'
+        },
+        body: xml
+      });
+      if (!rawResponse.ok) {
+        const errorText = await rawResponse.text();
+        console.error(`Validation failed: ${rawResponse.status} ${rawResponse.statusText}: ${errorText}`);
+        // Optionally, log the error to your modal here:
+        // this.logErrorToModal(`Validation failed: ${rawResponse.status} ${rawResponse.statusText}`);
+        return { error: { message: `Validation failed: ${rawResponse.status} ${rawResponse.statusText}` } };
+      }
+      const content = await rawResponse.json();
+      return content;
+    } catch(err) {
+      console.error("Validation error:", err);
+      return { error: { message: err.message } };
+    }
   },
-
-
-
 
   /**
   * Publish the NAR
@@ -3017,7 +3021,14 @@ const utilsNetwork = {
         return false
       }
 
-    },}
+    },
 
+    logActiveTemplate() {
+        // Use optional chaining and a default value to avoid errors if the store is not initialized
+        const templateType = useConfigStore()?.activeProfile?.templateType || 'monograph';
+        console.log('Active template type:', templateType);
+    },
+
+}
 
 export default utilsNetwork;
