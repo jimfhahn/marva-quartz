@@ -39,6 +39,28 @@ function ensureRoot(xmlStr) {
   return trimmed;
 }
 
+// Helper to ensure admin metadata defaults are set
+export function ensureAdminMetadataDefaults(userValue) {
+    if (!userValue['http://id.loc.gov/ontologies/bflc/catalogerId']) {
+        userValue['http://id.loc.gov/ontologies/bflc/catalogerId'] = [
+            {
+                "@guid": short.generate(),
+                "http://id.loc.gov/ontologies/bflc/catalogerId": usePreferenceStore().catInitals
+            }
+        ];
+    }
+    // Ensure assigner is Added to userValue
+    if (!userValue['http://id.loc.gov/ontologies/bibframe/assigner']) {
+        userValue['http://id.loc.gov/ontologies/bibframe/assigner'] = [
+            {
+                "@type": "http://id.loc.gov/ontologies/bibframe/Organization",
+                "rdf:about": "http://id.loc.gov/vocabulary/organizations/pu",
+                "rdfs:label": "University of Pennsylvania, Van Pelt-Dietrich Library"
+            }
+        ];
+    }
+}
+
 const utilsParse = {
 
   data: {
@@ -1476,7 +1498,7 @@ const utilsParse = {
 
                                 let ggggChildData = {'@guid': short.generate()}
 
-                                if (ggggChild.innerHTML != null && ggggChild.innerHTML.trim() != ''){
+                                if (ggggChild.innerHTML != null && gggggChild.innerHTML.trim() != ''){
                                   ggggChildData[ggggChildProperty] = unEscapeHTML(ggggChild.innerHTML)
 
                                   // does it have a data type or lang
@@ -1712,6 +1734,17 @@ const utilsParse = {
                 "http://id.loc.gov/ontologies/bflc/catalogerId": usePreferenceStore().catInitals
               }
             ]
+          }
+
+          // NEW: Ensure assigner is set if missing
+          if (!userValue['http://id.loc.gov/ontologies/bibframe/assigner']) {
+            userValue['http://id.loc.gov/ontologies/bibframe/assigner'] = [
+              {
+                "@type": "http://id.loc.gov/ontologies/bibframe/Organization",
+                "rdf:about": "http://id.loc.gov/vocabulary/organizations/pu",
+                "rdfs:label": "University of Pennsylvania, Van Pelt-Dietrich Library"
+              }
+            ];
           }
 
           // // we need to set the procInfo, so use whatever we have in the profile

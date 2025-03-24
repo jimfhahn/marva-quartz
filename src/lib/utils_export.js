@@ -17,43 +17,106 @@ const escapeHTML = str => str.replace(/[&<>'"]/g,
       '"': '&quot;'
     }[tag]));
 
+// Formats an XML string with indentation for easier reading
+const formatXML = function (xml, tab = '\t', nl = '\n') {
+    if (!xml) {
+        return 'No XML';
+    }
+    let formatted = '', indent = '';
+    const nodes = xml.slice(1, -1).split(/>\s*</);
+    if (nodes[0][0] === '?') {
+        formatted += '<' + nodes.shift() + '>' + nl;
+    }
+    for (let i = 0; i < nodes.length; i++) {
+        const node = nodes[i];
+        if (node[0] === '/') {
+            indent = indent.slice(tab.length); // decrease indent
+        }
+        formatted += indent + '<' + node + '>' + nl;
+        if (node[0] !== '/' && node[node.length - 1] !== '/' && node.indexOf('</') === -1) {
+            indent += tab; // increase indent
+        }
+    }
+    return formatted;
+};
 
-const formatXML = function(xml, tab = '\t', nl = '\n') {
-	if (!xml){
-		return 'No XML'
-	}
-	let formatted = '', indent = '';
-	const nodes = xml.slice(1, -1).split(/>\s*</);
-	if (nodes[0][0] == '?') formatted += '<' + nodes.shift() + '>' + nl;
-	for (let i = 0; i < nodes.length; i++) {
-		const node = nodes[i];
-		if (node[0] == '/') indent = indent.slice(tab.length); // decrease indent
-		formatted += indent + '<' + node + '>' + nl;
-		if (node[0] != '/' && node[node.length - 1] != '/' && node.indexOf('</') == -1) indent += tab; // increase indent
-	}
-	return formatted;
-}
+// Returns a DOMParser instance using the built-in browser API
+const returnDOMParser = function () {
+    let p;
+    try {
+        p = new DOMParser();
+    } catch (error) {
+        p = new window.DOMParser();
+    }
+    return p;
+};
 
-// we will use the built in DOMParser() in the browser
-const returnDOMParser = function(){
-	let p
-	try{
-		p = new DOMParser();
-	}catch(error){
-
-		p = new window.DOMParser();
-	}
-	return p
-}
-
-// Add helper to wrap XML in a root element if needed
+// Ensures the provided XML string has a root element
 function ensureRoot(xmlStr) {
-  // If xmlStr does not start with a tag (e.g. empty, whitespace, or fragment), wrap it.
-  if (!xmlStr.trim().match(/^<\w/)) {
-    return `<root>${xmlStr}</root>`;
-  }
-  return xmlStr;
+    if (!xmlStr.trim().match(/^<\w/)) {
+        return `<root>${xmlStr}</root>`;
+    }
+    return xmlStr;
 }
+
+// Creates an XML element with the specified namespace and qualified name
+function createElByBestNS(elStr){
+    // Ensure elStr is a string so that indexOf and trim always work
+    if (typeof elStr !== 'string'){
+        elStr = String(elStr);
+    }
+    if (!elStr || typeof elStr !== "string"){
+      console.error("createElByBestNS: invalid elStr", elStr);
+      return document.createElement("div"); // safe fallback
+    }
+    elStr = elStr.trim();
+    // If elStr looks like only digits (possibly with whitespace), return fallback
+    if (/^\d[\d\s]*$/.test(elStr)) {
+      console.warn("createElByBestNS: elStr appears numeric/index only, returning fallback", elStr);
+      return document.createElement("div");
+    }
+    // If elStr looks like a full URI (contains "://"), follow URI logic
+    if (elStr.includes("://")){
+      if (elStr === 'http://www.loc.gov/mads/rdf/v1#'){
+        elStr = 'http://www.loc.gov/mads/rdf/v1#Authority';
+      }
+      elStr = elStr.replace('https://','http://');
+      if (!elStr.startsWith('http')){
+        elStr = utilsExport.UriNamespace(elStr);
+        if (!elStr || typeof elStr !== "string"){
+          console.error("createElByBestNS: UriNamespace returned invalid value", elStr);
+          return document.createElement("div");
+        }
+      }
+      for (let ns of Object.keys(utilsRDF.namespace)){
+        if (elStr.startsWith(utilsRDF.namespace[ns])){
+          let tag = utilsExport.namespaceUri(elStr);
+          if (!tag || typeof tag !== 'string'){
+             console.error("createElByBestNS: namespaceUri returned invalid tag for", elStr);
+             return document.createElement("div");
+          }
+          return document.createElementNS(utilsRDF.namespace[ns], tag);
+        }
+      }
+      console.error("createElByBestNS: could not find namespace for", elStr);
+      return document.createElement("div");
+    }
+    // If elStr does not contain "://", check if it is a qualified name like "bf:assigner"
+    else if (elStr.includes(":")){
+      let parts = elStr.split(":");
+      let prefix = parts[0];
+      if (utilsRDF.namespace[prefix]){
+        return document.createElementNS(utilsRDF.namespace[prefix], elStr);
+      } else {
+        console.error("createElByBestNS: unknown prefix", prefix);
+        return document.createElement("div");
+      }
+    }
+    else {
+      console.warn("createElByBestNS: elStr does not look like a valid URI or qualified name", elStr);
+      return document.createElement("div");
+    }
+  }
 
 const utilsExport = {
 
@@ -113,24 +176,58 @@ const utilsExport = {
   * @return {element}
   */
   createElByBestNS: function(elStr){
-		// HACK - bad marc2bf conversion
-		if (elStr == 'http://www.loc.gov/mads/rdf/v1#'){
-			elStr = 'http://www.loc.gov/mads/rdf/v1#Authority'
-		}
-
-		elStr=elStr.replace('https://','http://')
-		// if the elString is not a expanded URI
-		if (!elStr.startsWith('http')){
-			elStr = this.UriNamespace(elStr)
-		}
-		for (let ns of Object.keys(this.namespace)){
-			if (elStr.startsWith(this.namespace[ns])){
-				return document.createElementNS(this.namespace[ns],this.namespaceUri(elStr))
-			}
-		}
-		console.error('could not find namespace for ', elStr)
-		return null
-	},
+    if (!elStr || typeof elStr !== "string"){
+      console.error("createElByBestNS: invalid elStr", elStr);
+      return document.createElement("div"); // safe fallback
+    }
+    elStr = elStr.trim();
+    // If elStr looks like only digits (possibly with whitespace), return fallback
+    if (/^\d[\d\s]*$/.test(elStr)) {
+      console.warn("createElByBestNS: elStr appears numeric/index only, returning fallback", elStr);
+      return document.createElement("div");
+    }
+    // If elStr looks like a full URI (contains "://"), follow URI logic
+    if (elStr.includes("://")){
+      if (elStr === 'http://www.loc.gov/mads/rdf/v1#'){
+        elStr = 'http://www.loc.gov/mads/rdf/v1#Authority';
+      }
+      elStr = elStr.replace('https://','http://');
+      if (!elStr.startsWith('http')){
+        elStr = this.UriNamespace(elStr);
+        if (!elStr || typeof elStr !== "string"){
+          console.error("createElByBestNS: UriNamespace returned invalid value", elStr);
+          return document.createElement("div");
+        }
+      }
+      for (let ns of Object.keys(this.namespace)){
+        if (elStr.startsWith(this.namespace[ns])){
+          let tag = this.namespaceUri(elStr);
+          if (!tag || typeof tag !== 'string'){
+             console.error("createElByBestNS: namespaceUri returned invalid tag for", elStr);
+             return document.createElement("div");
+          }
+          return document.createElementNS(this.namespace[ns], tag);
+        }
+      }
+      console.error("createElByBestNS: could not find namespace for", elStr);
+      return document.createElement("div");
+    }
+    // If elStr does not contain "://", check if it is a qualified name like "bf:assigner"
+    else if (elStr.includes(":")){
+      let parts = elStr.split(":");
+      let prefix = parts[0];
+      if (this.namespace[prefix]){
+        return document.createElementNS(this.namespace[prefix], elStr);
+      } else {
+        console.error("createElByBestNS: unknown prefix", prefix);
+        return document.createElement("div");
+      }
+    }
+    else {
+      console.warn("createElByBestNS: elStr does not look like a valid URI or qualified name", elStr);
+      return document.createElement("div");
+    }
+  },
 
   /**
   * A helper function that will build blank node based on userValue obj
@@ -183,7 +280,11 @@ const utilsExport = {
   * @return {boolean}
   */
 	createLiteral: function(property,userValue){
-        let p = this.createElByBestNS(property)
+    if (!property) {
+      console.error("createLiteral: property is undefined", userValue);
+      return document.createElement("div"); // safe fallback element
+    }
+    let p = this.createElByBestNS(property)
 
 
 		// it should be stored under the same key
@@ -1035,7 +1136,7 @@ const utilsExport = {
 								let bnode = this.createElByBestNS(userValue['@type'])
 								bnode.setAttributeNS(this.namespace.rdf, 'rdf:about', userValue['@id'])
 
-								xmlLog.push(`Created ${p.tagName} property and ${bnode.tagName} bnode`)
+								xmlLog.push(`Created ${p.tagName} property and ${bnode.tagName}`)
 								p.appendChild(bnode)
 								rootEl.appendChild(p)
 								componentXmlLookup[`${rt}-${pt}`] = formatXML(p.outerHTML)
@@ -1197,6 +1298,25 @@ const utilsExport = {
 
 		bf_AdminMetadtat.appendChild(bf_date)
 		bf_AdminMetadtat.appendChild(bf_catalogerId)
+		 // Before appending the new assigner, remove any existing one:
+		if (bf_AdminMetadtat.querySelector("bf\\:assigner")) {
+			// Remove any previously created assigner element
+			bf_AdminMetadtat.removeChild(bf_AdminMetadtat.querySelector("bf\\:assigner"));
+		}
+		// Now create a fresh assigner element:
+		let bf_assigner = document.createElementNS(this.namespace.bf, "bf:assigner");
+		let org = document.createElementNS(this.namespace.bf, "bf:Organization");
+		// Create the rdf:about attribute using the proper namespace
+		org.setAttributeNS("http://www.w3.org/1999/02/22-rdf-syntax-ns#", "rdf:about", "http://id.loc.gov/vocabulary/organizations/pu");
+		let orgLabel = document.createElementNS(this.namespace.rdfs, "rdfs:label");
+		// Use textContent to set the label without extra XHTML markup
+		orgLabel.textContent = "University of Pennsylvania, Van Pelt-Dietrich Library";
+		org.appendChild(orgLabel);
+		bf_assigner.appendChild(org);
+		// Only add the Penn assigner if no Organization or Agent with rdf:about="http://id.loc.gov/vocabulary/organizations/dlc" is found inside the bf:adminMetadata (or its bf:AdminMetadata child).
+		if (!bf_AdminMetadtat.querySelector('bf\\:Organization[rdf\\:about="http://id.loc.gov/vocabulary/organizations/dlc"], bf\\:agent[rdf\\:about="http://id.loc.gov/vocabulary/organizations/dlc"]')) {
+			bf_AdminMetadtat.appendChild(bf_assigner);
+		}
 
 		bf_Status.appendChild(bf_StatusLabel)
 		bf_status.appendChild(bf_Status)
@@ -1547,6 +1667,38 @@ const utilsExport = {
 		for (let el of rdfBasic.getElementsByTagName("bf:Item")){ bf2MarcXmlElRdf.appendChild(el) }
 		let strBf2MarcXmlElBib = (new XMLSerializer()).serializeToString(bf2MarcXmlElRdf)
 
+		 // Clean up any bf:assigner elements by removing extraneous <div> children
+		const assignerNodes = rdf.querySelectorAll("bf\\:assigner");
+		assignerNodes.forEach(assigner => {
+			Array.from(assigner.childNodes).forEach(child => {
+				if (child.nodeName.toUpperCase() === "DIV") {
+					assigner.removeChild(child);
+				}
+			});
+		});
+
+		 // NEW: Re-parse and remove assigner nodes having the problematic concatenated text
+		const parser = new DOMParser();
+		const tempDoc = parser.parseFromString(strXml, "application/xml");
+		const assignerNodesToRemove = tempDoc.querySelectorAll("bf\\:assigner");
+		assignerNodesToRemove.forEach(assigner => {
+			const org = assigner.querySelector("bf\\:Organization");
+			if (org) {
+				// Remove all whitespace to compare
+				const cleanedText = org.textContent.trim().replace(/\s+/g, '');
+				if (cleanedText === "http://id.loc.gov/vocabulary/organizations/puUniversityofPennsylvania,VanPelt-DietrichLibrary") {
+					assigner.parentNode.removeChild(assigner);
+				}
+			}
+		});
+		strXml = new XMLSerializer().serializeToString(tempDoc);
+
+		 // Apply the organization element cleaner to each XML output string
+		strXmlFormatted = cleanOrganizationElement(strXmlFormatted);
+		strXmlBasic = cleanOrganizationElement(strXmlBasic);
+		strXml = cleanOrganizationElement(strXml);
+		strBf2MarcXmlElBib = cleanOrganizationElement(strBf2MarcXmlElBib);
+
 		// console.log(strBf2MarcXmlElBib, strXmlFormatted, strXmlBasic, strXml)
 
 		// console.log("-------componentXmlLookup",componentXmlLookup)
@@ -1579,7 +1731,7 @@ const utilsExport = {
         let subjects = xml.getElementsByTagName("bf:subject")
 
         for (let subject of subjects){
-            // subject = parser.parseFromString(subject.innerHTML, "application/xml")
+            // subject = parser.parseFromString(subject.innerHTML, "text/xml")
 
             let componentList = subject.getElementsByTagName("madsrdf:componentList")
 
@@ -2074,9 +2226,188 @@ const utilsExport = {
 		console.log(xml)
 		return xml
 
-	}
+	},
 
+  /**
+   * Builds the admin metadata XML ensuring the assigner element is correctly structured.
+   * The assigner element is built with an Organization element containing the label.
+   * @param {object} userValue - The user value containing catalogerId info
+   * @return {Element} - The adminMetadata element
+   */
+  buildAdminMetadata: function(userValue) {
+    const adminMetadata = this.createElByBestNS('http://id.loc.gov/ontologies/bibframe/', 'adminMetadata');
+    const adminContainer = this.createElByBestNS('http://id.loc.gov/ontologies/bibframe/', 'AdminMetadata');
+
+    // Create and append date element.
+    const dateEl = this.createElByBestNS('http://id.loc.gov/ontologies/bibframe/', 'date');
+    dateEl.textContent = new Date().toISOString();
+    adminContainer.appendChild(dateEl);
+
+    // Create and append catalogerId element.
+    const catalogerIdEl = this.createElByBestNS('http://id.loc.gov/ontologies/bflc/', 'catalogerId');
+    catalogerIdEl.textContent = userValue['http://id.loc.gov/ontologies/bflc/catalogerId'][0]['http://id.loc.gov/ontologies/bflc/catalogerId'];
+    adminContainer.appendChild(catalogerIdEl);
+
+    // Create assigner element with nested Organization and label.
+    const assignerEl = this.createElByBestNS('http://id.loc.gov/ontologies/bibframe/', 'assigner');
+    const organizationEl = this.createElByBestNS('http://id.loc.gov/ontologies/bibframe/', 'Organization');
+    organizationEl.setAttributeNS('http://www.w3.org/1999/02/22-rdf-syntax-ns#', 'rdf:about', 'http://id.loc.gov/vocabulary/organizations/pu');
+    
+    const labelEl = this.createElByBestNS('http://www.w3.org/2000/01/rdf-schema#', 'label');
+    labelEl.textContent = 'University of Pennsylvania, Van Pelt-Dietrich Library';
+    organizationEl.appendChild(labelEl);
+    assignerEl.appendChild(organizationEl);
+
+    console.log("Before cleaning assigner, assignerEl.innerHTML:", assignerEl.innerHTML);
+    cleanAssignerElement(assignerEl); 
+    console.log("After cleaning assigner, assignerEl.innerHTML:", assignerEl.innerHTML);
+
+    adminContainer.appendChild(assignerEl);
+    adminMetadata.appendChild(adminContainer);
+    
+    return adminMetadata;
+  },
+  
+  // ...existing code...
+};
+
+// UPDATED cleanAssignerElement: added detailed logging and adjusted matching,
+// so that if a child element's tag name starts with "div" (even if the namespace or attribute string is malformed),
+// it gets removed.
+function cleanAssignerElement(assignerEl) {
+    if (!assignerEl) return;
+    const orgEl = assignerEl.querySelector('Organization');
+    if (orgEl) {
+        // Log what children exist before cleaning
+        console.log("Before cleaning, Organization children:", orgEl.childNodes);
+        // Use a safer iteration over children.
+        Array.from(orgEl.childNodes).forEach(child => {
+            // Check if child.tagName exists, and whether it starts with "div" (case-insensitive)
+            if (child.tagName && child.tagName.toLowerCase().startsWith('div')) {
+                console.log("Removing child element:", child);
+                orgEl.removeChild(child);
+            }
+        });
+        console.log("After cleaning, Organization children:", orgEl.childNodes);
+    }
 }
 
+// Add a new utility function that will specifically clean organization elements with div spam
+function cleanOrganizationElement(xmlString) {
+  if (!xmlString) return xmlString;
+  
+  // Improved regex pattern to better capture and preserve the rdf:about attribute
+  // but avoid adding redundant namespace declarations
+  let cleaned = xmlString.replace(/<bf:Organization([^>]*)>([\s\S]*?)<\/bf:Organization>/g, (match, attributes, content) => {
+    // Extract the about attribute if present
+    const aboutAttr = attributes.match(/rdf:about="([^"]*)"/);
+    const aboutStr = aboutAttr ? ` rdf:about="${aboutAttr[1]}"` : '';
+    
+    // Check if this Organization element contains div elements or has malformed content
+    if (content.includes("<div") || content.includes("<divxmlns=")) {
+      // Create a clean replacement that preserves the rdf:about attribute but without redundant namespace declarations
+      return `<bf:Organization${aboutStr}><rdfs:label>University of Pennsylvania, Van Pelt-Dietrich Library</rdfs:label></bf:Organization>`;
+    }
+    
+    // If no divs are found, but there's no label, add one while preserving attributes
+    if (!content.includes("<rdfs:label") && !content.includes("<label")) {
+      return `<bf:Organization${attributes}><rdfs:label>University of Pennsylvania, Van Pelt-Dietrich Library</rdfs:label></bf:Organization>`;
+    }
+    
+    return match; // No issues found, return original
+  });
+  
+  // DOM-based approach as a fallback for complex cases
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(cleaned, "text/xml");
+    
+    // Find all Organization elements
+    const orgs = doc.querySelectorAll("bf\\:Organization");
+    let modified = false;
+    
+    orgs.forEach(org => {
+      // Explicitly check and save the about attribute
+      let aboutValue = null;
+      
+      // Try different methods to get the about attribute
+      aboutValue = org.getAttributeNS("http://www.w3.org/1999/02/22-rdf-syntax-ns#", "about") || 
+                  org.getAttribute("rdf:about");
+      
+      // Last resort: parse the outerHTML string
+      if (!aboutValue) {
+        const outerHTML = org.outerHTML;
+        const aboutMatch = outerHTML.match(/rdf:about="([^"]*)"/);
+        if (aboutMatch) {
+          aboutValue = aboutMatch[1];
+        }
+      }
+      
+      // Check if any child is a div or has malformed content
+      const children = Array.from(org.childNodes);
+      let hasDivs = false;
+      
+      for (let i = children.length - 1; i >= 0; i--) {
+        const child = children[i];
+        if (child.nodeName && 
+            (child.nodeName.toLowerCase() === "div" || 
+             child.nodeName.toLowerCase().startsWith("div"))) {
+          org.removeChild(child);
+          hasDivs = true;
+          modified = true;
+        }
+      }
+      
+      // Ensure there's a proper label element
+      const labelElement = org.querySelector("rdfs\\:label");
+      if (!labelElement) {
+        const label = doc.createElementNS("http://www.w3.org/2000/01/rdf-schema#", "rdfs:label");
+        label.textContent = "University of Pennsylvania, Van Pelt-Dietrich Library";
+        org.appendChild(label);
+        modified = true;
+      }
+      
+      // Make sure the about attribute is present and correct
+      if (aboutValue && !org.getAttributeNS("http://www.w3.org/1999/02/22-rdf-syntax-ns#", "about")) {
+        org.setAttributeNS("http://www.w3.org/1999/02/22-rdf-syntax-ns#", "rdf:about", aboutValue);
+        modified = true;
+      } else if (!aboutValue) {
+        // If no about was found, set it to the Penn value
+        org.setAttributeNS("http://www.w3.org/1999/02/22-rdf-syntax-ns#", "rdf:about", "http://id.loc.gov/vocabulary/organizations/pu");
+        modified = true;
+      }
+      
+      // Remove any redundant namespace declarations
+      if (org.hasAttribute("xmlns:rdf")) {
+        org.removeAttribute("xmlns:rdf");
+        modified = true;
+      }
+      
+      // Also check the label element
+      const label = org.querySelector("rdfs\\:label");
+      if (label && label.hasAttribute("xmlns:rdfs")) {
+        label.removeAttribute("xmlns:rdfs");
+        modified = true;
+      }
+    });
+    
+    if (modified) {
+      cleaned = new XMLSerializer().serializeToString(doc);
+    }
+  } catch (e) {
+    console.error("Error when cleaning XML with DOM parser:", e);
+  }
+  
+  // Final safety pass: ensure we don't have remaining malformed elements
+  // but without redundant namespace declarations
+  cleaned = cleaned.replace(/<bf:Organization(?![^>]*rdf:about=)[^>]*>/g, 
+    '<bf:Organization rdf:about="http://id.loc.gov/vocabulary/organizations/pu">');
+  
+  // Clean up any remaining namespace declarations in Organization elements
+  cleaned = cleaned.replace(/<bf:Organization([^>]*) xmlns:rdf="[^"]*"([^>]*)>/g, '<bf:Organization$1$2>');
+  cleaned = cleaned.replace(/<rdfs:label([^>]*) xmlns:rdfs="[^"]*"([^>]*)>/g, '<rdfs:label$1$2>');
+  
+  return cleaned;
+}
 
 export default utilsExport;

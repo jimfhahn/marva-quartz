@@ -53,6 +53,26 @@ function cleanCacheGuid(cache, obj, target){
   )
 }
 
+export function ensureAdminMetadataDefaults(userValue) {
+    if (!userValue['http://id.loc.gov/ontologies/bflc/catalogerId']) {
+        userValue['http://id.loc.gov/ontologies/bflc/catalogerId'] = [
+            {
+                "@guid": short.generate(),
+                "http://id.loc.gov/ontologies/bflc/catalogerId": usePreferenceStore().catInitals
+            }
+        ];
+    }
+    if (!userValue['http://id.loc.gov/ontologies/bibframe/assigner']) {
+        userValue['http://id.loc.gov/ontologies/bibframe/assigner'] = [
+            {
+                "@type": "http://id.loc.gov/ontologies/bibframe/Organization",
+                "rdf:about": "http://id.loc.gov/vocabulary/organizations/pu",
+                "rdfs:label": "University of Pennsylvania, Van Pelt-Dietrich Library"
+            }
+        ];
+    }
+}
+
 export const useProfileStore = defineStore('profile', {
   state: () => ({
 
@@ -1067,64 +1087,78 @@ export const useProfileStore = defineStore('profile', {
       // console.log('------useProfile-------')
       // console.log(useProfile)
 
-      if (addAdmin){
-        for (let rt in useProfile.rt){
-          let adminMetadataProperty = {
-              "mandatory": false,
-              "propertyLabel": "Admin Metadata",
-              "propertyURI": "http://id.loc.gov/ontologies/bibframe/adminMetadata",
-              "repeatable": false,
-              "resourceTemplates": [],
-              '@guid': short.generate(),
-              "type": "resource",
-              "userValue": {
-                "@root":"http://id.loc.gov/ontologies/bibframe/adminMetadata",
-                "http://id.loc.gov/ontologies/bibframe/adminMetadata":[{
-
-                    "@type": "http://id.loc.gov/ontologies/bibframe/AdminMetadata",
-                    '@guid': short.generate(),
-                    "http://id.loc.gov/ontologies/bflc/catalogerId": [
-                      {
-                      "@guid": short.generate(),
-                      "http://id.loc.gov/ontologies/bflc/catalogerId": addAdmin
-                      }
+      if (addAdmin) {
+        for (let rt in useProfile.rt) {
+            let adminMetadataProperty = {
+                "mandatory": false,
+                "propertyLabel": "Admin Metadata",
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/adminMetadata",
+                "repeatable": false,
+                "resourceTemplates": [],
+                "@guid": short.generate(),
+                "type": "resource",
+                "userValue": {
+                    "@root": "http://id.loc.gov/ontologies/bibframe/adminMetadata",
+                    "http://id.loc.gov/ontologies/bibframe/adminMetadata": [{
+                        "@type": "http://id.loc.gov/ontologies/bibframe/AdminMetadata",
+                        "@guid": short.generate(),
+                        "http://id.loc.gov/ontologies/bflc/catalogerId": [
+                            {
+                                "@guid": short.generate(),
+                                "http://id.loc.gov/ontologies/bflc/catalogerId": addAdmin
+                            }
+                        ],
+                        "http://id.loc.gov/ontologies/bibframe/assigner": [
+                            {
+                                "@type": "http://id.loc.gov/ontologies/bibframe/Organization",
+                                "rdf:about": "http://id.loc.gov/vocabulary/organizations/pu",
+                                "rdfs:label": "University of Pennsylvania, Van Pelt-Dietrich Library"
+                            }
+                        ]
+                    }]
+                },
+                "valueConstraint": {
+                    "defaults": [],
+                    "useValuesFrom": [],
+                    "valueDataType": {},
+                    "valueTemplateRefs": [
+                        (!rt.includes(':GPO')) ?
+                        'lc:RT:bf2:AdminMetadata:BFDB' :
+                        'lc:RT:bf2:GPOMono:AdminMetadata'
                     ]
-                }]
-              },
-              "valueConstraint": {
-                "defaults": [],
-                "useValuesFrom": [],
-                "valueDataType": {},
-                "valueTemplateRefs": [  (!rt.includes(':GPO')) ? 'lc:RT:bf2:AdminMetadata:BFDB' :   'lc:RT:bf2:GPOMono:AdminMetadata'   ]
-              }
+                }
             }
-          let adminMetadataPropertyLabel = 'http://id.loc.gov/ontologies/bibframe/adminMetadata'.replace('http://','').replace('https://','').replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g,"_") + '__admin_metadata'
-
-          if (useProfile.rt[rt].pt[adminMetadataPropertyLabel]){
-            // console.log("Admin already exists for ", rt, 'chahhing userid')
-            // it already exists, so update the catalogerId and use the existing userValue
-
-            if (useProfile.rt[rt].pt[adminMetadataPropertyLabel].userValue['http://id.loc.gov/ontologies/bibframe/adminMetadata'][0]["http://id.loc.gov/ontologies/bflc/catalogerId"]){
-                useProfile.rt[rt].pt[adminMetadataPropertyLabel].userValue['http://id.loc.gov/ontologies/bibframe/adminMetadata'][0]["http://id.loc.gov/ontologies/bflc/catalogerId"] =  [
-                  {
-                  "@guid": short.generate(),
-                  "http://id.loc.gov/ontologies/bflc/catalogerId": addAdmin
-                  }
-                ]
+            let adminMetadataPropertyLabel = 'http://id.loc.gov/ontologies/bibframe/adminMetadata'
+                .replace('http://', '')
+                .replace('https://', '')
+                .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "_") + '__admin_metadata'
+    
+            if (useProfile.rt[rt].pt[adminMetadataPropertyLabel]) {
+                // update the catalogerId and use the existing userValue
+                if (useProfile.rt[rt].pt[adminMetadataPropertyLabel].userValue['http://id.loc.gov/ontologies/bibframe/adminMetadata'][0]["http://id.loc.gov/ontologies/bflc/catalogerId"]) {
+                    useProfile.rt[rt].pt[adminMetadataPropertyLabel].userValue['http://id.loc.gov/ontologies/bibframe/adminMetadata'][0]["http://id.loc.gov/ontologies/bflc/catalogerId"] = [
+                        {
+                            "@guid": short.generate(),
+                            "http://id.loc.gov/ontologies/bflc/catalogerId": addAdmin
+                        }
+                    ]
+                    useProfile.rt[rt].pt[adminMetadataPropertyLabel].userValue['http://id.loc.gov/ontologies/bibframe/adminMetadata'][0]["http://id.loc.gov/ontologies/bibframe/assigner"] = [
+                        {
+                            "@type": "http://id.loc.gov/ontologies/bibframe/Organization",
+                            "rdf:about": "http://id.loc.gov/vocabulary/organizations/pu",
+                            "rdfs:label": "University of Pennsylvania, Van Pelt-Dietrich Library"
+                        }
+                    ];
+                }
+            } else {
+                // add the admin metadata property to ptOrder and pt
+                useProfile.rt[rt].ptOrder.push(adminMetadataPropertyLabel)
+                useProfile.rt[rt].pt[adminMetadataPropertyLabel] = JSON.parse(JSON.stringify(adminMetadataProperty))
             }
-            // TODO remove local system number
-
-          }else{
-            // console.log("Admin does not exists for ", rt, 'adding it')
-            // doesn't exist, add it to the ptOrder and pt
-            useProfile.rt[rt].ptOrder.push(adminMetadataPropertyLabel)
-            useProfile.rt[rt].pt[adminMetadataPropertyLabel] = JSON.parse(JSON.stringify(adminMetadataProperty))
-          }
-
         }
-      }
-
-      return useProfile
+    }
+    
+    return useProfile
 
     },
 
@@ -2875,7 +2909,7 @@ export const useProfileStore = defineStore('profile', {
       if (numUpper == 2){
         code = code.split(':')[0] + ':' + justProperty.charAt(0) + justProperty.replace(/[a-z]/g, '')
       }else if (numUpper == 1){
-        code = code.split(':')[0] + ':' + justProperty.charAt(0) + justProperty.charAt(1) + justProperty.replace(/[a-z]/g, '')
+        code = code.split(':')[0] + justProperty.charAt(0) + justProperty.charAt(1) + justProperty.replace(/[a-z]/g, '')
       }else if (numUpper == 0){
         code = code.split(':')[0] + ':' + justProperty.charAt(0) + justProperty.charAt(1) + justProperty.charAt(2)
       }
@@ -2923,15 +2957,17 @@ export const useProfileStore = defineStore('profile', {
       // let valueLocation = utilsProfile.returnValueFromPropertyPath(pt,propertyPath)
       // some hard coded hacks
 
-      if (fieldStructure.propertyURI === 'http://id.loc.gov/ontologies/bflc/nonSortNum'){
-        return false
+      if (fieldStructure.propertyURI === 'http://id.loc.gov/ontologies/bibframe/title'){
+        return true
       }
+
       if (fieldStructure.propertyURI === 'http://id.loc.gov/ontologies/bibframe/mainTitle'){
         return true
       }
 
-
-
+      if (fieldStructure.propertyURI === 'http://id.loc.gov/ontologies/bflc/nonSortNum'){
+        return false
+      }
 
       // if it doesn't have any valuetemplates then it is a single property component
       if (pt.valueConstraint.valueTemplateRefs.length==0){
@@ -3132,8 +3168,8 @@ export const useProfileStore = defineStore('profile', {
         let target = false
 
         if (rtId.indexOf(":Work") > -1){
-          for (let ptId in this.activeProfile.rt[rtId].pt){
-            if (this.activeProfile.rt[rtId].pt[ptId]['@guid'] == componentGuid){
+          for (let pt in this.activeProfile.rt[rtId].pt){
+            if (this.activeProfile.rt[rtId].pt[pt]['@guid'] == componentGuid){
               work = this.activeProfile.rt[rtId]
               break
             }
