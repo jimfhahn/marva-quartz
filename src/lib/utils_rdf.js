@@ -43,6 +43,9 @@ const utilsRDF = {
     'owl': 'http://www.w3.org/2002/07/owl#',
 		'void':'http://rdfs.org/ns/void#',
     'lcc': 'http://id.loc.gov/ontologies/lcc#',
+    'skos': 'http://www.w3.org/2004/02/skos/core#"',
+    'cc': 'http://creativecommons.org/ns#',
+    'foaf': 'http://xmlns.com/foaf/0.1/',
     'vartitletype': 'http://id.loc.gov/vocabulary/vartitletype/',
   },
 
