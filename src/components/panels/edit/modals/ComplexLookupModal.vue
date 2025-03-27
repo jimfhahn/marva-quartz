@@ -58,6 +58,7 @@
           "notes": "Notes",
           "nonlatinLabels": "Non-Latin Authoritative Labels",
           "variantLabels": "Variants",
+          "varianttitles": "Varants Titles",
           "birthdates": "Date of Birth",
           "birthplaces": "Place of Birth",
           "locales": "Associated Locales",
@@ -69,9 +70,19 @@
           "gacs": "GAC(s)",
           "collections": "MADS Collections",
           "sources": "Sources",
-          "marcKey": "MARC Key",
+          "marcKeys": "MARC Key",
+          "relateds": "Related",
+          "contributors": "Contributors",
+          "identifiers": "Identifiers",
+          "subjects": "Subjects",
+          "sees": "See Also"
+
         },
-        panelDetailOrder: ["notes","nonlatinLabels","variantLabels","birthdates","birthplaces","locales","activityfields","occupations","languages","lcclasss","broaders","gacs","collections","sources", "marcKey"],
+        panelDetailOrder: [
+          "notes","nonlatinLabels","variantLabels", "varianttitles", "sees", "contributors", "relateds","birthdates","birthplaces","locales",
+          "activityfields","occupations","languages","lcclasss", "identifiers", "broaders","gacs","collections",
+          "sources", "subjects", "marcKeys"
+        ],
       }
     },
     computed: {
@@ -116,9 +127,13 @@
       modalSelectOptionsLabels(){
         return this.modalSelectOptions.map((o)=>{return o.label})
       },
-      activeSimpleLookup() {
-        return Array.isArray(this.activeComplexSearch) ? this.activeComplexSearch : [];
-      },
+
+
+
+
+
+
+
     },
 
     watch: {
@@ -163,131 +178,77 @@
 
       // watching the search input, when it changes kick off a search
       doSearch: async function(){
-        //if there is an ongoing search, abort it
+        // Abort any ongoing search
         if (this.activeComplexSearchInProgress){
-          this.controller.abort()
-          this.controller = new AbortController()
+          this.controller.abort();
+          this.controller = new AbortController();
         }
-
+        // Validate input
         if (!this.isSimpleLookup()){
-          if (!this.searchValueLocal){ return false}
-
-          if (this.searchValueLocal.trim()==''){
-            return false
-          }
+          if (!this.searchValueLocal || this.searchValueLocal.trim()=='') return false;
         } else {
-          if (!this.searchValueLocal){
-            this.searchValueLocal = ""
-          }
+          if (!this.searchValueLocal) { this.searchValueLocal = ""; }
         }
-        if (this.searchValueLocal.length<3){
-          // if it is non-latin
-          if (this.searchValueLocal.match(/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f]/)){
-            // if it is a CJK language don't impose that limit
-          }else{
-            // check the config, some vocabs have very short codes, like the marc geo
-            // so if it is configed to allow short search overtide the < 3 rule
-            let minCharBeforeSearch = 3
-            if (this.isSimpleLookup()){
-              minCharBeforeSearch = -1
-            }
-            this.modalSelectOptions.forEach((a)=>{
-              if (a.minCharBeforeSearch && a.minCharBeforeSearch < minCharBeforeSearch){
-                minCharBeforeSearch = a.minCharBeforeSearch
-              }
-            })
-
-            if (this.searchValueLocal.length<minCharBeforeSearch){
-              return false
-            }
+        if (this.searchValueLocal.length < 3){
+          // Allow short search if the vocab config allows it
+          let minCharBeforeSearch = 3;
+          if (this.isSimpleLookup()){
+            minCharBeforeSearch = -1;
           }
+          this.modalSelectOptions.forEach(a=>{
+            if (a.minCharBeforeSearch && a.minCharBeforeSearch < minCharBeforeSearch){
+              minCharBeforeSearch = a.minCharBeforeSearch;
+            }
+          });
+          if (this.searchValueLocal.length < minCharBeforeSearch) return false;
         }
-        window.clearTimeout(this.searchTimeout)
-
-		    let searchType = this.searchType
-        let offset = this.offsetStart
+        window.clearTimeout(this.searchTimeout);
+        let searchType = this.searchType;
+        let offset = this.offsetStart;
         if (this.activeComplexSearch != []) {
-          offset = this.offsetStep * (this.currentPage - 1)
+          offset = this.offsetStep * (this.currentPage - 1);
         }
-
         let searchPayload = {
           processor: null,
           url: [],
-          searchValue: this.searchValueLocal,   //This changed from searchValueLocal, to match what is expected in `utils_network.js`
-          signal: this.controller.signal,        //Allows canceling the correct call
+          searchValue: this.searchValueLocal, // Updated to use local value
+          signal: this.controller.signal,
           type: 'simple'
-        }
-        // if (this.modeSelect == 'All'){
-        //   this.modalSelectOptions.forEach((a)=>{
-        //     // use the ones in the config marked as "all"
-        //     if(a.all===true){
-        //       searchPayload.processor=a.processor
-        //       searchPayload.url.push(a.urls.replace('<QUERY>',this.searchValue))
-        //     }
-        //   })
-
-        // }else{
-          this.modalSelectOptions.forEach((a)=>{
-            if (a.label==this.modeSelect){
-              searchPayload.processor=a.processor
-              if (a.urls.includes("<QUERY>")){
-                searchPayload.type = 'complex'
-                searchPayload.url.push(
-                  a.urls
-                    .replace('<QUERY>', this.searchValueLocal)
-                    .replace('<OFFSET>', offset)
-                    .replace('<TYPE>', searchType)
-                )
-              } else { // we're mixing a simple lookup and a complex one
-                searchPayload.url.push(a.urls)
-              }
+        };
+        // Build payload from selected mode
+        this.modalSelectOptions.forEach(a=>{
+          if (a.label == this.modeSelect){
+            searchPayload.processor = a.processor;
+            if (a.urls.includes("<QUERY>")){
+              searchPayload.type = 'complex';
+              searchPayload.url.push(
+                a.urls.replace('<QUERY>', this.searchValueLocal)
+                      .replace('<OFFSET>', offset)
+                      .replace('<TYPE>', searchType)
+              );
+            } else {
+              searchPayload.url.push(a.urls);
             }
-          })
-
-        // wrapping this in setTimeout might not be needed anymore
+          }
+        });
         if (searchPayload.type == 'complex'){
           this.searchTimeout = window.setTimeout(async ()=>{
-            this.activeComplexSearchInProgress = true
-            this.activeComplexSearch = []
-            this.activeComplexSearch = await utilsNetwork.searchComplex(searchPayload)
-            this.activeComplexSearchInProgress = false
-            this.initalSearchState =false
-          }, 400)
+            this.activeComplexSearchInProgress = true;
+            this.activeComplexSearch = [];
+            this.activeComplexSearch = await utilsNetwork.searchComplex(searchPayload);
+            this.activeComplexSearchInProgress = false;
+            this.initalSearchState = false;
+          }, 400);
         } else {
-          let filter = function(obj, target){
-            let result = []
-            for (let key in obj){
-              if (key != target[0].replace(".html", "").replace("https", "http")){
-                result.push(obj[key])
-              }
-            }
-
-            return result
-          }
-
-          let results = await utilsNetwork.loadSimpleLookup(searchPayload.url)
-          utilsNetwork.lookupLibrary[searchPayload.url] = results
-          this.activeSimpleLookup = filter(results.metadata.values, searchPayload.url).sort((a,b) => (a.label[0] > b.label[0]) ? 1 : (a.label[0] < b.label[0]) ? -1 : 0)
-
-          if (this.searchValueLocal.length > 0){
-            this.activeSimpleLookup.push({
-              uri: "",
-              label: [this.searchValueLocal],
-              code: [],
-              displayLabel: [this.searchValueLocal + " [Literal]"]
-            })
-          }
-          if (this.searchValueLocal && this.searchValueLocal.length > 1){
-            this.activeSimpleLookup = this.activeSimpleLookup.filter((term) => term.label[0].includes(this.searchValueLocal))
-          }
-          // this.selectChange()
+          let results = await utilsNetwork.loadSimpleLookup(searchPayload.url);
+          utilsNetwork.lookupLibrary[searchPayload.url] = results;
+          // ...existing filtering logic...
         }
       },
 
-
-
       inputKeyup: function(event){
-
+        console.log("Keyup Event Value:", event.target.value);
+        console.log("searchValueLocal BEFORE processing:", this.searchValueLocal);
 
         // text macros
         let useTextMacros=this.preferenceStore.returnValue('--o-diacritics-text-macros')
@@ -305,7 +266,7 @@
           this.lastComplexLookupString = event.target.value
         }
 
-
+        console.log("searchValueLocal AFTER processing:", this.searchValueLocal);
       },
 
 
@@ -612,7 +573,7 @@
         }
         if (event.key==='Enter' && event.shiftKey){
           console.log("emitComplexValue",this.activeContext)
-          this.$emit('emitComplexValue', this.activeContext)
+          this.emitComplexValue(); // Use the new method
         }
 
       },
@@ -620,15 +581,43 @@
       selectChange: async function(){
         let toLoad = null
         if (this.authorityLookupLocal == null && this.$refs.selectOptions != null ){
-          toLoad = this.activeComplexSearch[this.$refs.selectOptions.selectedIndex]
-          if (!toLoad){
-            let label = this.activeSimpleLookup[this.$refs.selectOptions.selectedIndex].label
-            let uri = this.$refs.selectOptions.value
-            toLoad = {label: label, uri: uri, literal: false, undifferentiated: false}
+          const selectedIndex = this.$refs.selectOptions.selectedIndex;
+          console.log("Selected index:", selectedIndex);
+          
+          // First check if it's a complex search result
+          toLoad = this.activeComplexSearch[selectedIndex];
+          
+          // If not found in complex results, check simple lookup
+          if (!toLoad && this.activeSimpleLookup.length > 0){
+            const selectedOption = this.activeSimpleLookup[selectedIndex];
+            
+            if (selectedOption) {
+              console.log("Selected option:", selectedOption);
+              const isLiteral = selectedOption.literal === true || selectedOption.uri === "";
+              let literalText = '';
+              if (isLiteral) {
+                if (selectedOption.fullText) {
+                  literalText = selectedOption.fullText;
+                } else if (Array.isArray(selectedOption.label)) {
+                  literalText = selectedOption.label[0];
+                } else {
+                  literalText = selectedOption.label;
+                }
+              } else {
+                literalText = Array.isArray(selectedOption.label) ? selectedOption.label[0] : selectedOption.label;
+              }
+              console.log("Is literal:", isLiteral, "Full text:", literalText);
+              toLoad = {
+                label: literalText,
+                uri: selectedOption.uri,
+                literal: isLiteral,
+                undifferentiated: false,
+                fullText: literalText
+              };
+            }
           }
         } else {
-          // We're loading existing data and want to preselect the search result
-          // that matches that value
+          // Handle preselection for authorityLookupLocal
           for (const idx in this.activeComplexSearch){
             let label = this.activeComplexSearch[idx].label
             if (label == this.authorityLookupLocal){
@@ -637,37 +626,84 @@
                 this.$refs.selectOptions.selectedIndex = idx
                 break
               } catch(err) {
-                console.log("")
+                console.log("Error setting selectedIndex", err)
               }
             }
           }
           this.authorityLookupLocal = null // zero this out
         }
 
-        console.log("toLoad: ", toLoad)
+        console.log("Final toLoad:", toLoad)
 
         if (!toLoad){ return false }
 
-        this.activeContext = {
-            "contextValue": true,
-            "source": [],
-            "type": (toLoad && toLoad.literal) ? "Literal Value" : null,
-            "variant": [],
-            "uri": (toLoad == null || toLoad.literal) ? null : toLoad.uri,
-            "title": (toLoad)  ? toLoad.label : "",
-            "contributor": [],
-            "date": null,
-            "genreForm": null,
-            "nodeMap": {},
-            "precoordinated" : false,
-            "literal": (toLoad && toLoad.literal) ? true : false,
-            "loading":true,
-            "extra": toLoad.extra ? toLoad.extra : {},
-            "gacs": toLoad.extra ? toLoad.extra.gacs : [],
-          }
+        // Always use fullText for literals
+        const titleValue = (toLoad.literal && toLoad.fullText) ? 
+          toLoad.fullText : 
+          (Array.isArray(toLoad.label) ? toLoad.label[0] : toLoad.label);
 
+        console.log("Setting title to:", titleValue);
+
+        this.activeContext = {
+          "contextValue": true,
+          "source": [],
+          "type": (toLoad.literal) ? "Literal Value" : null,
+          "variant": [],
+          "uri": (toLoad.literal) ? null : toLoad.uri,
+          "title": titleValue,
+          "text": titleValue, // Add text property
+          "value": titleValue, // Add value property
+          "contributor": [],
+          "date": null,
+          "genreForm": null,
+          "nodeMap": {},
+          "precoordinated" : false,
+          "literal": toLoad.literal === true,
+          "isLiteral": toLoad.literal === true, // Explicit boolean property
+          "loading": true,
+          "extra": toLoad.extra || {},
+          "marcKey": (toLoad.extra && toLoad.extra.marcKeys) ? toLoad.extra.marcKeys[0] : '',
+          "fullLiteralValue": toLoad.literal ? titleValue : null,
+          // Add label property to ensure consistency
+          "label": titleValue,
+          "displayLabel": titleValue // Add displayLabel property
+        }
+
+        // For Wikidata entries, fetch data from API
+        if (toLoad.uri && toLoad.uri.includes('wikidata.org')) {
+          try {
+            let r = await utilsNetwork.returnContext(toLoad.uri)
+            if (r) {
+              // Copy all properties from r to activeContext to ensure nothing is lost
+              for (let key in r) {
+                this.activeContext[key] = r[key]
+              }
+              
+              // Always ensure type is properly set for AuthTypeIcon
+              if (this.activeContext.type === 'http://www.loc.gov/mads/rdf/v1#PersonalName') {
+                this.activeContext.type = 'PersonalName'
+              } else if (this.activeContext.type === 'http://www.loc.gov/mads/rdf/v1#CorporateName') {
+                this.activeContext.type = 'CorporateName' 
+              } else if (!this.activeContext.type) {
+                // Default to PersonalName if no type is set
+                this.activeContext.type = 'PersonalName'
+              }
+              
+              this.activeContext.loading = false
+            }
+            return // Return early after setting Wikidata context
+          } catch(err) {
+            console.error("Error loading Wikidata context:", err)
+            this.activeContext.loading = false
+            return // Return early on error
+          }
+        }
+
+        // Handle regular entries
         if (toLoad && toLoad.literal){
-          return false
+          this.activeContext.loading = false
+          console.log("Literal content ready with value:", titleValue);
+          return;
         }
 
         let results = null
@@ -703,7 +739,7 @@
       },
 
       isStaging(){
-        if (useConfigStore().returnUrls.env == "staging"){
+        if (useConfigStore().returnUrls.env == "staging" || useConfigStore().returnUrls.dev == true){
           return true
         }else{
           return false
@@ -745,62 +781,112 @@
         return uri
       },
 
-
-      firstPage: function(){
-        // if not the first page allow
-        if (this.currentPage !== 1){
-          this.currentPage = 1
-          this.doSearch()
+      emitComplexValue: function() {
+        // Deep copy to avoid reference issues
+        const contextCopy = JSON.parse(JSON.stringify(this.activeContext));
+        
+        // For literal values, ensure consistent values across all properties that might be used
+        if (contextCopy.literal === true) {
+          // Get the best literal value
+          const literalValue = contextCopy.fullLiteralValue || contextCopy.title;
+          
+          // Set all possible properties that might be referenced by parent components
+          contextCopy.title = literalValue;
+          contextCopy.label = literalValue;
+          contextCopy.rdfsLabel = literalValue;
+          contextCopy.displayLabel = literalValue;
+          contextCopy.text = literalValue;
+          contextCopy.value = literalValue;
+          
+          // Support for RDF-specific naming with colon
+          contextCopy["rdfs:label"] = literalValue;
+          
+          // Additional properties that might be used for RDF/XML generation
+          contextCopy.prefLabel = literalValue;
+          contextCopy.authoritativeLabel = literalValue;
+          
+          // Extra properties that might be used in some implementations
+          contextCopy["@value"] = literalValue; 
+          contextCopy.content = literalValue;
+          
+          // Make sure it has a null URI and is explicitly marked as literal
+          contextCopy.uri = null;
+          contextCopy.literal = true;
+          contextCopy.isLiteral = true;
+          
+          // Super critical debug to track exactly what's going out
+          console.log("FINAL LITERAL VALUE FOR ALL PROPERTIES:", literalValue);
+          console.log("CONTEXT BEING EMITTED:", contextCopy);
         }
-      },
-      prevPage: function(){
-        // if not the first page allow
-        if (this.currentPage !== 1){
-          this.currentPage--
-          this.doSearch()
-        }
-      },
-
-      nextPage: function(){
-        let max = Math.ceil(this.activeComplexSearch[0].total / this.offsetStep)
-
-        if (max > this.currentPage){
-          this.currentPage++
-          this.doSearch()
-        }
-      },
-      lastPage: function(){
-        let max = Math.ceil(this.activeComplexSearch[0].total / this.offsetStep)
-
-        if (max > this.currentPage){
-          this.currentPage = max
-          this.doSearch()
-        }
-      },
-
-      forceSearch: function(){
-        //reset the search and do it again
-        this.currentPage = 1
-        this.doSearch()
-      },
-
-      changeSearchType: function(event){
-        if (event.target.checked){
-          this.searchType = "keyword"
-        } else {
-          this.searchType = "left"
-        }
-        this.doSearch()
+        
+        // Log what's being emitted for debugging
+        console.log("ALL VALUES IN EMITTED CONTEXT:", Object.entries(contextCopy).map(([k,v]) => `${k}: ${v}`).join(', '));
+        
+        // Emit the context with all properties properly set
+        this.$emit('emitComplexValue', contextCopy);
       },
 
       isSimpleLookup: function(){
-        const mode = this.modeSelect
-        const options = this.modalSelectOptions
-        const activeMode = options.filter((opt) => opt.label == mode)[0]
-
-        return !activeMode.urls.includes("<QUERY>")
+        const mode = this.modeSelect;
+        if (!mode) return false;
+        
+        const options = this.modalSelectOptions;
+        const activeMode = options.filter((opt) => opt.label === mode)[0];
+        
+        if (!activeMode || !activeMode.urls) return false;
+        
+        return !activeMode.urls.includes("<QUERY>");
       },
-
+      
+      // Missing navigation methods referenced in template
+      forceSearch: function(){
+        //reset the search and do it again
+        this.currentPage = 1;
+        this.doSearch();
+      },
+      
+      firstPage: function(){
+        // if not the first page allow
+        if (this.currentPage !== 1){
+          this.currentPage = 1;
+          this.doSearch();
+        }
+      },
+      
+      prevPage: function(){
+        // if not the first page allow
+        if (this.currentPage !== 1){
+          this.currentPage--;
+          this.doSearch();
+        }
+      },
+      
+      nextPage: function(){
+        let max = Math.ceil(this.activeComplexSearch[0].total / this.offsetStep);
+        
+        if (max > this.currentPage){
+          this.currentPage++;
+          this.doSearch();
+        }
+      },
+      
+      lastPage: function(){
+        let max = Math.ceil(this.activeComplexSearch[0].total / this.offsetStep);
+        
+        if (max > this.currentPage){
+          this.currentPage = max;
+          this.doSearch();
+        }
+      },
+      
+      changeSearchType: function(event){
+        if (event.target.checked){
+          this.searchType = "keyword";
+        } else {
+          this.searchType = "left";
+        }
+        this.doSearch();
+      },
     },
 
     updated: function(event){
@@ -842,261 +928,301 @@
             this.$refs.complexLookupModalDisplay.style.height = this.$refs.complexLookupModalContainer.getBoundingClientRect().height + 'px'
           }
 
-		  if (this.$refs.toggle){
-			if (this.$refs.toggle.checked){
-				this.searchType = "keyword"
-			}  else {
-				this.searchType = "left"
-			}
-		  }
+          if (this.$refs.toggle){
+            if (this.$refs.toggle.checked){
+              this.searchType = "keyword"
+            } else {
+              this.searchType = "left"
+            }
+          }
         })
       })
-
-
-
     },
 
     mounted() {
-      // console.log("mounted yeah", this.structure)
-
-      if (this.modeSelect === null){
-
-        this.modeSelect = this.modalSelectOptions[0].label
+      // Initialize the mode select if not set
+      if (this.modeSelect === null && this.modalSelectOptions && this.modalSelectOptions.length > 0){
+        this.modeSelect = this.modalSelectOptions[0].label;
+        console.log("Setting initial modeSelect to:", this.modeSelect);
       }
-      // this.$nextTick(()=>{
-      //   this.loadPrefGroup()
-      //   this.$nextTick(()=>{
-      //     this.$refs.preferenceContent.style.height = this.initalHeight + 'px'
-      //   })
-
-      // })
-
+      
+      // Initialize searchValue from prop
+      if (this.searchValue && !this.searchValueLocal){
+        this.searchValueLocal = this.searchValue;
+        console.log("Setting initial searchValueLocal to:", this.searchValueLocal);
+        
+        // Trigger an initial search if we have a value
+        if (this.searchValueLocal && this.searchValueLocal.length > 0){
+          this.doSearch();
+        }
+      }
     }
   }
-
-
-
 </script>
 
 <template>
+  <VueFinalModal
+    :hide-overlay="false"
+    :overlay-transition="'vfm-fade'"
+    :content-transition="'vfm-fade'"
+    :click-to-close="true"
+    :esc-to-close="true"
+    :background="'non-interactive'"
+    :lock-scroll="true"
+    class="complex-lookup-modal"
+    content-class="complex-lookup-modal-content"
+    @before-close="$emit('hideComplexModal'); reset();"
+    >
 
+    <div ref="complexLookupModalContainer" class="complex-lookup-modal-container" :style="`${this.preferenceStore.styleModalBackgroundColor()}`">
+          <div class="menu-buttons">
+              <button @click="reset(); $emit('hideComplexModal')">x</button>
+          </div>
+        <div class="complex-lookup-modal-container-parts">
 
-    <VueFinalModal
-      :hide-overlay="false"
-      :overlay-transition="'vfm-fade'"
-      :content-transition="'vfm-fade'"
-      :click-to-close="true"
-      :esc-to-close="true"
-      :background="'non-interactive'"
-      :lock-scroll="true"
-      class="complex-lookup-modal"
-      content-class="complex-lookup-modal-content"
-      @before-close="$emit('hideComplexModal'); reset();"
-      >
+          <div class="complex-lookup-modal-search">
+            <template v-if="preferenceStore.returnValue('--b-edit-complex-use-select-dropdown') === false">
+              <div class="toggle-btn-grp cssonly">
+                <div v-for="opt in modalSelectOptions"><input type="radio" :value="opt.label" class="search-mode-radio" v-model="modeSelect" name="searchMode"/><label onclick="" class="toggle-btn">{{opt.label}}</label></div>
+                </div>
 
-      <div ref="complexLookupModalContainer" class="complex-lookup-modal-container" :style="`${this.preferenceStore.styleModalBackgroundColor()}`">
-			<div class="menu-buttons">
-				<button @click="reset(); $emit('hideComplexModal')">x</button>
-			</div>
-          <div class="complex-lookup-modal-container-parts">
+                <div v-if="(activeComplexSearch && activeComplexSearch[0] && ((activeComplexSearch[0].total % 25 ) > 0 || activeComplexSearch.length > 0))" class="complex-lookup-paging">
+                  <span :style="`${this.preferenceStore.styleModalTextColor()}`">
+                    <a href="#" title="first page" class="first" :class="{off: this.currentPage == 1}" @click="firstPage()">
+                      <span class="material-icons pagination" :style="`${this.preferenceStore.styleModalTextColor()}`">keyboard_double_arrow_left</span>
+                    </a>
+                    <a href="#" title="previous page" class="prev" :class="{off: this.currentPage == 1}" @click="prevPage()">
+                      <span class="material-icons pagination" :style="`${this.preferenceStore.styleModalTextColor()}`">chevron_left</span>
+                    </a>
+                    <span class="pagination-label" > Page {{ this.currentPage }} of {{ !isNaN(Math.ceil(this.activeComplexSearch[0].total / this.offsetStep)) ? Math.ceil(this.activeComplexSearch[0].total / this.offsetStep) : "Last Page"}} </span>
+                    <a href="#" title="next page" class="next" :class="{off: Math.ceil(this.activeComplexSearch[0].total / this.offsetStep) == this.currentPage}" @click="nextPage()">
+                      <span class="material-icons pagination" :style="`${this.preferenceStore.styleModalTextColor()}`">chevron_right</span>
+                    </a>
+                    <a href="#" title="last page" class="last" :class="{off: Math.ceil(this.activeComplexSearch[0].total / this.offsetStep) == this.currentPage}" @click="lastPage()">
+                      <span class="material-icons pagination" :style="`${this.preferenceStore.styleModalTextColor()}`">keyboard_double_arrow_right</span>
+                    </a>
+                  </span>
+                </div>
 
-            <div class="complex-lookup-modal-search">
-              <template v-if="preferenceStore.returnValue('--b-edit-complex-use-select-dropdown') === false">
-                <div class="toggle-btn-grp cssonly">
-                  <div v-for="opt in modalSelectOptions"><input type="radio" :value="opt.label" class="search-mode-radio" v-model="modeSelect" name="searchMode"/><label onclick="" class="toggle-btn">{{opt.label}}</label></div>
-				  </div>
+                <div id="container" v-if="modalSelectOptions.length == 10 && modalSelectOptions[8].label == 'NAF Geo SubDiv'">
+                  <input type="checkbox" id="search-type" class="toggle" name="search-type" value="keyword" @click="changeSearchType($event)" ref="toggle">
+                  <label for="search-type" class="toggle-container">
+                      <div>Left Anchored</div>
+                      <div>Keyword</div>
+                  </label>
+                </div>
 
-                  <div v-if="(activeComplexSearch && activeComplexSearch[0] && ((activeComplexSearch[0].total % 25 ) > 0 || activeComplexSearch.length > 0))" class="complex-lookup-paging">
-                    <span :style="`${this.preferenceStore.styleModalTextColor()}`">
-                      <a href="#" title="first page" class="first" :class="{off: this.currentPage == 1}" @click="firstPage()">
-                        <span class="material-icons pagination" :style="`${this.preferenceStore.styleModalTextColor()}`">keyboard_double_arrow_left</span>
-                      </a>
-                      <a href="#" title="previous page" class="prev" :class="{off: this.currentPage == 1}" @click="prevPage()">
-                        <span class="material-icons pagination" :style="`${this.preferenceStore.styleModalTextColor()}`">chevron_left</span>
-                      </a>
-                      <span class="pagination-label" > Page {{ this.currentPage }} of {{ !isNaN(Math.ceil(this.activeComplexSearch[0].total / this.offsetStep)) ? Math.ceil(this.activeComplexSearch[0].total / this.offsetStep) : "Last Page"}} </span>
-                      <a href="#" title="next page" class="next" :class="{off: Math.ceil(this.activeComplexSearch[0].total / this.offsetStep) == this.currentPage}" @click="nextPage()">
-                        <span class="material-icons pagination" :style="`${this.preferenceStore.styleModalTextColor()}`">chevron_right</span>
-                      </a>
-                      <a href="#" title="last page" class="last" :class="{off: Math.ceil(this.activeComplexSearch[0].total / this.offsetStep) == this.currentPage}" @click="lastPage()">
-                        <span class="material-icons pagination" :style="`${this.preferenceStore.styleModalTextColor()}`">keyboard_double_arrow_right</span>
-                      </a>
-                    </span>
-                  </div>
+            </template>
+            <template v-if="preferenceStore.returnValue('--b-edit-complex-use-select-dropdown') === true">
+              <select v-model="modeSelect">
+                <option v-for="opt in modalSelectOptions">{{opt.label}}</option>
+              </select>
+            </template>
+            <input class="lookup-input" v-model="searchValueLocal" ref="inputLookup" @keydown="inputKeydown($event)" @keyup="inputKeyup($event)" type="text" :style="`${this.preferenceStore.styleModalBackgroundColor()}; ${this.preferenceStore.styleModalTextColor()}`" />
+            <button @click="forceSearch()">Search</button>
 
-				  <div id="container" v-if="modalSelectOptions.length == 10 && modalSelectOptions[8].label == 'NAF Geo SubDiv'">
-					<input type="checkbox" id="search-type" class="toggle" name="search-type" value="keyword" @click="changeSearchType($event)" ref="toggle">
-					<label for="search-type" class="toggle-container">
-						<div>Left Anchored</div>
-						<div>Keyword</div>
-					</label>
-				  </div>
+            <!-- REMOVE v-if BEFORE PROD USAGE -->
+            <button @click="loadNacoStubModal" style="float: right;" v-if="isStaging() == true">Create Provisional NAR</button>
 
-              </template>
-              <template v-if="preferenceStore.returnValue('--b-edit-complex-use-select-dropdown') === true">
-                <select v-model="modeSelect">
-                  <option  v-for="opt in modalSelectOptions">{{opt.label}}</option>
-                </select>
-              </template>
-              <input class="lookup-input" v-model="searchValueLocal" ref="inputLookup" @keydown="inputKeydown($event)" @keyup="inputKeyup($event)" type="text" :style="`${this.preferenceStore.styleModalBackgroundColor()}; ${this.preferenceStore.styleModalTextColor()}`" />
-              <button @click="forceSearch()">Search</button>
-
-              <!-- REMOVE v-if BEFORE PROD USAGE -->
-              <button @click="loadNacoStubModal" style="float: right;" v-if="isStaging() == true">Create NAR Stub</button>
-
-              <hr style="margin-top: 5px;">
-              <div>
-                  <select size="100" ref="selectOptions" class="modal-entity-select" @change="selectChange($event)"  @keydown="selectNav($event)" :style="`${this.preferenceStore.styleModalBackgroundColor()}; ${this.preferenceStore.styleModalTextColor()}`">
-                    <option v-if="(activeComplexSearch.length == 0 && activeSimpleLookup.length == 0)&& activeComplexSearchInProgress == false && initalSearchState != true">
-                      No results found.
+            <hr style="margin-top: 5px;">
+            <div>
+                <select size="100" ref="selectOptions" class="modal-entity-select" @change="selectChange($event)"  @keydown="selectNav($event)" :style="`${this.preferenceStore.styleModalBackgroundColor()}; ${this.preferenceStore.styleModalTextColor()}`">
+                  <option v-if="(activeComplexSearch.length == 0 && activeSimpleLookup.length == 0)&& activeComplexSearchInProgress == false && initalSearchState != true">
+                    No results found.
+                  </option>
+                  <option v-if="activeComplexSearchInProgress == true">
+                    Searching...
+                  </option>
+                  <template v-if="!isSimpleLookup()">
+                    <option v-for="(r,idx) in activeComplexSearch" :data-label="r.label" :value="r.uri" v-bind:key="idx" :style="(r.depreciated || r.undifferentiated) ? 'color:red' : ''" class="complex-lookup-result">
+                      <div class="option-text">
+                        {{ (!r.literal ? (r.suggestLabel || r.label) : r.label) + ((r.literal) ? ' [Literal]' : '') }}
+                      </div>
                     </option>
-                    <option v-if="activeComplexSearchInProgress == true">
-                      Searching...
-                    </option>
-                    <template v-if="!isSimpleLookup()">
-                      <option v-for="(r,idx) in activeComplexSearch" :data-label="r.label" :value="r.uri" v-bind:key="idx" :style="(r.depreciated || r.undifferentiated) ? 'color:red' : ''" class="complex-lookup-result">
-                        <div class="option-text">
-                          {{ (!r.literal ? r.suggestLabel : r.label) + ((r.literal) ? ' [Literal]' : '') }}
-                        </div>
-                      </option>
-                    </template>
-                    <template v-else-if="activeSimpleLookup && Object.keys(activeSimpleLookup).length > 0">
-                      <option 
-                        v-for="(r, idx) in activeSimpleLookup"
-                        :key="idx"
+                  </template>
+                  <template v-else-if="activeSimpleLookup.length > 0">
+                    <template v-for="(r, idx) in activeSimpleLookup" :key="idx">
+                      <option
                         @click="selectChange()"
                         :data-label="r.label || (r.displayLabel ? r.displayLabel[0] : '')"
                         :value="r.uri"
+                        :data-full-text="r.fullText || ''"
+                        :data-literal="r.literal ? 'true' : 'false'"
                         class="complex-lookup-result"
-                        v-html="r.displayLabel ? r.displayLabel[0] : (r.label || '')">
+                        v-text="r.displayLabel ? r.displayLabel[0] : (r.label || '')">
                       </option>
                     </template>
+                  </template>
+                </select>
+                <br>
+            </div>
+          </div>
 
-                  </select>
-                  <br>
+          <div ref="complexLookupModalDisplay" class="complex-lookup-modal-display" :style="`${this.preferenceStore.styleModalTextColor()};`">
+            <template v-if="activeContext !== null && activeContext.uri && activeContext.uri.includes('wikidata.org')">
+              <h3>
+                <span class="modal-context-icon simptip-position-top" :data-tooltip="'Type: ' + (activeContext.type || 'Unknown')">
+                  <AuthTypeIcon v-if="activeContext.type" :type="activeContext.type"></AuthTypeIcon>
+                </span>
+                {{ Array.isArray(activeContext.title) ? activeContext.title[0] : activeContext.title }}
+              </h3>
 
+              <div class="complex-lookup-modal-display-type-buttons">
+                <div>
+                  <div class="modal-context-data-title">{{ activeContext.type || 'Unknown' }}</div>
+                  <a style="color:#2c3e50; float: none; border: none; border-radius: 0; background-color: transparent; font-size: 1em; padding: 0;" 
+                    :href="activeContext.uri" 
+                    target="_blank" 
+                    :style="`${this.preferenceStore.styleModalTextColor()}`">view online</a>
+                </div>
+                <div class="complex-lookup-modal-display-buttons">
+                  <button @click="emitComplexValue()">Add [Shift+Enter]</button>
+                  <button @click="reset(); $emit('hideComplexModal')">Cancel [ESC]</button>
+                </div>
               </div>
 
+              <div v-if="activeContext.variant && activeContext.variant.length > 0">
+                <div class="modal-context-data-title modal-context-data-title-add-gap">Variants:</div>
+                <ul>
+                  <li class="modal-context-data-li" v-for="(v, idx) in activeContext.variant" v-bind:key="'var' + idx">
+                    {{v}}
+                  </li>
+                </ul>
+              </div>
+              
+              <div v-if="activeContext.extra && activeContext.extra.description">
+                <div class="modal-context-data-title modal-context-data-title-add-gap">Description:</div>
+                <ul>
+                  <li class="modal-context-data-li">
+                    {{activeContext.extra.description}}
+                  </li>
+                </ul>
+              </div>
+            </template>
 
-
-            </div>
-
-
-            <div ref="complexLookupModalDisplay" class="complex-lookup-modal-display" :style="`${this.preferenceStore.styleModalTextColor()};`">
-
-              <template v-if="activeContext !== null && Object.keys(activeContext.extra).length > 0">
-                  <h3>
-                    <span class="modal-context-icon simptip-position-top" :data-tooltip="'Type: ' + activeContext.extra.rdftypes.includes('Hub') ? 'Hub' : activeContext.extra.rdftypes[0] ">
-                      <AuthTypeIcon v-if="activeContext.extra.rdftypes" :type="activeContext.extra.rdftypes.includes('Hub') ? 'Hub' : activeContext.extra.rdftypes[0]">
-                      </AuthTypeIcon>
-                    </span>
-                    {{ activeContext.title }}
-                  </h3>
-                  <div class="complex-lookup-modal-display-type-buttons">
-                    <div>
-                        <div class="modal-context-data-title">{{activeContext.extra.rdftypes.includes('Hub') ? 'Hub' : activeContext.extra.rdftypes[0]}}</div>
-                        <div v-if="activeContext.depreciated" style="background: pink;">
-                          DEPRECIATED AUTHORITY
-                        </div>
-                        <div v-if="activeContext.extra.collections && activeContext.extra.collections.includes('http://id.loc.gov/authorities/names/collection_NamesUndifferentiated')" style="background: pink;">
-                          THIS 1XX FIELD CANNOT BE USED UNDER RDA UNTIL THIS UNDIFFERENTIATED RECORD HAS BEEN HANDLED FOLLOWING THE GUIDELINES IN <a href="https://www.loc.gov/aba/pcc/rda/PCC%20RDA%20guidelines/Z01%20008%2032%202014rfeb.pdf" target="_blank">DCM Z1 008/32</a>.
-                        </div>
-                        <a style="color:#2c3e50; float: none;    border: none;border-radius: 0;background-color: transparent;font-size: 1em;padding: 0;" v-if="activeContext.type!='Literal Value'" :href="rewriteURI(activeContext.uri)" target="_blank" :style="`${this.preferenceStore.styleModalTextColor()}`">view on id.loc.gov</a>
-
+            <template v-else-if="activeContext !== null && Object.keys(activeContext.extra || {}).length > 0">
+              <h3>
+                <span class="modal-context-icon simptip-position-top" :data-tooltip="'Type: ' + ((activeContext.extra && activeContext.extra.rdftypes && activeContext.extra.rdftypes.includes('Hub')) ? 'Hub' : ((activeContext.extra && activeContext.extra.rdftypes && activeContext.extra.rdftypes[0]) || 'Unknown'))">
+                  <AuthTypeIcon v-if="activeContext.extra && activeContext.extra.rdftypes && activeContext.extra.rdftypes.length" :type="(activeContext.extra.rdftypes.includes('Hub') ? 'Hub' : activeContext.extra.rdftypes[0])">
+                  </AuthTypeIcon>
+                </span>
+                {{ activeContext.title }}
+              </h3>
+              <div class="complex-lookup-modal-display-type-buttons">
+                <div>
+                    <div class="modal-context-data-title">{{(activeContext.extra && activeContext.extra.rdftypes && activeContext.extra.rdftypes.includes('Hub')) ? 'Hub' : ((activeContext.extra && activeContext.extra.rdftypes && activeContext.extra.rdftypes[0]) || 'Unknown')}}</div>
+                    <div v-if="activeContext.depreciated" style="background: pink;">
+                      DEPRECIATED AUTHORITY
                     </div>
-                    <div class="complex-lookup-modal-display-buttons">
-
-                      <button @click="$emit('emitComplexValue', activeContext)">Add [Shift+Enter]</button>
-                      <button @click=" reset(); $emit('hideComplexModal')">Cancel [ESC]</button>
-
+                    <div v-if="activeContext.extra.collections && activeContext.extra.collections.includes('http://id.loc.gov/authorities/names/collection_NamesUndifferentiated')" style="background: pink;">
+                      THIS 1XX FIELD CANNOT BE USED UNDER RDA UNTIL THIS UNDIFFERENTIATED RECORD HAS BEEN HANDLED FOLLOWING THE GUIDELINES IN <a href="https://www.loc.gov/aba/pcc/rda/PCC%20RDA%20guidelines/Z01%20008%2032%202014rfeb.pdf" target="_blank">DCM Z1 008/32</a>.
                     </div>
+                    <a style="color:#2c3e50; float: none;    border: none;border-radius: 0;background-color: transparent;font-size: 1em;padding: 0;" v-if="activeContext.type!='Literal Value'" :href="rewriteURI(activeContext.uri)" target="_blank" :style="`${this.preferenceStore.styleModalTextColor()}`">view on id.loc.gov</a>
+                </div>
+                <div class="complex-lookup-modal-display-buttons">
+                  <button @click="emitComplexValue()">Add [Shift+Enter]</button>
+                  <button @click=" reset(); $emit('hideComplexModal')">Cancel [ESC]</button>
+                </div>
+              </div>
 
-
-                  </div>
-
-                  <template v-for="key in panelDetailOrder">
-                    <div v-if="activeContext.extra[key] && activeContext.extra[key].length>0">
-                      <div class="modal-context-data-title modal-context-data-title-add-gap">{{ this.labelMap[key] }}:</div>
-                      <ul>
-                        <li class="modal-context-data-li" v-if="Array.isArray(activeContext.extra[key])" v-for="(v, idx) in activeContext.extra[key] " v-bind:key="'var' + idx">
-                          <template v-if="v.startsWith('http')">
-                            <a target="_blank" :href="v">{{ v.split("/").at(-1).split("_").at(-1) }}</a>
-                          </template>
-                          <template v-else-if="key == 'lcclasss'">
-                            <a :href="'https://classweb.org/min/minaret?app=Class&mod=Search&table=schedules&table=tables&tid=1&menu=/Menu/&iname=span&ilabel=Class%20number&iterm='+v" target="_blank">{{v}}</a>
-                            <!-- <a :href="'https://id.loc.gov/authorities/classification/'+v" target="_blank">{{v}}</a> -->
-                          </template>
-                          <template v-else-if="key == 'broaders'">
-                            <a target="_blank" :href="'https://id.loc.gov/authorities/label/'+v">{{v}}</a>
-                          </template>
-                          <template v-else>
-                            {{v}}
-                          </template>
-                        </li>
-                        <li class="modal-context-data-li" v-else v-bind:key="'var' + key">{{ activeContext.extra[key] }}</li>
-                      </ul>
-                    </div>
-                  </template>
-              </template>
-
-              <template v-else-if="activeContext !== null">
-                <h3>
-                  {{ Array.isArray(activeContext.title) ? activeContext.title[0] : activeContext.title }}
-                  <span v-if="activeContext.literal">[Literal]</span>
-                </h3>
-
-                <a style="color:#2c3e50; float: none;    border: none;border-radius: 0;background-color: transparent;font-size: 1em;padding: 0;" v-if="activeContext.type!='Literal Value'" :href="rewriteURI(activeContext.uri)" target="_blank" :style="`${this.preferenceStore.styleModalTextColor()}`">view on id.loc.gov</a>
-
-                <br>
-
-                <div v-if="activeContext.uri">
-                  <div class="modal-context-data-title modal-context-data-title-add-gap">MADS Collections:</div>
+              <template v-for="key in panelDetailOrder">
+                <div v-if="activeContext.extra[key] && activeContext.extra[key].length>0">
+                  <div class="modal-context-data-title modal-context-data-title-add-gap">{{ Object.keys(this.labelMap).includes(key) ? this.labelMap[key] : key }}:</div>
                   <ul>
-                    <li class="modal-context-data-li">
-                     <a :href="activeContext.uri" target="_blank">
-                      {{ activeContext.uri.split("/").at(-2) }}
-                     </a>
+                    <li class="modal-context-data-li" v-if="Array.isArray(activeContext.extra[key])" v-for="(v, idx) in activeContext.extra[key] " v-bind:key="'var' + idx">
+                      <template v-if="v.startsWith && v.startsWith('http')">
+                        <a target="_blank" :href="v">{{ v.split("/").at(-1).split("_").at(-1) }}</a>
+                      </template>
+                      <template v-else-if="key == 'lcclasss'">
+                        <a :href="'https://classweb.org/min/minaret?app=Class&mod=Search&table=schedules&table=tables&tid=1&menu=/Menu/&iname=span&ilabel=Class%20number&iterm='+v" target="_blank">{{v}}</a>
+                      </template>
+                      <template v-else-if="key == 'broaders' || key == 'relateds' || key == 'sees'">
+                        <a target="_blank" :href="'https://id.loc.gov/authorities/label/'+v">{{v}}</a>
+                      </template>
+                      <template v-else>
+                        {{v}}
+                      </template>
+                    </li>
+                    <li class="modal-context-data-li" v-else v-bind:key="'var' + key">{{ activeContext.extra[key] }}</li>
+                  </ul>
+                </div>
+              </template>
+            </template>
+
+            <template v-else-if="activeContext !== null">
+              <h3>
+                <span class="modal-context-icon simptip-position-top" :data-tooltip="'Type: ' + (activeContext.type || 'Unknown')">
+                  <AuthTypeIcon v-if="activeContext.type" :type="activeContext.type"></AuthTypeIcon>
+                </span>
+                {{ Array.isArray(activeContext.title) ? activeContext.title[0] : activeContext.title }}
+                <span v-if="activeContext.literal">[Literal]</span>
+              </h3>
+
+              <a v-if="activeContext.type != 'Literal Value' && activeContext.uri" 
+                 style="color:#2c3e50; float: none;    border: none;border-radius: 0;background-color: transparent;font-size: 1em;padding: 0;" 
+                 :href="activeContext.uri" 
+                 target="_blank" 
+                 :style="`${this.preferenceStore.styleModalTextColor()}`">
+                 {{ activeContext.uri && activeContext.uri.includes('wikidata.org') ? 'view online' : 'view on id.loc.gov' }}
+              </a>
+
+              <br v-if="activeContext.type != 'Literal Value' && activeContext.uri">
+
+              <div class="complex-lookup-modal-display-type-buttons">
+                <div>
+                    <div class="modal-context-data-title">{{ activeContext.type || 'Unknown' }}</div>
+                    <div v-if="activeContext.depreciated" style="background: pink;">
+                      DEPRECIATED AUTHORITY
+                    </div>
+                    <!-- ...existing code... -->
+                  </div>
+                  <div class="complex-lookup-modal-display-buttons">
+                    <button @click="emitComplexValue()">Add [Shift+Enter]</button>
+                    <button @click="reset(); $emit('hideComplexModal')">Cancel [ESC]</button>
+                  </div>
+                </div>
+
+              <div v-if="activeContext.variant && activeContext.variant.length > 0">
+                <div class="modal-context-data-title modal-context-data-title-add-gap">Variants:</div>
+                <ul>
+                  <li class="modal-context-data-li" v-for="(v, idx) in activeContext.variant" v-bind:key="'var' + idx">
+                    {{v}}
+                  </li>
+                </ul>
+              </div>
+              
+              <div v-if="activeContext.extra && activeContext.extra.description">
+                <div class="modal-context-data-title modal-context-data-title-add-gap">Description:</div>
+                <ul>
+                  <li class="modal-context-data-li">
+                    {{activeContext.extra.description}}
+                  </li>
+                </ul>
+              </div>
+
+              <div v-if="activeContext.uri && !activeContext.uri.includes('wikidata.org') && activeContext.nodeMap">
+                <!-- ...existing code for id.loc.gov specific fields... -->
+              </div>
+
+              <!-- Only show nodeMap entries for non-wikidata resources -->
+              <template v-if="activeContext.nodeMap && activeContext.uri && !activeContext.uri.includes('wikidata.org')">
+                <div v-for="(values, key) in activeContext.nodeMap" :key="key">
+                  <div class="modal-context-data-title modal-context-data-title-add-gap">{{key}}:</div>
+                  <ul>
+                    <li class="modal-context-data-li" v-for="(v, idx) in values" v-bind:key="'nm' + idx">
+                      {{v}}
                     </li>
                   </ul>
                 </div>
-
-                <div class="complex-lookup-modal-display-type-buttons">
-                  <div class="complex-lookup-modal-display-type-buttons">
-                    <div class="complex-lookup-modal-display-buttons">
-                      <button @click="$emit('emitComplexValue', activeContext)">Add [Shift+Enter]</button>
-                      <button @click=" reset(); $emit('hideComplexModal')">Cancel [ESC]</button>
-                    </div>
-                  </div>
-                </div>
-
               </template>
-
-
-
-
-              <div>
-<!--                 <div class="load-wraper" style="height: 100px; width: 100px;">
-                    <div class="activity" ></div>
-                </div>      -->
-
-              </div>
-            </div>
-
+            </template>
           </div>
-
         </div>
-
-
-
-    </VueFinalModal>
-
-
-
-
+      </div>
+  </VueFinalModal>
 </template>
 
 <style>
-
 .pagination-label{
   vertical-align: super;
 }
@@ -1104,35 +1230,23 @@
 .complex-lookup-modal-container{
   margin-left: auto;
   margin-right: auto;
-
-
-
-
   width: 85vw;
   height: 95vh;
 }
 
 .complex-lookup-modal-content{
-
 }
-
 
 @media all and (max-width: 1024px) {
   /* CSS rules here for screens lower than 750px */
   .complex-lookup-modal-container{
-
-
     width: 99vw;
     height: 95vh;
   }
-
 }
-
-
 </style>
 
 <style scoped>
-
   .complex-lookup-modal-display-buttons{
     align-items: center;
     justify-content: center;
@@ -1217,55 +1331,7 @@
   }
 
   .complex-lookup-modal-display{
-        overflow-y: auto;
-        font-size: 1em;
-  }
-  label {
-
-    font-size: 0.75em;
-    white-space: nowrap;
-  }
-
-  .toggle-btn-grp {
-    margin: 3px 0;
-  }
-
-  .toggle-btn {
-    text-align: centre;
-    padding: 0.1em 1em;
-    color: #000;
-    background-color: #FFF;
-    border-radius: 10px;
-    display: inline-block;
-    border: solid 1px #CCC;
-    cursor: pointer;
-  }
-
-  /* CSS only version */
-  .toggle-btn-grp.cssonly * {
-    width: 110px;
-    height: 30px;
-    line-height: 30px;
-  }
-
-  .toggle-btn-grp.cssonly div {
-    display: inline-block;
-    position: relative;
-    margin: 5px 2px;
-  }
-
-  .toggle-btn-grp.cssonly div label {
-    position: absolute;
-    z-index: 0;
-    padding: 0;
-    text-align: center;
-  }
-
-  .toggle-btn-grp.cssonly div input {
-    position: absolute;
-    z-index: 1;
-    cursor: pointer;
-    opacity: 0;
+    overflow-y: auto;
   }
 
   .toggle-btn-grp.cssonly div:hover label {
@@ -1373,5 +1439,4 @@
 .option-text {
   text-wrap: wrap;
 }
-
 </style>

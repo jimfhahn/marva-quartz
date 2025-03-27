@@ -73,9 +73,23 @@ export function ensureAdminMetadataDefaults(userValue) {
     }
 }
 
-export const useProfileStore = defineStore('profile', {
+export const useProfileStore = defineStore({
+  id: 'profile',
+  
   state: () => ({
-
+    selectedProfile: null,
+    
+    // Settings for NACO stub creation
+    showNacoStubCreateModal: false,
+    
+    // Last complex lookup string for maintaining search history
+    lastComplexLookupString: '',
+    
+    // User preferences and settings
+    userSettings: {
+      preferredSearchSource: 'LCNAF',
+      defaultWorkTemplate: 'monograph'
+    },
     profilesLoaded: false,
 
     profiles: {},
@@ -94,7 +108,6 @@ export const useProfileStore = defineStore('profile', {
     showRecoveryModal: false,
     showValidateModal: false,
     showHubStubCreateModal: false,
-    showNacoStubCreateModal: false,
     lastComplexLookupString: "", // used in the naco stub process to paste what you were working on in the complex lookup
 
     showItemInstanceSelection: false,
@@ -155,6 +168,8 @@ export const useProfileStore = defineStore('profile', {
 
   }),
   getters: {
+    getSelectedProfile: (state) => state.selectedProfile,
+    getUserSettings: (state) => state.userSettings,
 
     /**
     * Can be used to return the structure of the component by passing the GUID
@@ -440,7 +455,19 @@ export const useProfileStore = defineStore('profile', {
 
   },
   actions: {
-
+    setSelectedProfile(profile) {
+      this.selectedProfile = profile
+    },
+    
+    updateUserSetting(key, value) {
+      if (key in this.userSettings) {
+        this.userSettings[key] = value
+      }
+    },
+    
+    clearLastComplexLookupString() {
+      this.lastComplexLookupString = ''
+    },
 
     resetLocalComponentCache(){
       cachePt = {}

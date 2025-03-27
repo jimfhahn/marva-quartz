@@ -502,14 +502,14 @@ const utilsNetwork = {
                 //   }
                 // }
 
-            }else if (r.search && searchPayload.processor == 'wikidataAPI'){
-
+            } else if (r.search && searchPayload.processor == 'wikidataAPI'){
                 for (let hit of r.search){
                   results.push({
-                    label: hit.label,
+                    label: hit.label || (hit.display && hit.display.label) || "Unknown Label",
+                    suggestLabel: hit.label || (hit.display && hit.display.label) || "Unknown Label",
                     uri: hit.concepturi,
-                    literal:false,
-                    extra: ''
+                    literal: false,
+                    extra: hit.description ? { description: hit.description } : {}
                   })
                 }
             }
@@ -522,9 +522,14 @@ const utilsNetwork = {
         if (!searchPayload.url[0].includes('/works/') && !searchPayload.url[0].includes('/hubs/')){
           results.push({
             label: searchPayload.searchValue,
+            // Add explicit properties to ensure parent component can access the value
+            title: searchPayload.searchValue,
+            displayLabel: searchPayload.searchValue,
+            rdfsLabel: searchPayload.searchValue,
             uri: null,
-            literal:true,
-            extra: ''
+            literal: true,
+            extra: '',
+            fullText: searchPayload.searchValue // Ensure the full text is preserved
           })
         }
 
@@ -854,47 +859,37 @@ const utilsNetwork = {
             date:null,
             genreForm: null,
             nodeMap:{},
+            extra: {}, // Initialize extra object for all responses
           };
           if (data.uri.includes('wikidata.org')){
-            if (data.entities){
-              let qid = Object.keys(data.entities)[0]
-
-              if (data.entities[qid].labels.en){
-                results.title = data.entities[qid].labels.en.value
-              }
-
-              if (data.entities[qid].descriptions.en){
-                results.nodeMap['Description'] = [data.entities[qid].descriptions.en.value]
-              }
-
-              if (data.entities[qid].aliases.en){
-                data.entities[qid].aliases.en.forEach((v)=>{
-                  results.variant.push(v.value)
-                })
-              }
-
-              // just hardcode it for now
-              results.type = 'http://www.loc.gov/mads/rdf/v1#PersonalName'
-              results.typeFull = 'http://www.loc.gov/mads/rdf/v1#PersonalName'
-
-              // get the P31 instanceOf
-              if (data.entities[qid].claims.P31){
-
-
-                if (data.entities[qid].claims.P31[0].mainsnak){
-                  if (data.entities[qid].claims.P31[0].mainsnak.datavalue){
-                    if (data.entities[qid].claims.P31[0].mainsnak.datavalue.value){
-
-                      results.type = this.rdfType(data.entities[qid].claims.P31[0].mainsnak.datavalue.value.id)
-                    }
+              results.extra = {}; // initialize extra to avoid undefined issues
+              if (data.entities){
+                  let qid = Object.keys(data.entities)[0];
+                  if (data.entities[qid].labels && data.entities[qid].labels.en){
+                      results.title = data.entities[qid].labels.en.value;
                   }
-                }
+                  if (data.entities[qid].descriptions && data.entities[qid].descriptions.en){
+                      results.extra.description = data.entities[qid].descriptions.en.value;
+                  }
+                  if (data.entities[qid].aliases && data.entities[qid].aliases.en){
+                      data.entities[qid].aliases.en.forEach(alias => {
+                          results.variant.push(alias.value);
+                      });
+                  }
+                  // Set default type
+                  results.type = 'http://www.loc.gov/mads/rdf/v1#PersonalName';
+                  results.typeFull = 'http://www.loc.gov/mads/rdf/v1#PersonalName';
+                  // Override type if P31 claim exists
+                  if (data.entities[qid].claims && data.entities[qid].claims.P31){
+                      let p31Claim = data.entities[qid].claims.P31[0];
+                      if (p31Claim.mainsnak && p31Claim.mainsnak.datavalue && p31Claim.mainsnak.datavalue.value){
+                          let typeUri = this.rdfType(p31Claim.mainsnak.datavalue.value.id);
+                          results.type = typeUri ? typeUri : 'PersonalName';
+                      }
+                  }
               }
-            }
           } else if (
               data.uri.includes('id.loc.gov/resources/works/')
-              || data.uri.includes('id.loc.gov/resources/instances/')
-              || data.uri.includes('id.loc.gov/resources/hubs/')
           ){
             let uriIdPart = data.uri.split('/').slice(-1)[0]
 
@@ -2742,7 +2737,7 @@ const utilsNetwork = {
 
     }else{
 
-      // alert("Did not post, please report this error--" + JSON.stringify(content.publish,null,2))
+      // alert("Did not post, please report this error--" + JSON.stringify(content,null,2))
 
 
       return {status:false, postLocation: (content.postLocation) ? content.postLocation : null, msg: JSON.stringify(content.publish,null,2), msgObj: content.publish}
