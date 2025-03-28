@@ -663,8 +663,8 @@
           "loading": true,
           "extra": toLoad.extra || {},
           "marcKey": (toLoad.extra && toLoad.extra.marcKeys) ? toLoad.extra.marcKeys[0] : '',
-          "fullLiteralValue": toLoad.literal ? titleValue : null,
-          // Add label property to ensure consistency
+          // Use the full input value for literals rather than a possibly truncated titleValue
+          "fullLiteralValue": toLoad.literal ? this.searchValueLocal : null,
           "label": titleValue,
           "displayLabel": titleValue // Add displayLabel property
         }
@@ -782,48 +782,66 @@
       },
 
       emitComplexValue: function() {
-        // Deep copy to avoid reference issues
-        const contextCopy = JSON.parse(JSON.stringify(this.activeContext));
-        
-        // For literal values, ensure consistent values across all properties that might be used
-        if (contextCopy.literal === true) {
-          // Get the best literal value
-          const literalValue = contextCopy.fullLiteralValue || contextCopy.title;
+        try {
+          // For literal values, create a structure specifically for literals that matches expected format
+          if (this.activeContext && this.activeContext.literal === true) {
+            // Get the best literal value
+            let literalValue = this.searchValueLocal || this.activeContext.fullLiteralValue || this.activeContext.title;
+            
+            // Create an object that matches exactly what LookupComplex expects
+            const literalObject = {
+              contextValue: true,
+              source: [],
+              type: "Literal Value",
+              variant: [],
+              uri: null,
+              // Keep title as an array - this is what LookupComplex expects for simple values
+              title: [literalValue],
+              text: literalValue,
+              value: literalValue,
+              contributor: [],
+              date: null,
+              genreForm: null,
+              nodeMap: {},
+              precoordinated: false,
+              literal: true,
+              isLiteral: true,
+              loading: false,
+              extra: {},  // Empty object for simple lookups
+              marcKey: '',
+              label: literalValue,
+              displayLabel: literalValue
+            };
+            
+            console.log("EMITTING LITERAL:", literalValue);
+            console.log("LITERAL OBJECT:", literalObject);
+            
+            // Emit the properly formatted literal object
+            this.$emit('emitComplexValue', literalObject);
+            return;
+          }
           
-          // Set all possible properties that might be referenced by parent components
-          contextCopy.title = literalValue;
-          contextCopy.label = literalValue;
-          contextCopy.rdfsLabel = literalValue;
-          contextCopy.displayLabel = literalValue;
-          contextCopy.text = literalValue;
-          contextCopy.value = literalValue;
+          // For non-literals, use the regular approach with deep copy
+          const contextCopy = JSON.parse(JSON.stringify(this.activeContext));
           
-          // Support for RDF-specific naming with colon
-          contextCopy["rdfs:label"] = literalValue;
+          // Log what's being emitted for debugging
+          console.log("ALL VALUES IN EMITTED CONTEXT:", 
+            Object.entries(contextCopy)
+              .filter(([k,v]) => typeof v !== 'object' || v === null)
+              .map(([k,v]) => `${k}: ${v}`)
+              .join(', '));
           
-          // Additional properties that might be used for RDF/XML generation
-          contextCopy.prefLabel = literalValue;
-          contextCopy.authoritativeLabel = literalValue;
-          
-          // Extra properties that might be used in some implementations
-          contextCopy["@value"] = literalValue; 
-          contextCopy.content = literalValue;
-          
-          // Make sure it has a null URI and is explicitly marked as literal
-          contextCopy.uri = null;
-          contextCopy.literal = true;
-          contextCopy.isLiteral = true;
-          
-          // Super critical debug to track exactly what's going out
-          console.log("FINAL LITERAL VALUE FOR ALL PROPERTIES:", literalValue);
-          console.log("CONTEXT BEING EMITTED:", contextCopy);
+          this.$emit('emitComplexValue', contextCopy);
+        } catch (err) {
+          console.error("Error in emitComplexValue:", err);
+          // Create a minimal fallback that still has the expected structure
+          this.$emit('emitComplexValue', {
+            title: [this.searchValueLocal || ""],  // Array with string
+            literal: true,
+            extra: {},  // Empty object
+            uri: null
+          });
         }
-        
-        // Log what's being emitted for debugging
-        console.log("ALL VALUES IN EMITTED CONTEXT:", Object.entries(contextCopy).map(([k,v]) => `${k}: ${v}`).join(', '));
-        
-        // Emit the context with all properties properly set
-        this.$emit('emitComplexValue', contextCopy);
       },
 
       isSimpleLookup: function(){
@@ -1058,7 +1076,7 @@
             </div>
           </div>
 
-          <div ref="complexLookupModalDisplay" class="complex-lookup-modal-display" :style="`${this.preferenceStore.styleModalTextColor()};`">
+          <div ref="complexLookupModalDisplay" class="complex-lookup-modal-display" :style="`${this.preferenceStore.styleModalTextColor()}`">
             <template v-if="activeContext !== null && activeContext.uri && activeContext.uri.includes('wikidata.org')">
               <h3>
                 <span class="modal-context-icon simptip-position-top" :data-tooltip="'Type: ' + (activeContext.type || 'Unknown')">
