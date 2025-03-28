@@ -860,9 +860,9 @@ const utilsNetwork = {
             genreForm: null,
             nodeMap:{},
             extra: {}, // Initialize extra object for all responses
+            useMADSRDF: true, // Add flag to force MADS RDF format for Wikidata entities
           };
           if (data.uri.includes('wikidata.org')){
-              results.extra = {}; // initialize extra to avoid undefined issues
               if (data.entities){
                   let qid = Object.keys(data.entities)[0];
                   if (data.entities[qid].labels && data.entities[qid].labels.en){
@@ -876,17 +876,40 @@ const utilsNetwork = {
                           results.variant.push(alias.value);
                       });
                   }
-                  // Set default type
-                  results.type = 'http://www.loc.gov/mads/rdf/v1#PersonalName';
-                  results.typeFull = 'http://www.loc.gov/mads/rdf/v1#PersonalName';
-                  // Override type if P31 claim exists
+                  
+                  // Check for P31 (instance of) claim
                   if (data.entities[qid].claims && data.entities[qid].claims.P31){
-                      let p31Claim = data.entities[qid].claims.P31[0];
-                      if (p31Claim.mainsnak && p31Claim.mainsnak.datavalue && p31Claim.mainsnak.datavalue.value){
-                          let typeUri = this.rdfType(p31Claim.mainsnak.datavalue.value.id);
-                          results.type = typeUri ? typeUri : 'PersonalName';
+                      // Look at all P31 claims, not just the first one
+                      for (let p31Claim of data.entities[qid].claims.P31) {
+                          if (p31Claim.mainsnak && p31Claim.mainsnak.datavalue && p31Claim.mainsnak.datavalue.value){
+                              let typeId = p31Claim.mainsnak.datavalue.value.id;
+                              let typeUri = this.wikidataTypeToRdf(typeId);
+                              if (typeUri) {
+                                  results.type = typeUri;
+                                  results.typeFull = "http://www.loc.gov/mads/rdf/v1#" + typeUri;
+                                  break;
+                              }
+                          }
                       }
                   }
+                  
+                  // If no type was determined and we have a description, try to guess
+                  if (!results.type && results.extra.description) {
+                      results.type = this.guessTypeFromDescription(results.extra.description);
+                      if (results.type) {
+                          results.typeFull = "http://www.loc.gov/mads/rdf/v1#" + results.type;
+                      }
+                  }
+                  
+                  // If we still don't have a type, default to Topic
+                  if (!results.type) {
+                      results.type = "Topic";
+                      results.typeFull = "http://www.loc.gov/mads/rdf/v1#Topic";
+                  }
+                  
+                  // Save Wikidata QID explicitly for reference 
+                  results.wikidataQID = qid;
+                  results.wikidataURI = "http://www.wikidata.org/entity/" + qid;
               }
           } else if (
               data.uri.includes('id.loc.gov/resources/works/')
@@ -1244,7 +1267,110 @@ const utilsNetwork = {
       return rdftype;
     },
 
+    /**
+    * Maps common Wikidata entity types to MADS RDF types
+    * @param {string} wikidataId - The Wikidata QID
+    * @return {string} - The corresponding MADS RDF type shortname
+    */
+    wikidataTypeToRdf: function(wikidataId){
+      // Common Wikidata entity types
+      switch (wikidataId) {
+        // People
+        case 'Q5': // human
+        case 'Q215627': // person
+        case 'Q3658341': // literary character
+          return 'PersonalName';
+          
+        // Organizations
+        case 'Q43229': // organization
+        case 'Q161726': // company
+        case 'Q31855': // research institute
+        case 'Q4830453': // business
+        case 'Q783794': // company
+        case 'Q7210356': // institution
+        case 'Q891723': // public company
+          return 'CorporateName';
+          
+        // Places
+        case 'Q2221906': // geographic location
+        case 'Q27096213': // geographic entity
+        case 'Q82794': // geographic region
+        case 'Q15284': // municipality
+        case 'Q6256': // country
+        case 'Q515': // city
+        case 'Q484170': // community
+        case 'Q3957': // town
+        case 'Q5119': // capital
+          return 'Geographic';
+        
+        // Taxonomic ranks (like our spider example)
+        case 'Q16521': // taxon
+        case 'Q147897': // family (taxonomy)
+        case 'Q37517': // biological classification
+        case 'Q7432': // species
+        case 'Q38348': // family
+        case 'Q146481': // breed
+          return 'Topic';
+          
+        // Concepts, subjects, etc.
+        case 'Q151885': // concept
+        case 'Q1190554': // occurrence
+        case 'Q35120': // event
+        case 'Q17537576': // creative work
+        case 'Q571': // book
+        case 'Q11424': // film
+        case 'Q7725634': // literary work
+        case 'Q1004': // work of art
+          return 'Topic';
+          
+        default:
+          return null; // Return null for unknown types
+      }
+    },
 
+    /**
+    * Attempts to guess the entity type from its description
+    * @param {string} description - The entity description
+    * @return {string} - The guessed MADS RDF type shortname
+    */
+    guessTypeFromDescription: function(description){
+      // Convert to lowercase for case-insensitive matching
+      const desc = description.toLowerCase();
+      
+      // Check for person indicators
+      if (desc.includes('person') || 
+          desc.includes('author') || 
+          desc.includes('writer') || 
+          desc.includes('actor') || 
+          desc.includes('politician') || 
+          desc.includes('scientist')) {
+        return 'PersonalName';
+      }
+      
+      // Check for organization indicators
+      if (desc.includes('organization') || 
+          desc.includes('company') || 
+          desc.includes('corporation') || 
+          desc.includes('institution') || 
+          desc.includes('university') || 
+          desc.includes('government')) {
+        return 'CorporateName';
+      }
+      
+      // Check for place indicators
+      if (desc.includes('country') || 
+          desc.includes('city') || 
+          desc.includes('town') || 
+          desc.includes('region') || 
+          desc.includes('place') ||
+          desc.includes('location') ||
+          desc.includes('geographic')) {
+        return 'Geographic';
+      }
+      
+      // Default to Topic for everything else
+      return 'Topic';
+    },
 
     fetchBfdbXML: async function(url){
 
@@ -1495,8 +1621,6 @@ const utilsNetwork = {
 
         let subjectChildren = useConfigStore().lookupConfig['http://id.loc.gov/authorities/childrensSubjects'].modes[0]['LCSHAC All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")
         let childrenSubjectSubdivision = useConfigStore().lookupConfig['http://id.loc.gov/authorities/childrensSubjects'].modes[0]['LCSHAC All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=4').replace("<OFFSET>", "1")+'&memberOf=http://id.loc.gov/authorities/subjects/collection_Subdivisions'
-
-        searchVal = decodeURIComponent(searchVal)
 
         const exactUri = 'https://preprod-8080.id.loc.gov/authorities/<SCHEME>/label/' + searchVal
         let exactName = exactUri.replace('<SCHEME>', 'names')

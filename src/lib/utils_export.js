@@ -230,6 +230,90 @@ const utilsExport = {
   },
 
   /**
+   * Serializes an XML node to a string, preserving all namespace declarations
+   * @param {Element} node - The XML node to serialize
+   * @return {String} The serialized XML string with namespace declarations preserved
+   */
+  serializePreservingNamespaces: function(node) {
+    // Create a new serializer that preserves namespaces
+    const serializer = new XMLSerializer();
+    let xmlString = serializer.serializeToString(node);
+    
+    // Ensure rdfs namespace declaration is present in rdfs:label elements
+    xmlString = xmlString.replace(/<rdfs:label(?![^>]*xmlns:rdfs=)/g, 
+      '<rdfs:label xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"');
+    
+    return xmlString;
+  },
+
+  /**
+  * Creates a properly namespaced rdfs:label element
+  * 
+  * @param {string} text - The label text content
+  * @return {Element} - The properly namespaced rdfs:label element
+  */
+  createRdfsLabel: function(text) {
+    const labelEl = document.createElementNS(this.namespace.rdfs, "rdfs:label");
+    // Explicitly set the namespace
+    labelEl.setAttributeNS("http://www.w3.org/2000/xmlns/", "xmlns:rdfs", this.namespace.rdfs);
+    labelEl.textContent = text || '';
+    return labelEl;
+  },
+
+  /**
+  * Formats an agent entity from a Wikidata source for RDF output
+  * @param {Object} agent - The agent entity object
+  * @return {String} - The formatted RDF for the agent
+  */
+  formatAgentEntity: function(agent) {
+    // Check if this is a Wikidata entity that should use MADS RDF types
+    if (agent.uri && agent.uri.includes('wikidata.org')) {
+      // Determine the entity type (PersonalName is default for agents if not specified)
+      const entityType = agent.type || 'PersonalName';
+      const rdfType = agent.typeFull || `http://www.loc.gov/mads/rdf/v1#${entityType}`;
+      
+      // Modified to ensure xmlns:rdfs is properly included and no extra whitespace is added
+      return `<madsrdf:${entityType} rdf:about="${agent.uri}">
+  <rdf:type rdf:resource="${rdfType}" />
+  <rdfs:label xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#">${agent.label || agent.title || ''}</rdfs:label>
+</madsrdf:${entityType}>`;
+    }
+    
+    // For non-Wikidata entities, use the standard bf:Agent format
+    // Also add the namespace declaration here for consistency
+    return `<bf:Agent rdf:about="${agent.uri}">
+  <rdf:type rdf:resource="${agent.typeFull || 'http://id.loc.gov/ontologies/bibframe/Agent'}" />
+  <rdfs:label xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#">${agent.label || agent.title || ''}</rdfs:label>
+</bf:Agent>`;
+  },
+
+  /**
+  * Generates RDF markup for a contribution
+  * @param {Object} contribution - The contribution object
+  * @param {String} contributionType - The type of contribution (Primary, etc.)
+  * @return {String} - The formatted RDF for the contribution
+  */
+  formatContribution: function(contribution, contributionType = 'Contribution') {
+    let agentMarkup;
+    
+    if (contribution.agent) {
+      // Use our specific formatter for agents
+      agentMarkup = this.formatAgentEntity(contribution.agent);
+    } else {
+      // Add xmlns:rdfs for consistency even in the fallback
+      agentMarkup = '<bf:Agent><rdfs:label xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#">Unknown</rdfs:label></bf:Agent>';
+    }
+    
+    // Ensure we properly preserve the XML structure when embedding
+    return `<bf:${contributionType}>
+  <bf:agent>
+    ${agentMarkup}
+  </bf:agent>
+  ${contribution.role ? `<bf:role><bf:Role rdf:about="${contribution.role}"/></bf:role>` : ''}
+</bf:${contributionType}>`;
+  },
+
+  /**
   * A helper function that will build blank node based on userValue obj
   *
   * @param {obj} userValue - the uservalue to test
@@ -1596,66 +1680,16 @@ const utilsExport = {
 			datasetDescriptionEl.appendChild(el)
 		}
 
-		let strXmlFormatted = (new XMLSerializer()).serializeToString(rdf)
+		let strXmlFormatted = this.serializePreservingNamespaces(rdf);
 		strXmlFormatted = ensureRoot(strXmlFormatted);
-		strXmlFormatted = utilsMisc.prettifyXmlJS(strXmlFormatted, ' ')
+		strXmlFormatted = utilsMisc.prettifyXmlJS(strXmlFormatted, ' ');
 
-		rdfBasic.appendChild(datasetDescriptionEl)
+		rdfBasic.appendChild(datasetDescriptionEl);
 
-		let strXmlBasic = (new XMLSerializer()).serializeToString(rdfBasic)
+		let strXmlBasic = this.serializePreservingNamespaces(rdfBasic);
 		strXmlBasic = ensureRoot(strXmlBasic);
-		let strXml = (new XMLSerializer()).serializeToString(rdf)
+		let strXml = this.serializePreservingNamespaces(rdf);
 		strXml = ensureRoot(strXml);
-		// console.log(strXml)
-    /*
-        kefo note
-        In FF, only strXmlBasic has any real content.  The other two -
-        strXml and strXmlFormatted - contain only the root node, rdf:RDF,
-        and all the namespaces.
-        The below line fixes this in FF for me.
-    */
-    //strXmlFormatted = uiUtils.prettifyXmlJS(strXmlBasic, ' ')
-
-    if (useConfigStore().postUsingAlmaXmlFormat){
-
-      // console.log("strXmlBasic")
-      // console.log(rdfBasic)
-
-      // get the various pieces
-      let almaWorksEl =  rdfBasic.getElementsByTagName("bf:Work")
-      let almaInstancesEl =  rdfBasic.getElementsByTagName("bf:Instance")
-      let almaItemsEl =  rdfBasic.getElementsByTagName("bf:Item") 
-	  // There is not currently an API for bf:Item in Alma
-
-      const doc = document.implementation.createDocument("", "", null);
-      // make a new root element
-      let almaXmlElBib = doc.createElement("bib");
-      // <bib>
-
-      let almaXmlElRecordFormat = doc.createElement("record_format");
-      almaXmlElRecordFormat.innerHTML = "BIBFRAME"
-      almaXmlElBib.appendChild(almaXmlElRecordFormat)
-      // make a child element record of bib
-      let almaXmlElRecord = doc.createElement("record");
-      //rdf tag should be open
-      let almaXmlElRdf = doc.createElement("rdf:RDF");
-      almaXmlElRdf.setAttribute("xmlns:rdf", "http://www.w3.org/1999/02/22-rdf-syntax-ns#");
-      almaXmlElRecord.appendChild(almaXmlElRdf)
-      almaXmlElBib.appendChild(almaXmlElRecord)
-
-      for (let el of almaWorksEl){ almaXmlElRdf.appendChild(el) }
-      for (let el of almaInstancesEl){ almaXmlElRdf.appendChild(el) }
-      for (let el of almaItemsEl){ almaXmlElRdf.appendChild(el) }
-
-
-      let strAlmaXmlElBib = (new XMLSerializer()).serializeToString(almaXmlElBib)
-
-      // overwrite the existing string with with one
-      // strXml is the one sent to the server
-      strXml = strAlmaXmlElBib
-
-    }
-
 
         // build the BF2MARC package
 

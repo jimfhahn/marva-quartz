@@ -679,14 +679,18 @@
                 this.activeContext[key] = r[key]
               }
               
-              // Always ensure type is properly set for AuthTypeIcon
+              // Convert full URI types to their short names
               if (this.activeContext.type === 'http://www.loc.gov/mads/rdf/v1#PersonalName') {
                 this.activeContext.type = 'PersonalName'
               } else if (this.activeContext.type === 'http://www.loc.gov/mads/rdf/v1#CorporateName') {
                 this.activeContext.type = 'CorporateName' 
+              } else if (this.activeContext.type === 'http://www.loc.gov/mads/rdf/v1#Topic') {
+                this.activeContext.type = 'Topic'
+              } else if (this.activeContext.type === 'http://www.loc.gov/mads/rdf/v1#Geographic') {
+                this.activeContext.type = 'Geographic'
               } else if (!this.activeContext.type) {
-                // Default to PersonalName if no type is set
-                this.activeContext.type = 'PersonalName'
+                // If still no type, use Topic as a safe default
+                this.activeContext.type = 'Topic'
               }
               
               this.activeContext.loading = false
@@ -1001,8 +1005,20 @@
           <div class="complex-lookup-modal-search">
             <template v-if="preferenceStore.returnValue('--b-edit-complex-use-select-dropdown') === false">
               <div class="toggle-btn-grp cssonly">
-                <div v-for="opt in modalSelectOptions"><input type="radio" :value="opt.label" class="search-mode-radio" v-model="modeSelect" name="searchMode"/><label onclick="" class="toggle-btn">{{opt.label}}</label></div>
+                <div v-for="(option, index) in modalSelectOptions" :key="index">
+                  <input 
+                    type="radio" 
+                    class="search-mode-radio" 
+                    name="searchMode"
+                    :value="option.label" 
+                    v-model="modeSelect"
+                  />
+                  <label 
+                    onclick=""
+                    class="toggle-btn"
+                  >{{ option.label }}</label>
                 </div>
+              </div>
 
                 <div v-if="(activeComplexSearch && activeComplexSearch[0] && ((activeComplexSearch[0].total % 25 ) > 0 || activeComplexSearch.length > 0))" class="complex-lookup-paging">
                   <span :style="`${this.preferenceStore.styleModalTextColor()}`">
@@ -1033,7 +1049,11 @@
             </template>
             <template v-if="preferenceStore.returnValue('--b-edit-complex-use-select-dropdown') === true">
               <select v-model="modeSelect">
-                <option v-for="opt in modalSelectOptions">{{opt.label}}</option>
+                <option 
+                  v-for="(option, index) in modalSelectOptions" 
+                  :key="index" 
+                  :value="option.label"
+                >{{ option.label }}</option>
               </select>
             </template>
             <input class="lookup-input" v-model="searchValueLocal" ref="inputLookup" @keydown="inputKeydown($event)" @keyup="inputKeyup($event)" type="text" :style="`${this.preferenceStore.styleModalBackgroundColor()}; ${this.preferenceStore.styleModalTextColor()}`" />

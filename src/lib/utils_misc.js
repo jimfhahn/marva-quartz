@@ -1,4 +1,3 @@
-
 const utilsMisc = {
 
   globalNav: function(dir,source){
@@ -31,14 +30,26 @@ const utilsMisc = {
 
   },
 
-  prettifyXmlJS(xml, tab = '\t', nl = '\n'){
+  /**
+   * Formats XML with proper indentation while preserving namespace declarations
+   * 
+   * @param {string} xml - The XML string to format
+   * @param {string} tab - The indentation character/string
+   * @return {string} - Formatted XML with preserved namespace declarations
+   */
+  prettifyXmlJS: function(xml, tab = '  ') {
+    // First ensure rdfs namespace declarations are present in rdfs:label elements
+    xml = xml.replace(/<rdfs:label(?![^>]*xmlns:rdfs=)/g, 
+      '<rdfs:label xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"');
+      
+    // Rest of the prettifying logic
     let formatted = '', indent = '';
     const nodes = xml.slice(1, -1).split(/>\s*</);
-    if (nodes[0][0] == '?') formatted += '<' + nodes.shift() + '>' + nl;
+    if (nodes[0][0] == '?') formatted += '<' + nodes.shift() + '>' + '\n';
     for (let i = 0; i < nodes.length; i++) {
       const node = nodes[i];
       if (node[0] == '/') indent = indent.slice(tab.length); // decrease indent
-      formatted += indent + '<' + node + '>' + nl;
+      formatted += indent + '<' + node + '>' + '\n';
       if (node[0] != '/' && node[node.length - 1] != '/' && node.indexOf('</') == -1) indent += tab; // increase indent
     }
     return formatted;

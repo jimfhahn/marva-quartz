@@ -480,11 +480,38 @@ const utilsRDF = {
       return true
     }
     return false
-  }
+  },
 
-
-
-
+  /**
+   * Generates RDF markup for entity references
+   * @param {Object} entity - The entity to generate markup for
+   * @param {String} elementName - The element name to wrap the entity in
+   * @return {String} - The RDF markup string
+   */
+  generateEntityMarkup: function(entity, elementName) {
+    if (!entity) return '';
+    
+    // Special handling for Wikidata entities with MADS RDF types
+    if (entity.uri && entity.uri.includes('wikidata.org') && entity.useMADSRDF && entity.type) {
+      let rdfType = entity.typeFull || `http://www.loc.gov/mads/rdf/v1#${entity.type}`;
+      let entityType = entity.type || 'Topic';
+      
+      return `<madsrdf:${entityType} rdf:about="${entity.uri}">
+  <rdf:type rdf:resource="${rdfType}" />
+  <rdfs:label xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#">${entity.title || entity.label || ''}</rdfs:label>
+</madsrdf:${entityType}>`;
+    }
+    
+    // Regular entity handling
+    const element = elementName || 'bf:Agent';
+    const typeAttribute = entity.typeFull ? 
+      `\n  <rdf:type rdf:resource="${entity.typeFull}" />` : '';
+    
+    return `<${element} rdf:about="${entity.uri}">
+  ${typeAttribute}
+  <rdfs:label xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#">${entity.title || entity.label || ''}</rdfs:label>
+</${element}>`;
+  },
 
 }
 
