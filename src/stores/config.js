@@ -101,7 +101,7 @@ export const useConfigStore = defineStore('config', {
         id: 'https://id.loc.gov/',
         env: "staging",
         publicEndpoints: true,
-        displayLCOnlyFeatures: true
+        displayLCOnlyFeatures: false
         },
 
     },

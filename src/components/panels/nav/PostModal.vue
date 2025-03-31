@@ -41,7 +41,29 @@
       },
 
       post: async function() {
-        await this.publishRecord('default');
+        this.$refs.errorHolder.style.height = this.initalHeight + 'px';
+        this.posting = true;
+        // Clear previous results
+        this.postResults = {};
+        try {
+          // publishRecord now receives xmlString and type
+          const response = await this.profileStore.publishRecord(
+            await this.generateXML(this.activeProfile),
+            this.activeProfile,
+            'default'
+          );
+          this.postResults = response;
+          if (response.publish && response.publish.status !== 'published') {
+            console.error("Error response:", response);
+          }
+        } catch (error) {
+          console.error("Error during post:", error);
+          this.postResults = {
+            publish: { status: 'error', message: error.message || 'An unknown error occurred' }
+          };
+        } finally {
+          this.posting = false;
+        }
       },
 
       postwork: async function() {
@@ -141,22 +163,25 @@
       },
 
       cleanUpErrorResponse: function(msg) {
-        if (!msg) return ''
-        msg = JSON.stringify(msg, null, 2)
-        msg = msg.replace(/\\n|\\t/g, '').replace(/\\"/g,'"').replace(/&lt;/g,'<').replace(/&gt;/g,'>')
-        return msg
+        if (!msg) return '';
+        let cleaned = JSON.stringify(msg, null, 2);
+        cleaned = cleaned
+          .replace(/\\n/g, '\n')
+          .replace(/\\t/g, '\t')
+          .replace(/\\"/g, '"')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>');
+        return cleaned;
       },
 
       // Implement a method to generate XML from the profile
       async generateXML(profile) {
         // Use the buildXML method from utilsExport to generate the XML
         const xmlObj = await utilsExport.buildXML(profile);
-        if (xmlObj && xmlObj.xmlStringFormatted) {
-          return xmlObj.xmlStringFormatted;
-        } else {
-          console.error('Failed to generate XML:', xmlObj);
-          return '<rdf:RDF></rdf:RDF>';
-        }
+        let xmlString = xmlObj && xmlObj.xmlStringFormatted ? xmlObj.xmlStringFormatted : '<rdf:RDF></rdf:RDF>';
+        // Remove any extraneous encoded quotes in namespace declarations (e.g. &quot;)
+        xmlString = xmlString.replace(/&quot;/g, '');
+        return xmlString;
       },
     },
 
