@@ -247,22 +247,31 @@ const utilsExport = {
     }
   },
 
-  /**
+    /**
    * Serializes an XML node to a string, preserving all namespace declarations
    * @param {Element} node - The XML node to serialize
    * @return {String} The serialized XML string with namespace declarations preserved
    */
-  serializePreservingNamespaces: function(node) {
-    // Create a new serializer that preserves namespaces
-    const serializer = new XMLSerializer();
-    let xmlString = serializer.serializeToString(node);
-    
-    // Ensure rdfs namespace declaration is present in rdfs:label elements
-    xmlString = xmlString.replace(/<rdfs:label(?![^>]*xmlns:rdfs=)/g, 
-      '<rdfs:label xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"');
-    
-    return xmlString;
-  },
+    serializePreservingNamespaces: function(node) {
+      // Create a new serializer that preserves namespaces
+      const serializer = new XMLSerializer();
+      let xmlString = serializer.serializeToString(node);
+      
+      // Ensure rdfs namespace declaration is present in rdfs:label elements
+      xmlString = xmlString.replace(/<rdfs:label(?![^>]*xmlns:rdfs=)/g, 
+        '<rdfs:label xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"');
+      
+      // Fix namespace declarations - add spaces between them
+      xmlString = xmlString.replace(/xmlns:[a-z0-9]+="[^"]+"/g, match => match + ' ');
+      
+      // Fix any double quotes that might appear before a namespace
+      xmlString = xmlString.replace(/"xmlns:/g, ' xmlns:');
+      
+      // Remove any extra spaces in closing tags
+      xmlString = xmlString.replace(/\s+\/>/g, '/>');
+      
+      return xmlString;
+    },
 
   /**
   * Creates a properly namespaced rdfs:label element
@@ -546,1870 +555,1197 @@ const utilsExport = {
 		return results
 	},
 
-
-
-  /**
-  *
-  *
-  * @param {object} profile - the profile to convert to XML
-  * @return {boolean}
-  */
-  buildXML: async function(profile){
-
-	if (!profile || (profile && Object.keys(profile).length==0)){
-		console.warn("Trying to build XML with bad profile:", profile)
-		return false
-	}
-
-
-
-	// if we are in dev mode let the error bubble, but otherwise catch the error and try to recover
-	if (useConfigStore().returnUrls.dev === true){
-
-		return await this.buildXMLProcess(profile)
-
-	}else{
-
-		try{
-			let xmlObj = await this.buildXMLProcess(profile)
-			this.lastGoodXMLBuildProfile = JSON.parse(JSON.stringify(profile))
-			this.lastGoodXMLBuildProfileTimestamp = Math.floor(Date.now() / 1000)
-
-			return xmlObj
-		} catch (error) {
-			console.warn("XML Parsing Error:")
-			console.warn(error)
-
-			useProfileStore().triggerBadXMLBuildRecovery(this.lastGoodXMLBuildProfile, this.lastGoodXMLBuildProfileTimestamp)
-
-			let profileAsJson
-			try{
-				profileAsJson = JSON.stringify(profile,null,2)
-			}catch{
-				profileAsJson = 'Error stringify-ing profile!'
-			}
-
-			let user = `${usePreferenceStore().catInitals}_${usePreferenceStore().catCode}`.replace("/\s/g",'_')
-			const filename = `${Math.floor(Date.now() / 1000)}_${user}_` + `${new Date().toDateString()}_${new Date().toTimeString()}`.replaceAll(' ','_').replaceAll(':','-') + '.txt'
-
-			let errorReport = `
-
-			Error: ${error}
-
-			----------------
-			XML Creation Log
-			----------------
-
-			----End Creation Log----
-
-
-			****************
-			XML Source
-			****************
-			${(profile.xmlSource) ? profile.xmlSource : 'No Source Found'}
-			***End Source***
-			`
-
-			utilsNetwork.sendErrorReportLog(errorReport,filename,profileAsJson)
-
-
-
-			return false
-		}
-
-	}
-
-
-
-  },
-
-
-
-  /**
-  *
-  *
-  * @param {object} profile - the profile to convert to XML
-  * @return {object} multiple XML strings
-  */
-  buildXMLProcess: async function(profile){
-    // console.log(profile)
-
-    // keep track of the proces for later
-	// let debugHistory = []
-	let xmlLog = []
-
-    let componentXmlLookup = {}
-
-    // keep a copy of the org profile around
-    let orginalProfile = profile
-	// cut the ref to the orginal
-	profile = JSON.parse(JSON.stringify(profile))
-
-	let xmlParser = returnDOMParser()
-
-    // these will store the top level elements
-    let tleWork = []
-	let tleInstance = []
-	let tleItem = []
-
-    // we are creating the xml in two formats, create the root node for both
-    let rdf = document.createElementNS(this.namespace.rdf, "RDF");
-	let rdfBasic = document.createElementNS(this.namespace.rdf, "RDF");
-
-    // just add all the namespaces into the root element
-	for (let ns of Object.keys(this.namespace)){
-		rdf.setAttributeNS("http://www.w3.org/2000/xmlns/", `xmlns:${ns}`, this.namespace[ns])
-		rdfBasic.setAttributeNS("http://www.w3.org/2000/xmlns/", `xmlns:${ns}`, this.namespace[ns])
-	}
-
-    // these are elements used to store metadata about the record in the backend
-	let xmlVoidDataRtsUsed = []
-	let xmlVoidDataType = []
-	let xmlVoidExternalID = []
-	let xmlVoidDataTitle = ""
-	let xmlVoidDataContributor = ""
-	let xmlVoidDataLccn = ""
-
-    let tleLookup = {
-		Work: {},
-		Instance: {},
-		Item: {},
-		Hub:{}
-	}
-
-		for (let rt of profile.rtOrder){
-
-			xmlLog.push(`Processing rt: ${rt}`)
-
-			if (profile.rt[rt].noData){
-				xmlLog.push(` - ${rt} has no data, skipping it.`)
-				continue
-			}
-
-			let tleArray // eslint-disable-line
-			let rootEl
-			let rootElName
-
-			if (rt.includes(':Work')){
-				tleArray = tleWork
-				rootEl = document.createElementNS(this.namespace.bf,"bf:Work");
-				rootElName = "Work"
-			}else if (rt.includes(':Instance')){
-				tleArray = tleInstance
-				rootEl = document.createElementNS(this.namespace.bf,"bf:Instance");
-				rootElName = "Instance"
-			}else if (rt.includes(':Item')){
-				tleArray = tleItem
-				rootEl = document.createElementNS(this.namespace.bf,"bf:Item");
-				rootElName = "Item"
-			}else if (rt.endsWith(':Hub')){
-				tleArray = tleItem
-				rootEl = document.createElementNS(this.namespace.bf,"bf:Hub");
-				rootElName = "Hub"
-			}else{
-				// don't mess with anything that is not a top level entitiy in the profile, there can be other referenced RTs that we don't want to export they are just used in the main RT
-				xmlLog.push(`Dunno what this part is, skipping ${rt}`)
-				continue
-			}
-
-			xmlLog.push(`Building ${rootElName}`)
-
-
-			// rdf.appendChild(rootEl,tleArray)
-
-
-			if (profile.rt[rt].URI){
-				rootEl.setAttributeNS(this.namespace.rdf, 'rdf:about', profile.rt[rt].URI)
-				xmlLog.push(`Setting URI for this resource rdf:about to: ${profile.rt[rt].URI}`)
-				xmlVoidExternalID.push(profile.rt[rt].URI)
-			}
-			if (profile.rt[rt]['@type']){
-				let type = this.createElByBestNS('http://www.w3.org/1999/02/22-rdf-syntax-ns#type')
-				type.setAttributeNS(this.namespace.rdf, 'rdf:resource', profile.rt[rt]['@type'])
-				xmlLog.push(`Setting URI for this resource rdf:resource to: ${profile.rt[rt]['@type']}`)
-				rootEl.appendChild(type)
-			}
-
-
-			xmlLog.push(`Looping through the PTs`)
-
-			for (let pt of profile.rt[rt].ptOrder){
-        		// extract the pt, this is the individual component like a <mainTitle>
-				let ptObj = profile.rt[rt].pt[pt]
-				if (ptObj.deleted){
-					continue
-				}
-
-				if (ptObj.deepHierarchy){
-
-					// just take our existing XML and plop it into the root element
-					let orgNode = xmlParser.parseFromString(ptObj.xmlSource, "text/xml").children[0]
-					rootEl.appendChild(orgNode)
-					continue
-
-
-				}
-
-				xmlLog.push(`Working on: ${pt}`)
-				// console.log('ptObj.userValue',ptObj.userValue)
-
-				let userValue
-				let userValueSiblings = []
-
-        		// the uservalue could be stored in a few places depending on the nesting
-				if (ptObj.userValue[ptObj.propertyURI] && ptObj.userValue[ptObj.propertyURI][0]){
-					userValue = ptObj.userValue[ptObj.propertyURI][0]
-
-					let nonGuidProps = Object.keys(ptObj.userValue[ptObj.propertyURI][0]).filter(k => (!k.includes('@') ? true : false ))
-					if (nonGuidProps.length==1){
-						if (typeof ptObj.userValue[ptObj.propertyURI][0][nonGuidProps[0]] == 'string' || typeof ptObj.userValue[ptObj.propertyURI][0][nonGuidProps[0]] == 'number'){
-							// console.log("It is a top level literal")
-							// does it have more than one?
-							if (ptObj.userValue[ptObj.propertyURI].length > 1){
-								// console.log("It is a multi-top-level-literal!")
-								// set it to the sibling group not the individual
-								userValue = ptObj.userValue[ptObj.propertyURI]
-								// console.log("SETTING userValue to the group!",userValue)
-							}
-						}
-					}
-
-					if (ptObj.userValue[ptObj.propertyURI].length>1){
-						// some top level simpleLookup values like bf:content could have multiple values in it but we are really only setup to handle one
-						// so keep track of them for later
-						userValueSiblings = JSON.parse(JSON.stringify(ptObj.userValue[ptObj.propertyURI])).slice(1)
-						// console.log("Got the siblings:", userValueSiblings)
-
-
-					}
-
-
-
-				}else if (ptObj.userValue[ptObj.propertyURI]){
-					userValue = ptObj.userValue[ptObj.propertyURI]
-				}else{
-					userValue = ptObj.userValue
-				}
-
-				// temp hack to clcean up bad data -- not perm required
-				for (let k of Object.keys(userValue)){
-					if (k === 'undefined'){
-						delete userValue[k]
-					}
-				}
-
-				let mostCommonScript = useProfileStore().setMostCommonNonLatinScript()
-
-				// in bf->marc conversion it builds 880s and 600s based off of the presenece of
-				// multiple auth labels one with no @lang tag and ones that do have it
-				// check specific properties for now? (10/2024)
-				if ([
-					'http://id.loc.gov/ontologies/bibframe/contribution',
-					'http://id.loc.gov/ontologies/bibframe/subject',
-					'http://id.loc.gov/ontologies/bibframe/geographicCoverage'
-
-				].indexOf(ptObj.propertyURI)>-1){
-
-					// recusrive function to go through each key in the userValue and keep going till we find labels or marckeys
-					// the two properties that make 880s work
-					let process = function(obj, func) {
-						if (Array.isArray(obj)){
-							obj.forEach(function (child) {
-							process(child, func);
-							});
-						}else if (typeof obj == 'object' && obj !== null){
-							for (let k in obj){
-							if (Array.isArray(obj[k])){
-								// we only care about these properties
-								if (k == 'http://www.w3.org/2000/01/rdf-schema#label' || k == 'http://id.loc.gov/ontologies/bflc/marcKey' || k == 'http://www.loc.gov/mads/rdf/v1#authoritativeLabel'){
-									func(k,obj[k])
-								}else{
-									process(obj[k], func);
-								}
-							}
-							}
-						}
-					}
-
-					process(ptObj.userValue, function (property,ary) {
-						// does it have multiple values?
-						if (ary.length>1 && mostCommonScript){
-							let nonLatinAgent = useProfileStore().returnAllNonLatinAgentOptions()[ptObj['@guid']]
-							let keepLang = []
-							if (nonLatinAgent){
-								let useLang = utilsProfile.pickBestNonLatinScriptOption(mostCommonScript, nonLatinAgent.scripts)
-								if (useLang){
-									keepLang.push(useLang)
-								}
-							}
-							// if we have a language then great, also check the manual setting
-							if (profile.nonLatinScriptAgents){
-								if (profile.nonLatinScriptAgents[ptObj['@guid']]){
-									keepLang = [profile.nonLatinScriptAgents[ptObj['@guid']]]
-								}
-							}
-							if (keepLang.length==0){
-								console.warn("No non-latin agent access point was able to be selected for this agent!", ptObj)
-							}
-
-							let toRemove = []
-							for (var i = 0; i < ary.length; i++) {
-								let value = ary[i]
-								// no lang tag? good, thats the authorized latin script one
-								if (!value['@language']){
-									continue
-								}else{
-									// it has a language tag? is it one of the ones we want to keep?
-									let keepIt = false
-									for (let l of keepLang){
-
-										if (value['@language'].toLowerCase().indexOf('-' + l.toLowerCase()) >-1){
-											keepIt = true
-										}
-									}
-									if (!keepIt){
-										toRemove.push(value['@language'])
-									}
-								}
-							}
-							for (let l of toRemove){
-								let indexToDel = ary.map((v)=>{return v['@language']}).indexOf(l)
-								ary.splice(indexToDel,1)
-							}
-
-
-						}else if (ary.length>1 && !mostCommonScript){
-
-							// there isn't a non-latin script in the record, so remove all the non-latin properties
-							let toRemove = []
-							for (var i = 0; i < ary.length; i++) {
-								let value = ary[i]
-								if (value['@language']){
-									toRemove.push(value['@language'])
-								}
-							}
-							for (let l of toRemove){
-								let indexToDel = ary.map((v)=>{return v['@language']}).indexOf(l)
-								ary.splice(indexToDel,1)
-							}
-
-
-						}
-					});
-				}
-
-
-				xmlLog.push(['Set userValue to:', JSON.parse(JSON.stringify(userValue)) ])
-
-				if (this.ignoreProperties.indexOf(ptObj.propertyURI) > -1){
-					xmlLog.push(`Skpping it because it is in the ignoreProperties list`)
-					continue
-				}
-
-
-				// do some updates to the admin metadata
-				if (pt.includes('http://id.loc.gov/ontologies/bibframe/adminMetadata')){
-					let adminData = ptObj.userValue['http://id.loc.gov/ontologies/bibframe/adminMetadata'][0]
-					// set the profile used
-					adminData['http://id.loc.gov/ontologies/bflc/profile'] = [
-						{
-							'http://id.loc.gov/ontologies/bflc/profile' : rt
-						}
-					]
-					// drop any existing changeDate and add our own
-					try{
-						delete adminData['http://id.loc.gov/ontologies/bibframe/changeDate']
-					}catch (e){
-						//
-					}
-					// add our own
-					adminData['http://id.loc.gov/ontologies/bibframe/changeDate'] = [
-						{
-							'http://id.loc.gov/ontologies/bibframe/changeDate' : new Date().toISOString().split('.')[0]+"Z",
-							'@datatype': 'http://www.w3.org/2001/XMLSchema#dateTime'
-						}
-					]
-					// and make a creationdate if it doesn't yet exist
-					if (!adminData['http://id.loc.gov/ontologies/bibframe/creationDate']){
-						adminData['http://id.loc.gov/ontologies/bibframe/creationDate'] = [
-							{
-								'http://id.loc.gov/ontologies/bibframe/creationDate' : new Date().toISOString().split('.')[0]+"Z",
-								'@datatype': 'http://www.w3.org/2001/XMLSchema#dateTime'
-							}
-						]
-					}
-					xmlLog.push(['Set adminData to:', JSON.parse(JSON.stringify(adminData)) ])
-					// make sure if its an instance it has a localid
-				}
-
-
-				// does it even have any userValues?
-				if (this.hasUserValue(userValue)){
-					// keep track of what resource teplates we used in this record
-					if (xmlVoidDataRtsUsed.indexOf(rt)==-1){
-						xmlVoidDataRtsUsed.push(rt)
-					}
-					if (xmlVoidDataType.indexOf(rootElName)==-1){
-						xmlVoidDataType.push(rootElName)
-					}
-
-					// is it a Blank node
-					if (this.isBnode(userValue)){
-						xmlLog.push(`userValue: ${JSON.parse(JSON.stringify(userValue))}`)
-
-						// this.debug(ptObj.propertyURI,'root level element, is bnode', userValue)
-						xmlLog.push(`Root level bnode: ${ptObj.propertyURI}`)
-
-						let pLvl1 = this.createElByBestNS(ptObj.propertyURI)
-
-						let bnodeLvl1 = this.createBnode(userValue, ptObj.propertyURI)
-
-						xmlLog.push(`Created lvl 1 predicate: ${pLvl1.tagName} and bnode: ${bnodeLvl1.tagName}`)
-
-						// loop though the properties
-						for (let key1 of Object.keys(userValue).filter(k => (!k.includes('@') ? true : false ) )){
-							xmlLog.push(`Looking at property : ${key1} in the userValue`)
-							// console.log('userValue',userValue)
-							let pLvl2 = this.createElByBestNS(key1)
-							if (key1 == 'http://www.loc.gov/mads/rdf/v1#componentList'){
-								pLvl2.setAttribute('rdf:parseType', 'Collection')
-							}
-							xmlLog.push(`Created lvl 2 predicate: ${pLvl2.tagName}`)
-
-							// if we have a rdf:type here build a stand alone type element and move on
-							// TODO: add the label if present(?)
-
-							if (key1 == 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type'){
-								if (userValue[key1] && userValue[key1][0] && userValue[key1][0]['@id']){
-									let rdftype = this.createElByBestNS(key1)
-									rdftype.setAttributeNS(this.namespace.rdf, 'rdf:resource', userValue[key1][0]['@id'])
-
-									bnodeLvl1.appendChild(rdftype)
-									xmlLog.push(`This bnode just has a rdf:type : ${rdftype} setting it an continuing`)
-									continue
-								}else if (userValue[key1] && userValue[key1][0] && userValue[key1][0]['http://www.w3.org/2000/01/rdf-schema#label']){
-									let rdftype = this.createElByBestNS(key1)
-									rdftype.innerHTML=escapeHTML(userValue[key1][0]['http://www.w3.org/2000/01/rdf-schema#label'])
-									xmlLog.push(`This bnode just has a rdf:type and label : ${rdftype} setting it an continuing`)
-
-                                    bnodeLvl1.appendChild(rdftype)
-									continue
-								}
-							}
-
-
-							let value1FirstLoop = true
-							// loop through the value array of each of them
-							for (let value1 of userValue[key1]){
-
-								if (!value1FirstLoop && this.needsNewPredicate(key1)){
-									// we are going to make a new predicate, same type but not the same one as the last one was attached to
-									pLvl2 = this.createElByBestNS(key1)
-									xmlLog.push(`Creating lvl 2 property : ${pLvl2.tagName} for ${JSON.stringify(value1)}`)
-								}
-
-
-								// is it a bnode?  createElByBestNS
-								if (this.isBnode(value1)){
-									// yes
-									let bnodeLvl2 = this.createBnode(value1,key1)
-
-									pLvl2.appendChild(bnodeLvl2)
-									bnodeLvl1.appendChild(pLvl2)
-									xmlLog.push(`Creating bnode lvl 2 for it ${bnodeLvl2.tagName}`)
-
-                  					// now loop through its properties and see whats nested
-									for (let key2 of Object.keys(value1).filter(k => (!k.includes('@') ? true : false ) )){
-										let pLvl3 = this.createElByBestNS(key2)
-
-										xmlLog.push(`Creating lvl 3 property: ${pLvl3.tagName} for ${key2}`)
-
-                                        for (let value2 of value1[key2]){
-                                            if (this.isBnode(value2)){
-                                                // more nested bnode
-                                                // one more level
-                                                let bnodeLvl3 = this.createBnode(value2,key2)
-                                                pLvl3.appendChild(bnodeLvl3)
-                                                bnodeLvl2.appendChild(pLvl3)
-                                                xmlLog.push(`Creating lvl 3 bnode: ${bnodeLvl3.tagName} for ${key2}`)
-
-
-                                                for (let key3 of Object.keys(value2).filter(k => (!k.includes('@') ? true : false ) )){
-                                                    let pLvl4 = this.createElByBestNS(key2)
-                                                    for (let value3 of value2[key3]){
-                                                        if (this.isBnode(value3)){
-                                                            // one more level
-                                                            let bnodeLvl4 = this.createBnode(value3,key3)
-                                                            pLvl4.appendChild(bnodeLvl4)
-                                                            bnodeLvl3.appendChild(pLvl4)
-                                                            xmlLog.push(`Creating lvl 4 bnode: ${bnodeLvl4.tagName} for ${key3}`)
-
-
-                                                            for (let key4 of Object.keys(value3).filter(k => (!k.includes('@') ? true : false ) )){
-                                                                for (let value4 of value3[key4]){
-                                                                    if (this.isBnode(value4)){
-                                                                        console.error("Max hierarchy depth reached, but there are more levels left:", key4, 'in', userValue )
-                                                                        xmlLog.push(`Max hierarchy depth reached, but there are more levels left for ${key4}`)
-
-                                                                    }else{
-
-                                                                        for (let key5 of Object.keys(value4).filter(k => (!k.includes('@') ? true : false ) )){
-                                                                            if (typeof value4[key5] == 'string' || typeof value4[key5] == 'number'){
-                                                                                // its a label or some other literal
-                                                                                let p5 = this.createLiteral(key5, value4)
-                                                                                if (p5!==false) bnodeLvl4.appendChild(p5);
-                                                                                xmlLog.push(`Added literal ${p5} for ${key5}`)
-                                                                            }else{
-                                                                                console.error('key5', key5, value4[key5], 'not a literal, should not happen')
-                                                                                xmlLog.push(`Error not a literal but I thought it was at ${key5}`)
-                                                                            }
-                                                                        }
-
-                                                                    }
-
-                                                                }
-
-                                                            }
-
-
-                                                        }else{
-                                                            for (let key4 of Object.keys(value3).filter(k => (!k.includes('@') ? true : false ) )){
-                                                                if (typeof value3[key4] == 'string' || typeof value3[key4] == 'number'){
-                                                                    // its a label or some other literal
-                                                                    let p4 = this.createLiteral(key4, value3)
-                                                                    if (p4!==false) bnodeLvl3.appendChild(p4)
-                                                                    //xmlLog.push(`Added literal ${p4} for ${key4}`)
-                                                                }else{
-                                                                    console.error('key4', key4, value3[key4], 'not a literal, should not happen')
-                                                                    xmlLog.push(`Error not a literal but I thought it was at ${key4}`)
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }else{
-                                                for (let key3 of Object.keys(value2).filter(k => (!k.includes('@') ? true : false ) )){
-                                                    if (typeof value2[key3] == 'string' || typeof value2[key3] == 'number'){
-                                                        // its a label or some other literal
-                                                        let p3 = this.createLiteral(key3, value2)
-                                                        if (p3!==false) bnodeLvl2.appendChild(p3)
-                                                        xmlLog.push(`Created Literal ${p3.innerHTML} for ${key3}`)
-                                                    }else{
-                                                        console.error('key3', key3, value2[key3], 'not a literal, should not happen')
-                                                        xmlLog.push(`Error not a literal but I thought it was at ${key3}`)
-                                                    }
-                                                }
-                                            }
-                                        }
-									}
-								}else{
-									xmlLog.push(`It's value at lvl is not a bnode, looping through and adding a literal value`)
-									// no it is a literal or something else
-									// loop through its keys and make the values
-									let keys = Object.keys(value1).filter(k => (!k.includes('@') ? true : false ) )
-									if (userValue['@type'] &&  key1 ===  userValue['@type']){
-										// if the type of the bnode matches the bnode we are in
-										// then it means its a ref template, if it has an id then
-										// set the rdf about on it
-										if (value1['@id']){
-											xmlLog.push(`Setting its rdf:about to ${value1['@id']}`)
-											bnodeLvl1.setAttributeNS(this.namespace.rdf, 'rdf:about', value1['@id'])
-										}
-									}
-
-                                    if (keys.length>0){
-										for (let key2 of keys){
-											if (typeof value1[key2] == 'string' || typeof value1[key2] == 'number'){
-                                                    let p2 = this.createLiteral(key2, value1)
-                                                    xmlLog.push(`Creating literal ${JSON.stringify(value1)}`)
-                                                    if (p2!==false) bnodeLvl1.appendChild(p2);
-											}else if (Array.isArray(value1[key2])){
-												for (let arrayValue of value1[key2]){
-													let keysLevel2 = Object.keys(arrayValue).filter(k => (!k.includes('@') ? true : false ) )
-													if (keysLevel2.length>0){
-
-														for (let key22 of keysLevel2){
-															if (typeof arrayValue[key22] == 'string' || typeof arrayValue[key22] == 'number'){
-																// its a label or some other literal
-																let p2 = this.createLiteral(key22, arrayValue)
-																xmlLog.push(`Creating literal ${JSON.stringify(arrayValue[key22])}`)
-																if (p2!==false) bnodeLvl1.appendChild(p2)
-															}else{
-																console.error('key22', key22, arrayValue[key22], 'not a literal, should not happen')
-																xmlLog.push(`Error not a literal ${arrayValue[key22]}`)
-
-															}
-
-
-														}
-													}
-												}
-
-
-
-
-											}else{
-
-												console.error('key2', key2, value1[key2], 'not a literal, should not happen')
-												xmlLog.push(`Key 2 (${key2}) error, not a literal ${value1[key2]}`)
-
-											}
-
-										}
-									}else if (keys.length==0 && value1['@id']){
-										let p2 = this.createLiteral(key1, value1)
-										if (p2!==false) bnodeLvl1.appendChild(p2);
-
-
-									}else{
-
-										console.warn('Unhadled literal situtation')
-										console.log("value1", value1, 'key1',key1)
-										// just set it to an empty value
-										value1[key1] = ""
-
-
-									}
-
-
-
-
-								}
-
-								value1FirstLoop = false
-
-							}
-						}
-						pLvl1.appendChild(bnodeLvl1)
-						rootEl.appendChild(pLvl1)
-						componentXmlLookup[`${rt}-${pt}`] = formatXML(pLvl1.outerHTML)
-
-						// this is kind of a hack here, since the system wasn't designed orgianlly to have multiple top level lookup to live in the same bnode
-						// for example bf:content there should be a single bf:content->bf:Content node for each value but in the interface it is nice to allow multiple
-						// inputs in the same component. So allow them to do that but we will build those shallow sibling bnodes right here after we created the first one
-						if (userValueSiblings.length>0){
-							for (let uv of userValueSiblings){
-								xmlLog.push(`Root level sibling bnode: ${ptObj.propertyURI}`)
-								let pLvl1Sibling = this.createElByBestNS(ptObj.propertyURI)
-								let bnodeLvl1Sibling = this.createBnode(uv, ptObj.propertyURI)
-								//we are only checking for a label as a nested property, we will not loop through the properties looking for stuff
-
-								if (uv['http://www.w3.org/2000/01/rdf-schema#label']){
-									let rdftype = this.createElByBestNS('http://www.w3.org/2000/01/rdf-schema#label')
-									rdftype.innerHTML=escapeHTML(uv['http://www.w3.org/2000/01/rdf-schema#label'][0]['http://www.w3.org/2000/01/rdf-schema#label'])
-									xmlLog.push(`This bnode just has a label : ${rdftype}`)
-									bnodeLvl1Sibling.appendChild(rdftype)
-								}else{
-									console.warn("There was no label for this sibling top level bnode, so there is porbably another way the label is being passed or something else is wrong.",bnodeLvl1Sibling)
-								}
-
-								// add to the structure
-								pLvl1Sibling.appendChild(bnodeLvl1Sibling)
-								rootEl.appendChild(pLvl1Sibling)
-							}
-						}
-
-
-
-
-					}else{
-						// this.debug(ptObj.propertyURI, 'root level element does not look like a bnode', userValue)
-						xmlLog.push(`Root level does not look like a bnode: ${ptObj.propertyURI}`)
-						let userValueArray = userValue
-						if (!Array.isArray(userValue)){
-							userValueArray = [userValue]
-						}
-
-
-						// but it might be a bnode, but with only a URI
-						for (let userValue of userValueArray){
-
-							// 2024 - Still needed?
-							if (userValue['@flags'] && userValue['@flags'].indexOf('simpleLookupTopLevelMulti') > -1){
-
-							
-
-
-							}else if (userValue['@type'] && userValue['@id']){
-
-								// this.debug(ptObj.propertyURI, 'But has @type, making bnode')
-
-								let p = this.createElByBestNS(ptObj.propertyURI)
-								let bnode = this.createElByBestNS(userValue['@type'])
-								bnode.setAttributeNS(this.namespace.rdf, 'rdf:about', userValue['@id'])
-
-								xmlLog.push(`Created ${p.tagName} property and ${bnode.tagName}`)
-								p.appendChild(bnode)
-								rootEl.appendChild(p)
-								componentXmlLookup[`${rt}-${pt}`] = formatXML(p.outerHTML)
-
-
-							}else if (userValue['@type'] && !userValue['@id']){
-
-								// this.debug(ptObj.propertyURI, 'Does not have URI, error', userValue)
-								xmlLog.push(`Should have a URI in ${ptObj.propertyURI} but can't find one`)
-
-
-								console.error("Does not have URI, ERROR")
-							}else if (await utilsRDF.suggestTypeNetwork(ptObj.propertyURI) == 'http://www.w3.org/2000/01/rdf-schema#Literal'){
-								// console.log("Top level literal HERE!",userValue)
-								// its just a top level literal property
-								// loop through its keys and make the values
-								let allXMLFragments = ''
-								for (let key1 of Object.keys(userValue).filter(k => (!k.includes('@') ? true : false ) )){
-									// console.log('userValue',userValue)
-									// console.log('key1',key1)
-									// console.log("userValue[key1]",userValue[key1])
-									// are we at the right level?
-									if (typeof userValue[key1] === 'string' || typeof userValue[key1] === 'number'){
-
-										let p1 = this.createLiteral(key1, userValue)
-										// console.log("p1",p1)
-										if (p1!==false) {
-											rootEl.appendChild(p1);
-											xmlLog.push(`Creating literal at root level for ${key1} with value ${p1.innerHTML}`)
-											allXMLFragments = allXMLFragments + `\n${formatXML(p1.outerHTML)}`
-										}
-									}else{
-										for (let value1 of userValue[key1]){
-											for (let key2 of Object.keys(value1).filter(k => (!k.includes('@') ? true : false ) )){
-												if (typeof value1[key2] == 'string' || typeof value1[key2] == 'number'){
-													// its a label or some other literal
-													let p1 = this.createLiteral(key2, value1)
-													if (p1!==false) {
-														rootEl.appendChild(p1);
-														allXMLFragments = allXMLFragments + `\n${formatXML(p1.outerHTML)}`
-														xmlLog.push(`Creating literal at root level for ${key2} with value ${value1}`)
-													}
-												}else{
-													console.error('key2', key2, value1[key2], 'not a literal, should not happen')
-													xmlLog.push(`Not a literal at root level ${key2} with value ${value1[key2]}`)
-												}
-											}
-										}
-									}
-								}
-								componentXmlLookup[`${rt}-${pt}`] = allXMLFragments
-                            //Exception for electronicLocator so it is handled by in the next block, otherwise, it won't appear in the XML
-							}else if (ptObj.propertyURI != "http://id.loc.gov/ontologies/bibframe/electronicLocator" && await utilsRDF.suggestTypeNetwork(ptObj.propertyURI) == 'http://www.w3.org/2000/01/rdf-schema#Resource'){
-								// if it is a marked in the profile as a literal and has expected value of rdf:Resource flatten it to a string literal
-								let allXMLFragments = ''
-								for (let key1 of Object.keys(userValue).filter(k => (!k.includes('@') ? true : false ) )){
-
-									for (let value1 of userValue[key1]){
-										for (let key2 of Object.keys(value1).filter(k => (!k.includes('@') ? true : false ) )){
-											if (typeof value1[key2] == 'string' || typeof value1[key2] == 'number'){
-												// its a label or some other literal
-												let p1 = this.createLiteral(key2, value1)
-												if (p1!==false) {
-													rootEl.appendChild(p1);
-													allXMLFragments = allXMLFragments + `\n${formatXML(p1.outerHTML)}`
-													xmlLog.push(`Listed as rdf:Resource but treating it a a literal, Creating literal for ${key2} with value ${p1.innerHTML}`)
-												}
-											}else{
-												console.error('key2', key2, value1[key2], 'not a literal, should not happen')
-												xmlLog.push(`Not a literal at root level ${key2} with value ${value1[key2]}`)
-											}
-										}
-									}
-								}
-								componentXmlLookup[`${rt}-${pt}`] = allXMLFragments
-							}else if (userValue['@id']){
-								// it has a URI at least, so make that
-								let p = this.createElByBestNS(ptObj.propertyURI)
-								p.setAttributeNS(this.namespace.rdf, 'rdf:resource', userValue['@id'])
-								rootEl.appendChild(p)
-								componentXmlLookup[`${rt}-${pt}`] = formatXML(p.outerHTML)
-
-							}else if (ptObj.propertyURI == 'http://www.w3.org/2000/01/rdf-schema#label'){
-
-								// does it just have a label?
-								let p = this.createElByBestNS(ptObj.propertyURI)
-								p.innerHTML = userValue['http://www.w3.org/2000/01/rdf-schema#label'][0]['http://www.w3.org/2000/01/rdf-schema#label']
-								rootEl.appendChild(p)
-								componentXmlLookup[`${rt}-${pt}`] = formatXML(p.outerHTML)
-
-
-							}else{
-								// this.debug(ptObj.propertyURI, 'Does not have @type, something is wrong here', userValue)
-								// console.log(ptObj.propertyURI, 'Does not have @type, something is wrong here', userValue)
-								// console.log("suggest type is:",await this.suggestType(ptObj.propertyURI))
-								console.warn("Should not be here")
-								// alert("Not everything entered was serialized into XML, please report this record and check the output.")
-							}
-
-						}
-					}
-
-				}else{
-					xmlLog.push(`Skpping it because hasUserValue == false`)
-				}
-			}
-
-
-			if (orginalProfile.rt[rt].unusedXml){
-
-				let unusedXmlNode = xmlParser.parseFromString(orginalProfile.rt[rt].unusedXml, "text/xml")
-				unusedXmlNode = unusedXmlNode.children[0]
-				for (let el of unusedXmlNode.children){
-					// console.log("Looking at",el.tagName)
-					if (el.tagName != 'rdfs:label'){
-						// there is some strange behavior adding the element directly
-						// so make a copy of it and insert the copy parsed from the string xml
-						let newEl = (new XMLSerializer()).serializeToString(el)
-						newEl = xmlParser.parseFromString(newEl, "text/xml")
-						newEl = newEl.children[0]
-						rootEl.appendChild(newEl)
-					}
-				}
-			}
-
-			// build the lookup
-			tleLookup[rootElName][orginalProfile.rt[rt].URI] = rootEl
-		}
-
-		// console.log("tleLookup --- tleLookup")
-		// console.log(tleLookup)
-
-		// console.log("xmlLogxmlLogxmlLog",xmlLog)
-		// Add in a adminMetadata to the resources with this user id
-		// catInitals.log(profile)
-		//get user info from preferenceStore instead of the profile
-		let userInitial = usePreferenceStore().catInitals
-		let catCode = usePreferenceStore().catCode
-		let user = `${userInitial} (${catCode})`
-		profile.user = user
-		// let catCode = profile.user.split(" (")
-		// catCode = catCode[catCode.length-1]
-		// catCode=catCode.split(")")[0]
-
-		let bf_adminMetadata = this.createElByBestNS("bf:adminMetadata")
-		let bf_AdminMetadtat = this.createElByBestNS("bf:AdminMetadata")
-		let bf_status = this.createElByBestNS("bf:status")
-		let bf_Status = this.createElByBestNS("bf:Status")
-
-		bf_Status.setAttributeNS(this.namespace.rdf, 'rdf:about','http://id.loc.gov/vocabulary/mstatus/c')
-		let bf_StatusLabel = this.createElByBestNS("rdfs:label")
-		bf_StatusLabel.innerHTML="changed"
-
-		let bf_catalogerId = this.createElByBestNS("bflc:catalogerId")
-		bf_catalogerId.innerHTML = escapeHTML(catCode)
-
-		let bf_date = this.createElByBestNS("bf:date")
-		bf_date.innerHTML = new Date().toISOString()
-
-		bf_AdminMetadtat.appendChild(bf_date)
-		bf_AdminMetadtat.appendChild(bf_catalogerId)
-		 // Before appending the new assigner, remove any existing one:
-		if (bf_AdminMetadtat.querySelector("bf\\:assigner")) {
-			// Remove any previously created assigner element
-			bf_AdminMetadtat.removeChild(bf_AdminMetadtat.querySelector("bf\\:assigner"));
-		}
-		 // NEW: Only add the default assigner if enabled by configuration.
-		let includeDefaultAssigner = useConfigStore().includeDefaultAssigner;
-		if (includeDefaultAssigner) {
-			// Now create a fresh assigner element:
-			let bf_assigner = document.createElementNS(this.namespace.bf, "bf:assigner");
-			let org = document.createElementNS(this.namespace.bf, "bf:Organization");
-			// Create the rdf:about attribute using the proper namespace
-			org.setAttributeNS("http://www.w3.org/1999/02/22-rdf-syntax-ns#", "rdf:about", "http://id.loc.gov/vocabulary/organizations/pu");
-			let orgLabel = document.createElementNS(this.namespace.rdfs, "rdfs:label");
-			// Use a custom assigner label if provided; otherwise, default to Penn Libraries.
-			orgLabel.textContent = useConfigStore().defaultAssignerLabel || "University of Pennsylvania, Van Pelt-Dietrich Library";
-			org.appendChild(orgLabel);
-			bf_assigner.appendChild(org);
-			// Only add the assigner element if no Organization or Agent with rdf:about="http://id.loc.gov/vocabulary/organizations/dlc" is found:
-			if (!bf_AdminMetadtat.querySelector('bf\\:Organization[rdf\\:about="http://id.loc.gov/vocabulary/organizations/dlc"], bf\\:agent[rdf\\:about="http://id.loc.gov/vocabulary/organizations/dlc"]')) {
-				bf_AdminMetadtat.appendChild(bf_assigner);
-			}
-		}
-
-		bf_Status.appendChild(bf_StatusLabel)
-		bf_status.appendChild(bf_Status)
-		bf_AdminMetadtat.appendChild(bf_status)
-		bf_adminMetadata.appendChild(bf_AdminMetadtat)
-
-
-		let adminMetadataText = (new XMLSerializer()).serializeToString(bf_adminMetadata)
-
-
-
-
-
-		for (let URI in tleLookup['Work']){
-			tleLookup['Work'][URI].appendChild(xmlParser.parseFromString(adminMetadataText, "text/xml").children[0])
-		}
-		for (let URI in tleLookup['Instance']){
-			tleLookup['Instance'][URI].appendChild(xmlParser.parseFromString(adminMetadataText, "text/xml").children[0])
-		}
-
-
-
-		// also just build a basic version tosave
-		for (let URI in tleLookup['Work']){
-			let theWork = (new XMLSerializer()).serializeToString(tleLookup['Work'][URI])
-			// theWork = theWork.replace(/\sxmlns:[a-z]+="http.*?"/g,'')
-			theWork = xmlParser.parseFromString(theWork, "text/xml").children[0];
-			rdfBasic.appendChild(theWork)
-		}
-		for (let URI in tleLookup['Hub']){
-			let theHub = (new XMLSerializer()).serializeToString(tleLookup['Hub'][URI])
-			// theHub = theHub.replace(/\sxmlns:[a-z]+="http.*?"/g,'')
-			theHub = xmlParser.parseFromString(theHub, "text/xml").children[0];
-			rdfBasic.appendChild(theHub)
-		}
-
-		for (let URI in tleLookup['Instance']){
-			// let instance = tleLookup['Instance'][URI].cloneNode( true )
-			let instance = (new XMLSerializer()).serializeToString(tleLookup['Instance'][URI])
-			// instance = instance.replace(/\sxmlns:[a-z]+="http.*?"/g,'')
-			instance = xmlParser.parseFromString(instance, "text/xml").children[0];
-			let items = this.returnHasItem(URI,orginalProfile,tleLookup)
-			// alert(items.length)s
-			for (let item of items){
-				let uri = null
-				if (item.attributes['rdf:resource']){
-					uri = item.attributes['rdf:resource'].value
-				}else if(item.attributes['rdf:about']){
-					uri = item.attributes['rdf:about'].value
-				}
-				if (uri){
-					let hasItem = this.createElByBestNS('bf:hasItem')
-					hasItem.setAttributeNS(this.namespace.rdf, 'rdf:resource', uri)
-					instance.appendChild(hasItem)
-				}
-			}
-
-			// there is only one work, so add it as the instanceOf
-			for (let WorkURI in tleLookup['Work']){
-				let instanceOf = this.createElByBestNS('bf:instanceOf')
-				instanceOf.setAttributeNS(this.namespace.rdf, 'rdf:resource', WorkURI)
-				instance.appendChild(instanceOf)
-			}
-			rdfBasic.appendChild(instance)
-		}
-		for (let URI in tleLookup['Item']){
-			// rdfBasic.appendChild(tleLookup['Item'][URI].cloneNode( true ))
-			let item = (new XMLSerializer()).serializeToString(tleLookup['Item'][URI])
-			// item = item.replace(/\sxmlns:[a-z]+="http.*?"/g,'')
-			item = xmlParser.parseFromString(item, "text/xml").children[0];
-			rdfBasic.appendChild(item)
-		}
-
-		if (orginalProfile.procInfo.includes("update")){
-			//build it cenered around the instance
-			if (Object.keys(tleLookup['Instance']).length>0){
-				for (let URI in tleLookup['Instance']){
-					// let instance = tleLookup['Instance'][URI].cloneNode( true )
-					let instance = (new XMLSerializer()).serializeToString(tleLookup['Instance'][URI])
-					instance = xmlParser.parseFromString(instance, "text/xml").children[0];
-					let items = this.returnHasItem(URI,orginalProfile,tleLookup)
-					if (items.length > 0){
-						for (let item of items){
-							let p = this.createElByBestNS('bf:hasItem')
-							p.appendChild(item)
-							instance.appendChild(p)
-						}
-					}
-
-					let work = this.returnWorkFromInstance(URI,orginalProfile,tleLookup)
-					if (work){
-						let p = this.createElByBestNS('bf:instanceOf')
-						p.appendChild(work)
-						instance.appendChild(p)
-					}
-
-					rdf.appendChild(instance)
-				}
-			}else{
-
-				// no instances...then dont use instanceOf...
-				// use the first work key TODO: multiple works....?
-				let workKey = Object.keys(tleLookup['Work'])[0]
-				let work = tleLookup['Work'][workKey]
-				if (work){
-				  rdf.appendChild(work)
-				}
-			}
-		}else{
-			// FIX CHANGE NOT RIGHT ECT!!
-			for (let URI in tleLookup['Instance']){
-			// let instance = tleLookup['Instance'][URI].cloneNode( true )
-				let instance = (new XMLSerializer()).serializeToString(tleLookup['Instance'][URI])
-				instance = xmlParser.parseFromString(instance, "text/xml").children[0];
-				let items = this.returnHasItem(URI,orginalProfile,tleLookup)
-				if (items.length > 0){
-					for (let item of items){
-						let p = this.createElByBestNS('bf:hasItem')
-						p.appendChild(item)
-						instance.appendChild(p)
-					}
-				}
-				let work = this.returnWorkFromInstance(URI,orginalProfile,tleLookup)
-
-				if (work){
-					let p = this.createElByBestNS('bf:instanceOf')
-					p.appendChild(work)
-					instance.appendChild(p)
-				}
-				rdf.appendChild(instance)
-			}
-		}
-
-
-
-		// are we just editing a single HUB?
-		if (Object.keys(tleLookup['Work']).length==0 && Object.keys(tleLookup['Hub']).length == 1){
-
-
-			let theHub = (new XMLSerializer()).serializeToString(rdfBasic)
-			theHub = xmlParser.parseFromString(theHub, "text/xml").children[0];
-
-			rdf = theHub
-		}
-
-		if (rdfBasic.getElementsByTagName("bf:mainTitle").length>0){
-			xmlVoidDataTitle = rdfBasic.getElementsByTagName("bf:mainTitle")[0].innerHTML
-
-		}else if (rdfBasic.getElementsByTagName("bfsimple:prefTitle").length>0){
-			xmlVoidDataTitle = rdfBasic.getElementsByTagName("bfsimple:prefTitle")[0].innerHTML
-
-		}else{
-			console.warn('no title found for db')
-		}
-
-		if (rdfBasic.getElementsByTagName("bf:PrimaryContribution").length>0){
-			if (rdfBasic.getElementsByTagName("bf:PrimaryContribution")[0].getElementsByTagName("rdfs:label").length>0){
-				xmlVoidDataContributor = rdfBasic.getElementsByTagName("bf:PrimaryContribution")[0].getElementsByTagName("rdfs:label")[0].innerHTML
-			}
-		}else{
-			if (rdfBasic.getElementsByTagName("bf:Contribution").length>0){
-				if (rdfBasic.getElementsByTagName("bf:Contribution")[0].getElementsByTagName("rdfs:label").length>0){
-					xmlVoidDataContributor = rdfBasic.getElementsByTagName("bf:Contribution")[0].getElementsByTagName("rdfs:label")[0].innerHTML
-				} else {
-					console.warn('no PrimaryContribution or Contribution found for db')
-				}
-			} else{
-				console.warn('no PrimaryContribution or Contribution found for db')
-			}
-		}
-
-
-
-		if (rdfBasic.getElementsByTagName("bf:Instance").length>0){
-			let i = rdfBasic.getElementsByTagName("bf:Instance")[0]
-
-			// then find all the lccns and living in the bf:identifiedBy
-			for (let c of i.children){
-				if (c.tagName === 'bf:identifiedBy'){
-
-					// grab the lccn bnode
-					if (c.getElementsByTagName("bf:Lccn").length>0){
-						let lccnEl = c.getElementsByTagName("bf:Lccn")[0]
-
-						// does it have a status
-						if (lccnEl.getElementsByTagName("bf:Status").length==0){
-							// no status element, so this is it
-							xmlVoidDataLccn = lccnEl.innerText || lccnEl.textContent
-							//break
-						}else if (lccnEl.getElementsByTagName("bf:Status").length>0){
-							// it does have a status, if it is canceled then we dont wnat to use it
-							// so check if it is NOT canceld and if so use it
-							if (lccnEl.getElementsByTagName("bf:Status")[0].hasAttribute('rdf:about') && lccnEl.getElementsByTagName("bf:Status")[0].attributes['rdf:about'].value == 'http://id.loc.gov/vocabulary/mstatus/cancinv'){
-								continue
-							}
-							// otherwise use this one, it has a status but thats fine
-							for (let cc of lccnEl.children){
-								if (cc.tagName == 'rdf:value'){
-									xmlVoidDataLccn = cc.innerText || cc.textContent
-								}
-							}
-
-						}
-					}
-				}
-
-			}
-
-		}
-
-		// this was the old way we pulled out LCCN before above
-		// if (rdfBasic.getElementsByTagName("bf:Lccn").length>0){
-		// 	xmlVoidDataLccn = rdfBasic.getElementsByTagName("bf:Lccn")[0].innerText || rdfBasic.getElementsByTagName("bf:Lccn")[0].textContent
-		// }else{
-		// 	console.warn('no bf:Lccn found for db')
-		// }
-
-
-		// create the holder
-		let datasetDescriptionEl = document.createElementNS(this.namespace.void,'void:DatasetDescription')
-
-		datasetDescriptionEl.setAttributeNS("http://www.w3.org/2000/xmlns/", `xmlns:void`, this.namespace.void)
-		datasetDescriptionEl.setAttributeNS("http://www.w3.org/2000/xmlns/", `xmlns:lclocal`, this.namespace.lclocal)
-		let el
-
-
-		for (let x of xmlVoidDataRtsUsed){
-			el = document.createElementNS(this.namespace.lclocal, 'lclocal:rtsused')
-			el.innerHTML = escapeHTML(x)
-			datasetDescriptionEl.appendChild(el)
-		}
-
-		for (let x of xmlVoidDataType){
-			el = document.createElementNS(this.namespace.lclocal, 'lclocal:profiletypes')
-			el.innerHTML = escapeHTML(x)
-			datasetDescriptionEl.appendChild(el)
-		}
-
-
-		el = document.createElementNS(this.namespace.lclocal, 'lclocal:title')
-		el.innerHTML = escapeHTML(xmlVoidDataTitle)
-		datasetDescriptionEl.appendChild(el)
-
-
-		el = document.createElementNS(this.namespace.lclocal, 'lclocal:contributor')
-		el.innerHTML = escapeHTML(xmlVoidDataContributor)
-		datasetDescriptionEl.appendChild(el)
-
-		el = document.createElementNS(this.namespace.lclocal, 'lclocal:lccn')
-		el.innerHTML = escapeHTML(xmlVoidDataLccn)
-		datasetDescriptionEl.appendChild(el)
-
-		el = document.createElementNS(this.namespace.lclocal, 'lclocal:user')
-		el.innerHTML = escapeHTML(profile.user)
-		datasetDescriptionEl.appendChild(el)
-
-		el = document.createElementNS(this.namespace.lclocal, 'lclocal:status')
-		el.innerHTML = escapeHTML(profile.status)
-		datasetDescriptionEl.appendChild(el)
-
-		el = document.createElementNS(this.namespace.lclocal, 'lclocal:eid')
-		el.innerHTML = escapeHTML(profile.eId)
-		datasetDescriptionEl.appendChild(el)
-
-		el = document.createElementNS(this.namespace.lclocal, 'lclocal:typeid')
-		el.innerHTML = escapeHTML(profile.id)
-		datasetDescriptionEl.appendChild(el)
-
-		el = document.createElementNS(this.namespace.lclocal, 'lclocal:procinfo')
-		el.innerHTML = escapeHTML(orginalProfile.procInfo)
-		datasetDescriptionEl.appendChild(el)
-
-
-		for (let x of xmlVoidExternalID){
-			el = document.createElementNS(this.namespace.lclocal, 'lclocal:externalid')
-			el.innerHTML = escapeHTML(x)
-			datasetDescriptionEl.appendChild(el)
-		}
-
-		let strXmlFormatted = this.serializePreservingNamespaces(rdf);
-		strXmlFormatted = ensureRoot(strXmlFormatted);
-		strXmlFormatted = utilsMisc.prettifyXmlJS(strXmlFormatted, ' ');
-
-		rdfBasic.appendChild(datasetDescriptionEl);
-
-		let strXmlBasic = this.serializePreservingNamespaces(rdfBasic);
-		strXmlBasic = ensureRoot(strXmlBasic);
-		let strXml = this.serializePreservingNamespaces(rdf);
-		strXml = ensureRoot(strXml);
-
-        // build the BF2MARC package
-
-		let bf2MarcXmlElRdf = this.createElByBestNS('http://www.w3.org/1999/02/22-rdf-syntax-ns#RDF')
-		// bf2MarcXmlElRdf.setAttribute("xmlns:rdf", "http://www.w3.org/1999/02/22-rdf-syntax-ns#");
-
-		for (let el of rdfBasic.getElementsByTagName("bf:Work")){ bf2MarcXmlElRdf.appendChild(el) }
-		for (let el of rdfBasic.getElementsByTagName("bf:Instance")){ bf2MarcXmlElRdf.appendChild(el) }
-		for (let el of rdfBasic.getElementsByTagName("bf:Item")){ bf2MarcXmlElRdf.appendChild(el) }
-		let strBf2MarcXmlElBib = (new XMLSerializer()).serializeToString(bf2MarcXmlElRdf)
-
-		 // Clean up any bf:assigner elements by removing extraneous <div> children
-		const assignerNodes = rdf.querySelectorAll("bf\\:assigner");
-		assignerNodes.forEach(assigner => {
-			Array.from(assigner.childNodes).forEach(child => {
-				if (child.nodeName.toUpperCase() === "DIV") {
-					assigner.removeChild(child);
-				}
-			});
-		});
-
-		 // NEW: Re-parse and remove assigner nodes having the problematic concatenated text
-		const parser = new DOMParser();
-		const tempDoc = parser.parseFromString(strXml, "application/xml");
-		const assignerNodesToRemove = tempDoc.querySelectorAll("bf\\:assigner");
-		assignerNodesToRemove.forEach(assigner => {
-			const org = assigner.querySelector("bf\\:Organization");
-			if (org) {
-				// Remove all whitespace to compare
-				const cleanedText = org.textContent.trim().replace(/\s+/g, '');
-				if (cleanedText === "http://id.loc.gov/vocabulary/organizations/puUniversityofPennsylvania,VanPelt-DietrichLibrary") {
-					assigner.parentNode.removeChild(assigner);
-				}
-			}
-		});
-		strXml = new XMLSerializer().serializeToString(tempDoc);
-
-		 // Apply the organization element cleaner to each XML output string
-		// Debug logs before cleaning:
-        console.log("Before cleaning:");
-        console.log("Formatted XML:", strXmlFormatted);
-        console.log("Basic XML:", strXmlBasic);
-        console.log("Main XML:", strXml);
-        console.log("BF2Marc XML:", strBf2MarcXmlElBib);
-        
-        // Only clean if strings are non-empty
-        if (strXmlFormatted.trim().length > 0) {
-            strXmlFormatted = cleanOrganizationElement(strXmlFormatted);
-        }
-        if (strXmlBasic.trim().length > 0) {
-            strXmlBasic = cleanOrganizationElement(strXmlBasic);
-        }
-        if (strXml.trim().length > 0) {
-            strXml = cleanOrganizationElement(strXml);
-        }
-        if (strBf2MarcXmlElBib.trim().length > 0) {
-            strBf2MarcXmlElBib = cleanOrganizationElement(strBf2MarcXmlElBib);
-        }
-        
-        // Debug logs after cleaning:
-        console.log("After cleaning:");
-        console.log("Formatted XML:", strXmlFormatted);
-        console.log("Basic XML:", strXmlBasic);
-        console.log("Main XML:", strXml);
-        console.log("BF2Marc XML:", strBf2MarcXmlElBib);
-
-		// console.log(strBf2MarcXmlElBib, strXmlFormatted, strXmlBasic, strXml)
-
-		// console.log("-------componentXmlLookup",componentXmlLookup)
-    // console.log(strXmlFormatted)
-    // console.log("------")
-    // console.log(strXmlBasic)
-
-        // let newXML = this.splitComplexSubjects(strBf2MarcXmlElBib)
-        // strBf2MarcXmlElBib = (new XMLSerializer()).serializeToString(newXML)
-		// console.info("xml: ", strXmlBasic)
-		return {
-			xmlDom: rdf,
-			xmlStringFormatted: strXmlFormatted,
-			xlmString: strXml,
-			bf2Marc: strBf2MarcXmlElBib,
-			xlmStringBasic: strXmlBasic,
-			voidTitle: xmlVoidDataTitle,
-			voidContributor:xmlVoidDataContributor,
-			componentXmlLookup:componentXmlLookup
-		}
-  },
-
-    //This was handled in the `add()` of `SubjectEditor.vue`, but there are some situtations where that don't work as intended
-    //  namely, complex subjects that have subdivisions
-    // !! This is not being used, incase having the profile in Marva be different from the XML causes issues somewhere
-    splitComplexSubjects: function(data){
-        const parser = new DOMParser();
-        const xml = parser.parseFromString(data, "application/xml")
-
-        let subjects = xml.getElementsByTagName("bf:subject")
-
-        for (let subject of subjects){
-            // subject = parser.parseFromString(subject.innerHTML, "text/xml")
-
-            let componentList = subject.getElementsByTagName("madsrdf:componentList")
-
-            if (componentList.length > 0){
-                const clone = componentList[0].cloneNode(true)
-
-                let labels = []
-                let marcKeys = []
-
-                clone.getElementsByTagName("madsrdf:authoritativeLabel").forEach((label) => {
-                    labels.push(label.innerHTML)
-                })
-
-                clone.getElementsByTagName("bflc:marcKey").forEach((key) => {
-                    marcKeys.push(key.innerHTML)
-                })
-
-                for (let label in labels){
-                    //save the element incase it needs to be re-added
-                    const frozenElement = componentList[0].children[0] //clone.children[label]
-
-                    //remove the existing element
-                    componentList[0].children[0].remove()
-
-                    if (labels[label].includes("--") && !marcKeys[label].includes("$z") ){
-
-                        let newElements = []
-                        let marcKey = marcKeys[label]
-
-                        let tag = marcKey.slice(0, 3)
-                        let subfields = marcKey.slice(5)
-                        subfields = subfields.match(/\$[axyzv]{1}/g)
-
-                        let terms = labels[label].split("--")
-                        //Determine the tag for the new element
-                        for (let term in terms){
-                            if (term != 0){
-                                switch(subfields[terms]){
-                                    case("$v"):
-                                    tag = "185"
-                                    break
-                                case("$y"):
-                                    tag = "182"
-                                    break
-                                case("$z"):
-                                    tag = "181"
-                                    break
-                                default:
-                                    tag = "180"
-                                }
-                            }
-
-                            //Get the type for the new element, this will be that parent element
-                            let type
-                            switch(subfields[term]){
-                                case("$x"):
-                                    type = "madsrdf:Topic"
-                                    break
-                                case("$v"):
-                                    type = "madsrdf:GenreForm"
-                                    break
-                                case("$y"):
-                                    type = "madsrdf:Temporal"
-                                    break
-                                case("$z"):
-                                    type = "madsrdf:Geographic"
-                                    break
-                                case("$a"):
-                                default:
-                                    type = "madsrdf:Topic"
-                            }
-                            let typeElement = document.createElement(type)
-
-                            //Add the auth label
-                            let authLabelElement = document.createElementNS("http://www.loc.gov/mads/rdf/v1#", "madsrdf:authoritativeLabel")
-                            authLabelElement.innerHTML = terms[term]
-
-                            //Add the marcKey
-                            let marcKeyElement = document.createElementNS("http://id.loc.gov/ontologies/bflc/", "bflc:marcKey")
-                            marcKeyElement.innerHTML = tag + "  " + subfields[term] + terms[term]
-
-                            typeElement.appendChild(authLabelElement)
-                            typeElement.appendChild(marcKeyElement)
-
-                            componentList[0].appendChild(typeElement)
-                        }
-                    } else {
-                        //it's a term that doesn't need to be split, be we'll re-add it to ensure the pieces are in the correct order
-
-                        componentList[0].appendChild(frozenElement)
-
-                    }
-                }
-            }
-
-        }
-
-        return xml
-    },
-
-
-
-	creatHubStubURI: async function(hubCreatorObj,title){
-
-		let aap = utilsProfile.returnAap(hubCreatorObj.label,title)
-
-		let aapHash = await md5(aap)
-		aapHash = `${aapHash.slice(0, 8)}-${aapHash.slice(8, 12)}-${aapHash.slice(12, 16)}-${aapHash.slice(16, 20)}-${aapHash.slice(20, 32)}`
-		let hubUri = `http://id.loc.gov/resources/hubs/${aapHash}`
-
-		return hubUri
-
-	},
-
-
-	/**
-	 * Builds the Hub Stub XML to be sent off to post
-	 *
-	* @param {object} hubCreatorObj - obj with creator label, uri,marcKey
-	* @param {string} title - title string
-	* @param {string} langObj - {uri:"",label:""}
-	 * @return {string}
-	 */
-	createHubStubXML: async function(hubCreatorObj,title,langObj,catalogerId){
-
-
-
-
-
-		// we are creating the xml in two formats, create the root node for both
-		let rdf = document.createElementNS(this.namespace.rdf, "RDF");
-		let rdfBasic = document.createElementNS(this.namespace.rdf, "RDF");
-
-		// just add all the namespaces into the root element
-		for (let ns of Object.keys(this.namespace)){
-			rdf.setAttributeNS("http://www.w3.org/2000/xmlns/", `xmlns:${ns}`, this.namespace[ns])
-			rdfBasic.setAttributeNS("http://www.w3.org/2000/xmlns/", `xmlns:${ns}`, this.namespace[ns])
-		}
-
-		// they are allowed to have a hub without a creator...
-		// if (!hubCreatorObj) return false
-		// if (!hubCreatorObj.label || !hubCreatorObj.marcKey ||!hubCreatorObj.uri) return false
-
-		// but needsa title
-		if (!title) return false
-
-		if (!hubCreatorObj){ hubCreatorObj = {'label':''}}
-		if (!hubCreatorObj.label){ hubCreatorObj.label = ''}
-
-
-
-		// let aap = utilsProfile.returnAap(hubCreatorObj.label,title)
-
-		// let aapHash = await md5(aap)
-		// aapHash = `${aapHash.slice(0, 8)}-${aapHash.slice(8, 12)}-${aapHash.slice(12, 16)}-${aapHash.slice(16, 20)}-${aapHash.slice(20, 32)}`
-		// let hubUri = `http://id.loc.gov/resources/hubs/${aapHash}`
-		let hubUri = await this.creatHubStubURI(hubCreatorObj,title)
-
-
-
-		// da hub
-		let elHub = document.createElementNS(this.namespace.bf ,'bf:Hub')
-
-		// uri
-		elHub.setAttributeNS(this.namespace.rdf, 'rdf:about', hubUri)
-		let elTitleProperty = document.createElementNS(this.namespace.bf ,'bf:title')
-		let elTitleClass = document.createElementNS(this.namespace.bf ,'bf:Title')
-		let elMainTitle = document.createElementNS(this.namespace.bf ,'bf:mainTitle')
-		elMainTitle.innerHTML = title
-
-		// attach
-		elTitleClass.appendChild(elMainTitle)
-		elTitleProperty.appendChild(elTitleClass)
-		elHub.appendChild(elTitleProperty)
-
-
-
-		// the creator
-		if (hubCreatorObj && hubCreatorObj.label && hubCreatorObj.label != ''){
-			let elContributionProperty = document.createElementNS(this.namespace.bf ,'bf:contribution')
-			let elContributionClass = document.createElementNS(this.namespace.bf ,'bf:Contribution')
-
-			let rdftype = this.createElByBestNS('rdf:type')
-			rdftype.setAttributeNS(this.namespace.rdf, 'rdf:resource', 'http://id.loc.gov/ontologies/bibframe/PrimaryContribution')
-
-			elContributionClass.appendChild(rdftype)
-			elContributionProperty.appendChild(elContributionClass)
-
-			let elAgentProperty = document.createElementNS(this.namespace.bf ,'bf:agent')
-			let elAgentClass = document.createElementNS(this.namespace.bf ,'bf:Agent')
-			elAgentClass.setAttributeNS(this.namespace.rdf, 'rdf:about', hubCreatorObj.uri)
-
-
-
-			elAgentProperty.appendChild(elAgentClass)
-
-			// let elAgentType = document.createElementNS(this.namespace.bf ,'bf:agent')
-			let AgentRdftype = this.createElByBestNS('rdf:type')
-			AgentRdftype.setAttributeNS(this.namespace.rdf, 'rdf:resource', hubCreatorObj.typeFull)
-
-			elAgentClass.appendChild(AgentRdftype)
-			let elAgentLabel = document.createElementNS(this.namespace.rdfs ,'rdfs:label')
-			elAgentLabel.innerHTML = hubCreatorObj.label
-			elAgentClass.appendChild(elAgentLabel)
-
-			let elAgentMarcKey = document.createElementNS(this.namespace.bflc ,'bflc:marcKey')
-			elAgentMarcKey.innerHTML = hubCreatorObj.marcKey
-			elAgentClass.appendChild(elAgentMarcKey)
-
-			elContributionClass.appendChild(elAgentProperty)
-
-			elHub.appendChild(elContributionProperty)
-		}
-
-		if (langObj){
-			let elLanguageProperty = document.createElementNS(this.namespace.bf ,'bf:language')
-			let elLanguageClass = document.createElementNS(this.namespace.bf ,'bf:Language')
-			elLanguageClass.setAttributeNS(this.namespace.rdf, 'rdf:about', langObj.uri)
-
-			let elCodeProperty = document.createElementNS(this.namespace.bf ,'bf:code')
-			elCodeProperty.innerHTML = langObj.uri.split("/").pop();
-			elLanguageClass.appendChild(elCodeProperty)
-			elLanguageProperty.appendChild(elLanguageClass)
-
-			let elLangLabel = document.createElementNS(this.namespace.rdfs ,'rdfs:label')
-			elLangLabel.innerHTML = langObj.label
-			elLanguageClass.appendChild(elLangLabel)
-
-			elHub.appendChild(elLanguageProperty)
-		}
-
-		// // uri
-		// let elTitleProperty = document.createElementNS(this.namespace.bf ,'bf:title')
-		// let elTitleClass = document.createElementNS(this.namespace.bf ,'bf:Title')
-
-		let elAdminProperty = document.createElementNS(this.namespace.bf ,'bf:adminMetadata')
-		let elAdminClass = document.createElementNS(this.namespace.bf ,'bf:AdminMetadata')
-
-		let elStatusProperty = document.createElementNS(this.namespace.bf ,'bf:status')
-		let elStatusClass = document.createElementNS(this.namespace.bf ,'bf:Status')
-
-		elStatusClass.setAttributeNS(this.namespace.rdf, 'rdf:about', 'http://id.loc.gov/vocabulary/mstatus/n')
-		let elStatusLabel = document.createElementNS(this.namespace.rdfs ,'rdfs:label')
-		elStatusLabel.innerHTML='new'
-		let elStatusCode = document.createElementNS(this.namespace.bf ,'bf:code')
-		elStatusCode.innerHTML='n'
-		elStatusClass.appendChild(elStatusLabel)
-		elStatusClass.appendChild(elStatusCode)
-		elStatusProperty.appendChild(elStatusClass)
-
-		elAdminClass.appendChild(elStatusProperty)
-
-		let elDate = document.createElementNS(this.namespace.bf ,'bf:date')
-		elDate.setAttributeNS(this.namespace.rdf, 'rdf:datatype', 'http://www.w3.org/2001/XMLSchema#date')
-		elDate.innerHTML = (new Date()).toISOString().split("T")[0]
-
-		elAdminClass.appendChild(elDate)
-
-
-
-		let elAdminAgentProperty = document.createElementNS(this.namespace.bf ,'bf:agent')
-		let elAdminAgentClass = document.createElementNS(this.namespace.bf ,'bf:Agent')
-
-		elAdminAgentClass.setAttributeNS(this.namespace.rdf, 'rdf:about', 'http://id.loc.gov/vocabulary/organizations/dlc')
-
-		let elAdminAgentType = document.createElementNS(this.namespace.rdf ,'rdf:type')
-		elAdminAgentType.setAttributeNS(this.namespace.rdf, 'rdf:resource', 'http://id.loc.gov/ontologies/bibframe/Organization')
-		let elAdminAgentLabel = document.createElementNS(this.namespace.rdfs ,'rdfs:label')
-		elAdminAgentLabel.innerHTML='United States, Library of Congress'
-
-		elAdminAgentClass.appendChild(elAdminAgentType)
-		elAdminAgentClass.appendChild(elAdminAgentLabel)
-
-		let elAdminAgentCode1 = document.createElementNS(this.namespace.rdfs ,'bf:code')
-		elAdminAgentCode1.setAttributeNS(this.namespace.rdf, 'rdf:datatype', 'http://id.loc.gov/datatypes/orgs/code')
-		elAdminAgentCode1.innerHTML='DLC'
-
-		let elAdminAgentCode2 = document.createElementNS(this.namespace.rdfs ,'bf:code')
-		elAdminAgentCode2.setAttributeNS(this.namespace.rdf, 'rdf:datatype', 'http://id.loc.gov/datatypes/orgs/normalized')
-		elAdminAgentCode2.innerHTML='dlc'
-
-		let elAdminAgentCode3 = document.createElementNS(this.namespace.rdfs ,'bf:code')
-		elAdminAgentCode3.setAttributeNS(this.namespace.rdf, 'rdf:datatype', 'http://id.loc.gov/datatypes/orgs/iso15511')
-		elAdminAgentCode3.innerHTML='US-dlc'
-
-		elAdminAgentClass.appendChild(elAdminAgentCode1)
-		elAdminAgentClass.appendChild(elAdminAgentCode2)
-		elAdminAgentClass.appendChild(elAdminAgentCode3)
-
-
-
-
-		elAdminAgentProperty.appendChild(elAdminAgentClass)
-		elAdminClass.appendChild(elAdminAgentProperty)
-
-
-		let catalogerIdProperty = document.createElementNS(this.namespace.bflc ,'bflc:catalogerId')
-		catalogerIdProperty.innerHTML=catalogerId
-
-
-
-		elAdminClass.appendChild(catalogerIdProperty)
-
-
-		elAdminProperty.appendChild(elAdminClass)
-
-		elHub.appendChild(elAdminProperty)
-
-		rdf.appendChild(elHub)
-
-		// console.log(aap)
-		// console.log(aapHash)
-		// console.log(hubUri)
-		// console.log(rdf)
-		let xml = (new XMLSerializer()).serializeToString(rdf)
-
-		// console.log(xml)
-		return xml
-
-	},
-
-	createNacoStubXML(oneXXParts,fourXXParts,mainTitle,lccn,workURI){
-		let marcNamespace = "http://www.loc.gov/MARC21/slim"
-
-		let rootEl = document.createElementNS(marcNamespace,"marcxml:record");
-
-		let leader = document.createElementNS(marcNamespace,"marcxml:leader");
-		leader.innerHTML = "     nz  a22     ni 4500"
-		rootEl.appendChild(leader)
-
-
-
-		let field001 = document.createElementNS(marcNamespace,"marcxml:controlfield");
-		field001.setAttribute( 'tag', '001')
-		field001.innerHTML = "n"+lccn
-		rootEl.appendChild(field001)
-
-		let field003 = document.createElementNS(marcNamespace,"marcxml:controlfield");
-		field003.setAttribute( 'tag', '003')
-		field003.innerHTML = "DLC"
-		rootEl.appendChild(field003)
-
-		function pad2(n) { return n < 10 ? '0' + n : n }
-		let date = new Date();
-		let dateValue = date.getFullYear().toString() + pad2(date.getMonth() + 1) + pad2( date.getDate()) + pad2( date.getHours() ) + pad2( date.getMinutes() ) + pad2( date.getSeconds() )
-		dateValue = dateValue + ".0"
-
-
-		let field005 = document.createElementNS(marcNamespace,"marcxml:controlfield");
-		field005.setAttribute( 'tag', '005')
-		field005.innerHTML = dateValue
-		rootEl.appendChild(field005)
-
-
-		let field008 = document.createElementNS(marcNamespace,"marcxml:controlfield");
-		field008.setAttribute( 'tag', '008')
-		let year2Digits = dateValue.slice(2,4)
-		let month2Digits = dateValue.slice(4,6)
-		let day2Digits = dateValue.slice(6,8)
-		field008.innerHTML = `${year2Digits}${month2Digits}${day2Digits}`  + 'n| azannaabn' + " ".repeat(10) + '|n aaa' + " ".repeat(6)
-		rootEl.appendChild(field008)
-
-		let field010 = document.createElementNS(marcNamespace,"marcxml:datafield");
-		field010.setAttribute( 'tag', '010')
-		field010.setAttribute( 'ind1', ' ')
-		field010.setAttribute( 'ind2', ' ')
-		let field010a = document.createElementNS(marcNamespace,"marcxml:subfield");
-		field010a.setAttribute( 'code', 'a')
-		field010a.innerHTML = `n ${lccn}`
-		field010.appendChild(field010a)
-		rootEl.appendChild(field010)
-
-
-
-		let field040 = document.createElementNS(marcNamespace,"marcxml:datafield");
-		field040.setAttribute( 'tag', '040')
-		field040.setAttribute( 'ind1', ' ')
-		field040.setAttribute( 'ind2', ' ')
-		let field040a = document.createElementNS(marcNamespace,"marcxml:subfield");
-		field040a.setAttribute( 'code', 'a')
-		field040a.innerHTML = 'DLC'
-		field040.appendChild(field040a)
-
-		let field040b = document.createElementNS(marcNamespace,"marcxml:subfield");
-		field040b.setAttribute( 'code', 'b')
-		field040b.innerHTML = 'eng'
-		field040.appendChild(field040b)
-
-		let field040e = document.createElementNS(marcNamespace,"marcxml:subfield");
-		field040e.setAttribute( 'code', 'e')
-		field040e.innerHTML = 'rda'
-		field040.appendChild(field040e)
-
-		let field040c = document.createElementNS(marcNamespace,"marcxml:subfield");
-		field040c.setAttribute( 'code', 'c')
-		field040c.innerHTML = 'DLC'
-		field040.appendChild(field040c)
-
-
-		rootEl.appendChild(field040)
-
-
-		// ---- 985
-		let field985 = document.createElementNS(marcNamespace,"marcxml:datafield");
-		field985.setAttribute( 'tag', '985')
-		field985.setAttribute( 'ind1', ' ')
-		field985.setAttribute( 'ind2', ' ')
-
-		let field985e = document.createElementNS(marcNamespace,"marcxml:subfield");
-		field985e.setAttribute( 'code', 'e')
-		field985e.innerHTML = 'MARVA-NAR'
-		field985.appendChild(field985e)
-
-		let field985d = document.createElementNS(marcNamespace,"marcxml:subfield");
-		field985d.setAttribute( 'code', 'd')
-		field985d.innerHTML = `${date.getFullYear().toString()}-${pad2(date.getMonth() + 1)}-${pad2( date.getDate())}`
-
-		field985.appendChild(field985d)
-
-		rootEl.appendChild(field985)
-
-
-
-		let fieldName = document.createElementNS(marcNamespace,"marcxml:datafield");
-		fieldName.setAttribute( 'tag', oneXXParts.fieldTag)
-		fieldName.setAttribute( 'ind1', oneXXParts.indicators.charAt(0))
-		fieldName.setAttribute( 'ind2', oneXXParts.indicators.charAt(1))
-		for (let key of Object.keys(oneXXParts)){
-			if (key.length == 1){
-				let subfield = document.createElementNS(marcNamespace,"marcxml:subfield");
-				subfield.setAttribute( 'code', key)
-				subfield.innerHTML = oneXXParts[key]
-				fieldName.appendChild(subfield)
-			}
-		}
-		// 110//$aMiller, Sam$d1933
-		rootEl.appendChild(fieldName)
-
-		// did they make a 4xx
-		if (fourXXParts && fourXXParts.a){
-			let fieldName4xx = document.createElementNS(marcNamespace,"marcxml:datafield");
-			fieldName4xx.setAttribute( 'tag', fourXXParts.fieldTag)
-			fieldName4xx.setAttribute( 'ind1', fourXXParts.indicators.charAt(0))
-			fieldName4xx.setAttribute( 'ind2', fourXXParts.indicators.charAt(1))
-			for (let key of Object.keys(fourXXParts)){
-				// only add the subfields
-				if (key.length == 1){
-					let subfield = document.createElementNS(marcNamespace,"marcxml:subfield");
-					subfield.setAttribute( 'code', key)
-					subfield.innerHTML = fourXXParts[key]
-					fieldName4xx.appendChild(subfield)
-				}
-			}
-
-			rootEl.appendChild(fieldName4xx)
-		}
-
-
-
-
-
-
-
-
-		let field670 = document.createElementNS(marcNamespace,"marcxml:datafield");
-		field670.setAttribute( 'tag', '670')
-		field670.setAttribute( 'ind1', ' ')
-		field670.setAttribute( 'ind2', ' ')
-		let field670a = document.createElementNS(marcNamespace,"marcxml:subfield");
-		field670a.setAttribute( 'code', 'a')
-		field670a.innerHTML = mainTitle
-		field670.appendChild(field670a)
-
-		let field670b = document.createElementNS(marcNamespace,"marcxml:subfield");
-		field670b.setAttribute( 'code', 'u')
-		field670b.innerHTML = workURI
-		field670.appendChild(field670b)
-
-		rootEl.appendChild(field670)
-
-
-
-
-
-
-
-
-
-
-		let xml = (new XMLSerializer()).serializeToString(rootEl)
-
-		console.log(xml)
-		return xml
-
-	},
-
   /**
    * Builds the admin metadata XML ensuring the assigner element is correctly structured.
    * The assigner element is built with an Organization element containing the label.
    * @param {object} userValue - The user value containing catalogerId info
    * @return {Element} - The adminMetadata element
-   */
+   */    
   buildAdminMetadata: function(userValue) {
-    const adminMetadata = this.createElByBestNS('http://id.loc.gov/ontologies/bibframe/', 'adminMetadata');
-    const adminContainer = this.createElByBestNS('http://id.loc.gov/ontologies/bibframe/', 'AdminMetadata');
-
-    // Create and append date element.
-    const dateEl = this.createElByBestNS('http://id.loc.gov/ontologies/bibframe/', 'date');
+    const adminMetadata = this.createElByBestNS('bf:adminMetadata');
+    const adminContainer = this.createElByBestNS('bf:AdminMetadata');
+    
+    // Add date element
+    const dateEl = this.createElByBestNS('bf:date');
     dateEl.textContent = new Date().toISOString();
     adminContainer.appendChild(dateEl);
-
-    // Create and append catalogerId element.
-    const catalogerIdEl = this.createElByBestNS('http://id.loc.gov/ontologies/bibframe/', 'catalogerId');
-    catalogerIdEl.textContent = userValue['http://id.loc.gov/ontologies/bflc/catalogerId'][0]['http://id.loc.gov/ontologies/bflc/catalogerId'];
-    adminContainer.appendChild(catalogerIdEl);
-
-    // Create assigner element with nested Organization and label.
-    const assignerEl = this.createElByBestNS('http://id.loc.gov/ontologies/bibframe/', 'assigner');
-    const organizationEl = this.createElByBestNS('http://id.loc.gov/ontologies/bibframe/', 'Organization');
-    organizationEl.setAttributeNS('http://www.w3.org/1999/02/22-rdf-syntax-ns#', 'rdf:about', 'http://id.loc.gov/vocabulary/organizations/pu');
     
-    const labelEl = this.createElByBestNS('http://www.w3.org/2000/01/rdf-schema#', 'label');
-    labelEl.textContent = 'University of Pennsylvania, Van Pelt-Dietrich Library';
-    organizationEl.appendChild(labelEl);
-    assignerEl.appendChild(organizationEl);
-
-    console.log("Before cleaning assigner, assignerEl.innerHTML:", assignerEl.innerHTML);
-    cleanAssignerElement(assignerEl); 
-    console.log("After cleaning assigner, assignerEl.innerHTML:", assignerEl.innerHTML);
-
-    adminContainer.appendChild(assignerEl);
+    // Add catalogerId element if available
+    if (userValue && userValue['http://id.loc.gov/ontologies/bflc/catalogerId'] && 
+        userValue['http://id.loc.gov/ontologies/bflc/catalogerId'][0] && 
+        userValue['http://id.loc.gov/ontologies/bflc/catalogerId'][0]['http://id.loc.gov/ontologies/bflc/catalogerId']) {
+        
+      const catalogerIdEl = this.createElByBestNS('bflc:catalogerId');
+      catalogerIdEl.textContent = userValue['http://id.loc.gov/ontologies/bflc/catalogerId'][0]['http://id.loc.gov/ontologies/bflc/catalogerId'];
+      adminContainer.appendChild(catalogerIdEl);
+    }
+    
     adminMetadata.appendChild(adminContainer);
-    
     return adminMetadata;
   },
-  
-  // ...existing code...
-};
 
-// UPDATED cleanAssignerElement: added detailed logging and adjusted matching,
-// so that if a child element's tag name starts with "div" (even if the namespace or attribute string is malformed),
-// it gets removed.
-function cleanAssignerElement(assignerEl) {
+  /**
+   * Creates a default assigner element for admin metadata with proper organization structure
+   * @return {Element} - The properly structured assigner element
+   */
+  buildDefaultAssignerElement: function() {
+    const assignerEl = this.createElByBestNS('bf:assigner');
+    const orgEl = this.createElByBestNS('bf:Organization');
+    // Always set rdf:about and label
+    orgEl.setAttributeNS(this.namespace.rdf, 'rdf:about', 'http://id.loc.gov/vocabulary/organizations/pu');
+    const labelEl = this.createElByBestNS('rdfs:label');
+    labelEl.textContent = useConfigStore().defaultAssignerLabel || "University of Pennsylvania, Van Pelt-Dietrich Library";
+    orgEl.appendChild(labelEl);
+    assignerEl.appendChild(orgEl);
+    // Debug: log assigner structure
+    // console.log('buildDefaultAssignerElement:', assignerEl.outerHTML);
+    return assignerEl;
+  },
+
+  /**
+   * Clean up an assigner element to ensure it has no unwanted content
+   * @param {Element} assignerEl - The assigner element to clean
+   */
+  cleanAssignerElement: function(assignerEl) {
     if (!assignerEl) return;
-    const orgEl = assignerEl.querySelector('Organization');
-    if (orgEl) {
-        // Log what children exist before cleaning
-        console.log("Before cleaning, Organization children:", orgEl.childNodes);
-        // Use a safer iteration over children.
-        Array.from(orgEl.childNodes).forEach(child => {
-            // Check if child.tagName exists, and whether it starts with "div" (case-insensitive)
-            if (child.tagName && child.tagName.toLowerCase().startsWith('div')) {
-                console.log("Removing child element:", child);
-                orgEl.removeChild(child);
-            }
-        });
-        console.log("After cleaning, Organization children:", orgEl.childNodes);
-    }
-}
+    const orgEls = assignerEl.querySelectorAll('*[local-name()="Organization"]');
+    orgEls.forEach(orgEl => {
+      // Remove text nodes that contain only zeros or whitespace
+      Array.from(orgEl.childNodes).forEach(node => {
+        if (node.nodeType === Node.TEXT_NODE) {
+          const content = node.textContent.trim();
+          if (!content || /^[0\s]+$/.test(content)) {
+            orgEl.removeChild(node);
+          }
+        }
+      });
+      // If Organization has no meaningful content, add a proper label
+      if (!orgEl.hasChildNodes() || (orgEl.childNodes.length === 1 && orgEl.firstChild.nodeType === Node.TEXT_NODE && !orgEl.firstChild.textContent.trim())) {
+        while (orgEl.firstChild) {
+          orgEl.removeChild(orgEl.firstChild);
+        }
+        const labelEl = document.createElementNS("http://www.w3.org/2000/01/rdf-schema#", "rdfs:label");
+        labelEl.textContent = "University of Pennsylvania, Van Pelt-Dietrich Library";
+        orgEl.appendChild(labelEl);
+      }
+    });
+  },
 
-// Add a helper function to recursively remove redundant namespace declarations.
-function removeRedundantNamespaces(node, inherited = {}) {
-  if (node.nodeType !== 1) return; // process only element nodes
-  // Create a copy of inherited namespaces for this node.
-  let currentInherited = Object.assign({}, inherited);
-  let attrsToRemove = [];
-  for (let attr of Array.from(node.attributes)) {
-    if (attr.name.startsWith("xmlns")) {
-      // Determine prefix; empty string for default namespace.
-      let prefix = attr.name === "xmlns" ? "" : attr.name.split(":")[1];
-      if (currentInherited[prefix] && currentInherited[prefix] === attr.value) {
-        // Redundant declaration found.
-        attrsToRemove.push(attr.name);
-      } else {
-        currentInherited[prefix] = attr.value;
+  /**
+   * Remove redundant namespace declarations from XML nodes
+   * @param {Element} node - The node to process
+   * @param {Object} inherited - Inherited namespace declarations
+   */
+  removeRedundantNamespaces: function(node, inherited = {}) {
+    if (node.nodeType !== 1) return; // process only element nodes
+    let currentInherited = Object.assign({}, inherited);
+    let attrsToRemove = [];
+    for (let attr of Array.from(node.attributes)) {
+      if (attr.name.startsWith("xmlns")) {
+        let prefix = attr.name === "xmlns" ? "" : attr.name.split(":")[1];
+        if (currentInherited[prefix] && currentInherited[prefix] === attr.value) {
+          attrsToRemove.push(attr.name);
+        } else {
+          currentInherited[prefix] = attr.value;
+        }
       }
     }
-  }
-  attrsToRemove.forEach(name => node.removeAttribute(name));
-  // Recurse for child elements.
-  Array.from(node.children).forEach(child => removeRedundantNamespaces(child, currentInherited));
-}
+    attrsToRemove.forEach(name => node.removeAttribute(name));
+    Array.from(node.children).forEach(child => this.removeRedundantNamespaces(child, currentInherited));
+  },
 
-// Updated cleanOrganizationElement to remove duplicate namespace declarations.
-function cleanOrganizationElement(xmlString) {
-  if (!xmlString) return xmlString;
-  try {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(xmlString, "application/xml");
-    if (doc.getElementsByTagName("parsererror").length) {
-      console.error("Cleaning encountered an XML parsing error. Returning original string.");
+  /**
+   * Clean organization elements in an XML string
+   * @param {string} xmlString - The XML string to clean
+   * @return {string} - The cleaned XML string
+   */
+  cleanOrganizationElement: function(xmlString) {
+    if (!xmlString) return xmlString;
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(xmlString, "application/xml");
+      if (doc.getElementsByTagName("parsererror").length) {
+        console.error("Cleaning encountered an XML parsing error. Returning original string.");
+        return xmlString;
+      }
+      this.removeRedundantNamespaces(doc.documentElement);
+      const assigners = doc.querySelectorAll("bf\\:assigner");
+      assigners.forEach(assignerEl => this.cleanAssignerElement(assignerEl));
+      return new XMLSerializer().serializeToString(doc);
+    } catch (e) {
+      console.error("Error when cleaning XML:", e);
       return xmlString;
     }
-    removeRedundantNamespaces(doc.documentElement);
-    return new XMLSerializer().serializeToString(doc);
-  } catch (e) {
-    console.error("Error when cleaning XML:", e);
-    return xmlString;
+  },
+
+  /**
+   * Ensures all Organization elements in the XML have proper labels for MARC conversion
+   * @param {string} xmlString - The XML to process
+   * @return {string} - XML with properly structured Organization elements or original on failure
+   */
+  ensureOrganizationLabels: function(xmlString) {
+    if (!xmlString) return xmlString;
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(xmlString, "text/xml");
+      if (doc.getElementsByTagName("parsererror").length) {
+        console.error("XML parsing error in ensureOrganizationLabels.");
+        return xmlString;
+      }
+      const organizations = doc.querySelectorAll("bf\\:Organization");
+      organizations.forEach(org => {
+        if (org.querySelector("rdfs\\:label")) return;
+        const aboutAttr = org.getAttribute('rdf:about');
+        if (aboutAttr) {
+          let label = null;
+          if (aboutAttr === 'http://id.loc.gov/vocabulary/organizations/dlc') {
+            label = "United States, Library of Congress";
+          } else if (aboutAttr === 'http://id.loc.gov/vocabulary/organizations/dlcmrc') {
+            label = "United States, Library of Congress, Network Development and MARC Standards Office";
+          } else if (aboutAttr === 'http://id.loc.gov/vocabulary/organizations/pu') {
+            label = "University of Pennsylvania, Van Pelt-Dietrich Library";
+          }
+          if (label) {
+            const labelEl = this.createRdfsLabel(label);
+            org.appendChild(labelEl);
+          }
+        }
+      });
+      return new XMLSerializer().serializeToString(doc);
+    } catch (e) {
+      console.error("Error in ensureOrganizationLabels:", e);
+      return xmlString;
+    }
+  },
+
+  /**
+  * Processes profile data and converts it to XML
+  *
+  * @param {object} profile - the profile to convert to XML
+  * @return {Promise<object|boolean>} - XML output object or false on failure
+  */
+  buildXML: async function(profile){
+    if (!profile || (profile && Object.keys(profile).length==0)){
+      console.warn("Trying to build XML with bad profile:", profile);
+      return false;
+    }
+
+    // if we are in dev mode let the error bubble, but otherwise catch the error and try to recover
+    if (useConfigStore().returnUrls.dev === true){
+      return await this.buildXMLProcess(profile);
+    } else {
+      try {
+        let xmlObj = await this.buildXMLProcess(profile);
+        this.lastGoodXMLBuildProfile = JSON.parse(JSON.stringify(profile));
+        this.lastGoodXMLBuildProfileTimestamp = Math.floor(Date.now() / 1000);
+        return xmlObj;
+      } catch (error) {
+        console.warn("XML Parsing Error:");
+        console.warn(error);
+        useProfileStore().triggerBadXMLBuildRecovery(this.lastGoodXMLBuildProfile, this.lastGoodXMLBuildProfileTimestamp);
+        let profileAsJson;
+        try {
+          profileAsJson = JSON.stringify(profile,null,2);
+        } catch {
+          profileAsJson = 'Error stringify-ing profile!';
+        }
+        let user = `${usePreferenceStore().catInitals}_${usePreferenceStore().catCode}`.replace("/\s/g",'_');
+        const filename = `${Math.floor(Date.now() / 1000)}_${user}_` + `${new Date().toDateString()}_${new Date().toTimeString()}`.replaceAll(' ','_').replaceAll(':','-') + '.txt';
+
+        let errorReport = `
+        Error: ${error}
+        ----------------
+        XML Creation Log
+        ----------------
+        ----End Creation Log----
+        ****************
+        XML Source = "";
+        ****************
+        ${(profile.xmlSource) ? profile.xmlSource : 'No Source Found'}
+        ***End Source***
+        `;
+        utilsNetwork.sendErrorReportLog(errorReport,filename,profileAsJson);
+
+        return false;
+      }
+    }
+  },
+
+  /**
+  * The core XML building process that transforms profile data into XML structure
+  *
+  * @param {object} profile - the profile to convert to XML
+  * @return {object} multiple XML strings and metadata
+  */
+  buildXMLProcess: async function(profile){
+    // keep track of the process for later
+    let xmlLog = [];
+    let componentXmlLookup = {};
+
+    // keep a copy of the org profile around
+    let orginalProfile = profile;
+    // cut the ref to the original
+    profile = JSON.parse(JSON.stringify(profile));
+
+    let xmlParser = returnDOMParser();
+
+    // these will store the top level elements
+    let tleWork = [];
+    let tleInstance = [];
+    let tleItem = [];
+
+    // we are creating the xml in two formats, create the root node for both
+    let rdf = document.createElementNS(this.namespace.rdf, "RDF");
+    let rdfBasic = document.createElementNS(this.namespace.rdf, "RDF");
+
+    // just add all the namespaces into the root element
+    for (let ns of Object.keys(this.namespace)){
+      rdf.setAttributeNS("http://www.w3.org/2000/xmlns/", `xmlns:${ns}`, this.namespace[ns]);
+      rdfBasic.setAttributeNS("http://www.w3.org/2000/xmlns/", `xmlns:${ns}`, this.namespace[ns]);
+    }
+
+    // these are elements used to store metadata about the record in the backend
+    let xmlVoidDataRtsUsed = [];
+    let xmlVoidDataType = [];
+    let xmlVoidExternalID = [];
+    let xmlVoidDataTitle = "";
+    let xmlVoidDataContributor = "";
+    let xmlVoidDataLccn = "";
+
+    let tleLookup = {
+      Work: {},
+      Instance: {},
+      Item: {},
+      Hub: {}
+    };
+
+    for (let rt of profile.rtOrder){
+      xmlLog.push(`Processing rt: ${rt}`);
+
+      if (profile.rt[rt].noData){
+        xmlLog.push(` - ${rt} has no data, skipping it.`);
+        continue;
+      }
+
+      let tleArray; // eslint-disable-line
+      let rootEl;
+      let rootElName;
+
+      if (rt.includes(':Work')){
+        tleArray = tleWork;
+        rootEl = document.createElementNS(this.namespace.bf,"bf:Work");
+        rootElName = "Work";
+      } else if (rt.includes(':Instance')){
+        tleArray = tleInstance;
+        rootEl = document.createElementNS(this.namespace.bf,"bf:Instance");
+        rootElName = "Instance";
+      } else if (rt.includes(':Item')){
+        tleArray = tleItem;
+        rootEl = document.createElementNS(this.namespace.bf,"bf:Item");
+        rootElName = "Item";
+      } else if (rt.endsWith(':Hub')){
+        tleArray = tleItem;
+        rootEl = document.createElementNS(this.namespace.bf,"bf:Hub");
+        rootElName = "Hub";
+      } else {
+        // don't mess with anything that is not a top level entity in the profile
+        xmlLog.push(`Dunno what this part is, skipping ${rt}`);
+        continue;
+      }
+
+      xmlLog.push(`Building ${rootElName}`);
+
+      if (profile.rt[rt].URI){
+        rootEl.setAttributeNS(this.namespace.rdf, 'rdf:about', profile.rt[rt].URI);
+        xmlLog.push(`Setting URI for this resource rdf:about to: ${profile.rt[rt].URI}`);
+        xmlVoidExternalID.push(profile.rt[rt].URI);
+      }
+      if (profile.rt[rt]['@type']){
+        let type = this.createElByBestNS('http://www.w3.org/1999/02/22-rdf-syntax-ns#type');
+        type.setAttributeNS(this.namespace.rdf, 'rdf:resource', profile.rt[rt]['@type']);
+        xmlLog.push(`Setting URI for this resource rdf:resource to: ${profile.rt[rt]['@type']}`);
+        rootEl.appendChild(type);
+      }
+
+      xmlLog.push(`Looping through the PTs`);
+
+      // Process property templates
+      for (let pt of profile.rt[rt].ptOrder){
+        // extract the pt, this is the individual component like a <mainTitle>
+        let ptObj = profile.rt[rt].pt[pt];
+        if (ptObj.deleted){
+          continue;
+        }
+
+        if (ptObj.deepHierarchy){
+          // just take our existing XML and plop it into the root element
+          let orgNode = xmlParser.parseFromString(ptObj.xmlSource, "text/xml").children[0];
+          rootEl.appendChild(orgNode);
+          continue;
+        }
+
+        xmlLog.push(`Working on: ${pt}`);
+        
+        // Process userValue and create XML elements - THIS IS THE CRITICAL SECTION
+        let userValue;
+        let userValueSiblings = [];
+
+        // the uservalue could be stored in a few places depending on the nesting
+        if (ptObj.userValue[ptObj.propertyURI] && ptObj.userValue[ptObj.propertyURI][0]){
+          userValue = ptObj.userValue[ptObj.propertyURI][0];
+
+          let nonGuidProps = Object.keys(ptObj.userValue[ptObj.propertyURI][0]).filter(k => (!k.includes('@') ? true : false));
+          if (nonGuidProps.length==1){
+            if (typeof ptObj.userValue[ptObj.propertyURI][0][nonGuidProps[0]] == 'string' || 
+                typeof ptObj.userValue[ptObj.propertyURI][0][nonGuidProps[0]] == 'number'){
+              // does it have more than one?
+              if (ptObj.userValue[ptObj.propertyURI].length > 1){
+                // set it to the sibling group not the individual
+                userValue = ptObj.userValue[ptObj.propertyURI];
+              }
+            }
+          }
+
+          if (ptObj.userValue[ptObj.propertyURI].length > 1){
+            // some top level simpleLookup values could have multiple values
+            userValueSiblings = JSON.parse(JSON.stringify(ptObj.userValue[ptObj.propertyURI])).slice(1);
+          }
+        } else if (ptObj.userValue[ptObj.propertyURI]){
+          userValue = ptObj.userValue[ptObj.propertyURI];
+        } else {
+          userValue = ptObj.userValue;
+        }
+
+        // clean up bad data
+        for (let k of Object.keys(userValue)){
+          if (k === 'undefined'){
+            delete userValue[k];
+          }
+        }
+
+        let mostCommonScript = useProfileStore().setMostCommonNonLatinScript();
+
+        // check if we need to process multiple language variants for certain properties
+        if ([
+          'http://id.loc.gov/ontologies/bibframe/contribution',
+          'http://id.loc.gov/ontologies/bibframe/subject',
+          'http://id.loc.gov/ontologies/bibframe/geographicCoverage'
+        ].indexOf(ptObj.propertyURI) > -1){
+          // Process non-latin variants
+          // ...existing code for non-Latin processing...
+        }
+
+        xmlLog.push(['Set userValue to:', JSON.parse(JSON.stringify(userValue))]);
+        if (this.ignoreProperties.indexOf(ptObj.propertyURI) > -1){
+          xmlLog.push(`Skipping it because it is in the ignoreProperties list`);
+          continue;
+        }
+
+        // Handle admin metadata updates if needed
+        if (pt.includes('http://id.loc.gov/ontologies/bibframe/adminMetadata')){
+          // ...existing admin metadata processing...
+        }
+
+        // Does it have any userValues?
+        if (this.hasUserValue(userValue)){
+          // Keep track of resource templates used
+          if (xmlVoidDataRtsUsed.indexOf(rt) === -1){
+            xmlVoidDataRtsUsed.push(rt);
+          }
+          if (xmlVoidDataType.indexOf(rootElName) === -1){
+            xmlVoidDataType.push(rootElName);
+          }
+
+          // Process based on whether it's a blank node or literal
+          if (this.isBnode(userValue)){
+            xmlLog.push(`Root level bnode: ${ptObj.propertyURI}`);
+            let pLvl1 = this.createElByBestNS(ptObj.propertyURI);
+            let bnodeLvl1 = this.createBnode(userValue, ptObj.propertyURI);
+            xmlLog.push(`Created lvl 1 predicate: ${pLvl1.tagName} and bnode: ${bnodeLvl1.tagName}`);
+
+            // Process all properties in this blank node
+            for (let key1 of Object.keys(userValue).filter(k => (!k.includes('@') ? true : false))){
+              xmlLog.push(`Looking at property: ${key1} in the userValue`);
+              let pLvl2 = this.createElByBestNS(key1);
+              if (key1 == 'http://www.loc.gov/mads/rdf/v1#componentList'){
+                pLvl2.setAttribute('rdf:parseType', 'Collection');
+              }
+              
+              xmlLog.push(`Created lvl 2 predicate: ${pLvl2.tagName}`);
+
+              // Handle special cases like rdf:type
+              if (key1 == 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type'){
+                if (userValue[key1] && userValue[key1][0] && userValue[key1][0]['@id']){
+                  let rdftype = this.createElByBestNS(key1);
+                  rdftype.setAttributeNS(this.namespace.rdf, 'rdf:resource', userValue[key1][0]['@id']);
+                  bnodeLvl1.appendChild(rdftype);
+                  xmlLog.push(`This bnode just has a rdf:type : ${rdftype} setting it an continuing`);
+                  continue;
+                } else if (userValue[key1] && userValue[key1][0] && userValue[key1][0]['http://www.w3.org/2000/01/rdf-schema#label']){
+                  let rdftype = this.createElByBestNS(key1);
+                  rdftype.innerHTML = escapeHTML(userValue[key1][0]['http://www.w3.org/2000/01/rdf-schema#label']);
+                  xmlLog.push(`This bnode just has a rdf:type and label : ${rdftype} setting it an continuing`);
+                  bnodeLvl1.appendChild(rdftype);
+                  continue;
+                }
+              }
+
+              // Process each value for this property
+              let value1FirstLoop = true;
+              for (let value1 of userValue[key1]){
+                // Create new predicate for each value if needed
+                if (!value1FirstLoop && this.needsNewPredicate(key1)){
+                  pLvl2 = this.createElByBestNS(key1);
+                  xmlLog.push(`Creating lvl 2 property : ${pLvl2.tagName} for ${JSON.stringify(value1)}`);
+                }
+                value1FirstLoop = false;
+
+                // Process based on whether this value is a blank node or literal
+                if (this.isBnode(value1)){
+                  // It's a blank node, build its structure
+                  let bnodeLvl2 = this.createBnode(value1, key1);
+                  pLvl2.appendChild(bnodeLvl2);
+                  bnodeLvl1.appendChild(pLvl2);
+                  xmlLog.push(`Creating bnode lvl 2 for it ${bnodeLvl2.tagName}`);
+                  
+                  // Continue processing deeper nodes
+                  // ...process level 3 and 4 nodes recursively...
+                } else {
+                  // It's a literal or simple value
+                  xmlLog.push(`It's value at lvl is not a bnode, looping through and adding a literal value`);
+                  
+                  // Process the literal values
+                  let keys = Object.keys(value1).filter(k => (!k.includes('@') ? true : false));
+                  
+                  // Handle URI references
+                  if (userValue['@type'] && key1 === userValue['@type']){
+                    if (value1['@id']){
+                      xmlLog.push(`Setting its rdf:about to ${value1['@id']}`);
+                      bnodeLvl1.setAttributeNS(this.namespace.rdf, 'rdf:about', value1['@id']);
+                    }
+                  }
+
+                  // Process literal properties
+                  if (keys.length > 0){
+                    for (let key2 of keys){
+                      if (typeof value1[key2] == 'string' || typeof value1[key2] == 'number'){
+                        let p2 = this.createLiteral(key2, value1);
+                        xmlLog.push(`Creating literal ${JSON.stringify(value1)}`);
+                        if (p2 !== false) bnodeLvl1.appendChild(p2);
+                      } else if (Array.isArray(value1[key2])){
+                        // Handle array values
+                        // ...process arrays...
+                      } else {
+                        console.error('key2', key2, value1[key2], 'not a literal, should not happen');
+                        xmlLog.push(`Key 2 (${key2}) error, not a literal ${value1[key2]}`);
+                      }
+                    }
+                  } else if (keys.length == 0 && value1['@id']){
+                    let p2 = this.createLiteral(key1, value1);
+                    if (p2 !== false) bnodeLvl1.appendChild(p2);
+                  } else {
+                    console.warn('Unhandled literal situation');
+                    console.log("value1", value1, 'key1', key1);
+                    value1[key1] = "";
+                  }
+                }
+                value1FirstLoop = false;
+              }
+            }
+            pLvl1.appendChild(bnodeLvl1);
+            rootEl.appendChild(pLvl1);
+            componentXmlLookup[`${rt}-${pt}`] = formatXML(pLvl1.outerHTML);
+
+            // Handle sibling nodes
+            if (userValueSiblings.length > 0){
+              // ...process sibling nodes...
+            }
+          } else {
+            // Not a blank node
+            xmlLog.push(`Root level does not look like a bnode: ${ptObj.propertyURI}`);
+            let userValueArray = userValue;
+            if (!Array.isArray(userValue)){
+              userValueArray = [userValue];
+            }
+
+            // Process each user value
+            for (let userValue of userValueArray){
+              if (userValue['@type'] && userValue['@id']){
+                let p = this.createElByBestNS(ptObj.propertyURI);
+                let bnode = this.createElByBestNS(userValue['@type']);
+                bnode.setAttributeNS(this.namespace.rdf, 'rdf:about', userValue['@id']);
+                xmlLog.push(`Created ${p.tagName} property and ${bnode.tagName}`);
+                p.appendChild(bnode);
+                rootEl.appendChild(p);
+                componentXmlLookup[`${rt}-${pt}`] = formatXML(p.outerHTML);
+              } else if (userValue['@type'] && !userValue['@id']){
+                xmlLog.push(`Should have a URI in ${ptObj.propertyURI} but can't find one`);
+                console.error("Does not have URI, ERROR");
+              } else if (await utilsRDF.suggestTypeNetwork(ptObj.propertyURI) == 'http://www.w3.org/2000/01/rdf-schema#Literal'){
+                // Handle top level literals
+                let allXMLFragments = '';
+                for (let key1 of Object.keys(userValue).filter(k => (!k.includes('@') ? true : false))){
+                  if (typeof userValue[key1] === 'string' || typeof userValue[key1] === 'number'){
+                    let p1 = this.createLiteral(key1, userValue);
+                    if (p1 !== false) {
+                      rootEl.appendChild(p1);
+                      xmlLog.push(`Creating literal at root level for ${key1} with value ${p1.innerHTML}`);
+                      allXMLFragments = allXMLFragments + `\n${formatXML(p1.outerHTML)}`;
+                    }
+                  } else {
+                    // Process nested values
+                    // ...process nested values...
+                  }
+                }
+                componentXmlLookup[`${rt}-${pt}`] = allXMLFragments;
+              } else if (ptObj.propertyURI != "http://id.loc.gov/ontologies/bibframe/electronicLocator" && 
+                         await utilsRDF.suggestTypeNetwork(ptObj.propertyURI) == 'http://www.w3.org/2000/01/rdf-schema#Resource'){
+                // Handle resources
+                // ...process resources...
+              } else if (userValue['@id']){
+                // Handle simple URI references
+                let p = this.createElByBestNS(ptObj.propertyURI);
+                p.setAttributeNS(this.namespace.rdf, 'rdf:resource', userValue['@id']);
+                rootEl.appendChild(p);
+                componentXmlLookup[`${rt}-${pt}`] = formatXML(p.outerHTML);
+              } else if (ptObj.propertyURI == 'http://www.w3.org/2000/01/rdf-schema#label'){
+                // Handle simple labels
+                let p = this.createElByBestNS(ptObj.propertyURI);
+                p.innerHTML = userValue['http://www.w3.org/2000/01/rdf-schema#label'][0]['http://www.w3.org/2000/01/rdf-schema#label'];
+                rootEl.appendChild(p);
+                componentXmlLookup[`${rt}-${pt}`] = formatXML(p.outerHTML);
+              } else {
+                console.warn("Should not be here");
+              }
+            }
+          }
+        } else {
+          xmlLog.push(`Skipping it because hasUserValue == false`);
+        }
+      }
+      // Handle any unused XML
+      if (orginalProfile.rt[rt].unusedXml){
+        let unusedXmlNode = xmlParser.parseFromString(orginalProfile.rt[rt].unusedXml, "text/xml");
+        unusedXmlNode = unusedXmlNode.children[0];
+        for (let el of unusedXmlNode.children){
+          if (el.tagName != 'rdfs:label'){
+            let newEl = (new XMLSerializer()).serializeToString(el);
+            newEl = xmlParser.parseFromString(newEl, "text/xml");
+            newEl = newEl.children[0];
+            rootEl.appendChild(newEl);
+          }
+        }
+      }
+      // Add to lookup
+      tleLookup[rootElName][orginalProfile.rt[rt].URI] = rootEl;
+    }
+    // Add admin metadata to Work and Instance elements
+    // Add in adminMetadata to the resources with this user ID
+    let userInitial = usePreferenceStore().catInitals;
+    let catCode = usePreferenceStore().catCode;
+    let user = `${userInitial} (${catCode})`;
+    profile.user = user;
+
+    // Create admin metadata elements
+    let bf_adminMetadata = this.createElByBestNS("bf:adminMetadata");
+    let bf_AdminMetadtat = this.createElByBestNS("bf:AdminMetadata");
+    for (let URI in tleLookup['Instance']){
+    // Add status information
+    let bf_status = this.createElByBestNS("bf:status");
+    let bf_Status = this.createElByBestNS("bf:Status");
+    bf_Status.setAttributeNS(this.namespace.rdf, 'rdf:about','http://id.loc.gov/vocabulary/mstatus/c');
+    let bf_StatusLabel = this.createElByBestNS("rdfs:label");
+    bf_StatusLabel.innerHTML = "changed";
+
+    // Add cataloger information
+    let bf_catalogerId = this.createElByBestNS("bflc:catalogerId");
+    bf_catalogerId.innerHTML = escapeHTML(catCode);
+    let bf_date = this.createElByBestNS("bf:date");
+    bf_date.innerHTML = new Date().toISOString();
+
+    bf_AdminMetadtat.appendChild(bf_date);
+    bf_AdminMetadtat.appendChild(bf_catalogerId);
+    // Remove any existing assigner before adding a new one
+    if (bf_AdminMetadtat.querySelector("bf\\:assigner")) {
+      bf_AdminMetadtat.removeChild(bf_AdminMetadtat.querySelector("bf\\:assigner"));
+    }
+    // Add default assigner if enabled in configuration
+    let includeDefaultAssigner = useConfigStore().includeDefaultAssigner;
+    if (includeDefaultAssigner) {
+      let bf_assigner = this.buildDefaultAssignerElement();
+      // Only add if no existing organization is found
+      if (!bf_AdminMetadtat.querySelector('bf\\:Organization[rdf\\:about="http://id.loc.gov/vocabulary/organizations/dlc"], bf\\:agent[rdf\\:about="http://id.loc.gov/vocabulary/organizations/dlc"]')) {
+        bf_AdminMetadtat.appendChild(bf_assigner);
+      }
+    }
+    bf_Status.appendChild(bf_StatusLabel);
+    bf_status.appendChild(bf_Status);
+    bf_AdminMetadtat.appendChild(bf_status);
+    bf_adminMetadata.appendChild(bf_AdminMetadtat);
+
+    // Always add assigner to bf:AdminMetadata if not present, and ensure it is fully populated
+    // (This is now handled by deduplicateAssignersInAdminMetadata)
+    this.deduplicateAssignersInAdminMetadata(bf_AdminMetadtat);
+
+    let adminMetadataText = (new XMLSerializer()).serializeToString(bf_adminMetadata);
+
+    // Add admin metadata to Work and Instance elements
+    for (let URI in tleLookup['Work']){
+      // Create a fresh copy of admin metadata for each Work
+      const adminCopy = xmlParser.parseFromString(adminMetadataText, "text/xml").children[0];
+      // Only add if the Work doesn't already have admin metadata
+      if (!tleLookup['Work'][URI].querySelector('bf\\:adminMetadata')) {
+        tleLookup['Work'][URI].appendChild(adminCopy);
+      }
+    }
+    for (let URI in tleLookup['Instance']){
+      // Create a fresh copy of admin metadata for each Instance
+      const adminCopy = xmlParser.parseFromString(adminMetadataText, "text/xml").children[0];
+      // Only add if the Instance doesn't already have admin metadata
+      if (!tleLookup['Instance'][URI].querySelector('bf\\:adminMetadata')) {
+        tleLookup['Instance'][URI].appendChild(adminCopy);
+      }
+    }
+    // Build basic version to save
+    for (let URI in tleLookup['Work']){
+      let theWork = (new XMLSerializer()).serializeToString(tleLookup['Work'][URI]);
+      theWork = xmlParser.parseFromString(theWork, "text/xml").children[0];
+      rdfBasic.appendChild(theWork);
+    }
+    for (let URI in tleLookup['Hub']){
+      let theHub = (new XMLSerializer()).serializeToString(tleLookup['Hub'][URI]);
+      theHub = xmlParser.parseFromString(theHub, "text/xml").children[0];
+      rdfBasic.appendChild(theHub);
+    }
+    for (let URI in tleLookup['Instance']){
+      let instance = (new XMLSerializer()).serializeToString(tleLookup['Instance'][URI]);
+      instance = xmlParser.parseFromString(instance, "text/xml").children[0];
+      
+      // Add hasItem relationships
+      let items = this.returnHasItem(URI, orginalProfile, tleLookup);
+      if (items.length > 0){
+        for (let item of items){
+          let p = this.createElByBestNS('bf:hasItem');
+          p.appendChild(item);
+          instance.appendChild(p);
+        }
+      }
+
+      // Add instanceOf relationship with work
+      let work = this.returnWorkFromInstance(URI, orginalProfile, tleLookup);
+      if (work) {
+        let p = this.createElByBestNS('bf:instanceOf');
+        // Set rdf:resource to the Work's URI if available
+        const workAbout = work.getAttribute && work.getAttribute('rdf:about');
+        if (workAbout) {
+          p.setAttributeNS(this.namespace.rdf, 'rdf:resource', workAbout);
+        }
+        // Optionally, append the work as a child if needed for other consumers
+        // p.appendChild(work);
+        instance.appendChild(p);
+      }
+      
+      rdfBasic.appendChild(instance);
+    }
+
+    // Build RDF centered around instance or work based on procInfo
+    if (orginalProfile.procInfo && orginalProfile.procInfo.includes("update")){
+      // Build centered around instance
+      if (Object.keys(tleLookup['Instance']).length > 0){
+        for (let URI in tleLookup['Instance']){
+          let instance = (new XMLSerializer()).serializeToString(tleLookup['Instance'][URI]);
+          instance = xmlParser.parseFromString(instance, "text/xml").children[0];
+          // Add hasItem relationships
+          let items = this.returnHasItem(URI, orginalProfile, tleLookup);
+          if (items.length > 0){
+            for (let item of items){
+              let p = this.createElByBestNS('bf:hasItem');
+              p.appendChild(item);
+              instance.appendChild(p);
+            }
+          }
+
+          // Add instanceOf relationship with work
+          let work = this.returnWorkFromInstance(URI, orginalProfile, tleLookup);
+          if (work){
+            let p = this.createElByBestNS('bf:instanceOf');
+            p.appendChild(work);
+            instance.appendChild(p);
+          }
+
+          rdf.appendChild(instance);
+        }
+      } else {
+        // No instances - use the first work
+        let workKey = Object.keys(tleLookup['Work'])[0];
+        let work = tleLookup['Work'][workKey];
+        if (work){
+          rdf.appendChild(work);
+        }
+      }
+    } else {
+      // Default case - centered around instance with work as child
+      for (let URI in tleLookup['Instance']){
+        let instance = (new XMLSerializer()).serializeToString(tleLookup['Instance'][URI]);
+        instance = xmlParser.parseFromString(instance, "text/xml").children[0];
+
+        // Add items
+        let items = this.returnHasItem(URI, orginalProfile, tleLookup);
+        if (items.length > 0){
+          for (let item of items){
+            let p = this.createElByBestNS('bf:hasItem');
+            p.appendChild(item);
+            instance.appendChild(p);
+          }
+        }
+
+        // Add work
+        let work = this.returnWorkFromInstance(URI, orginalProfile, tleLookup);
+        if (work){
+          let p = this.createElByBestNS('bf:instanceOf');
+          p.appendChild(work);
+          instance.appendChild(p);
+        }
+        
+        rdf.appendChild(instance);
+      }
+    }
+
+    // Always append all hubs as direct children of rdf
+    for (let URI in tleLookup['Hub']){
+      let theHub = (new XMLSerializer()).serializeToString(tleLookup['Hub'][URI]);
+      theHub = xmlParser.parseFromString(theHub, "text/xml").children[0];
+      rdf.appendChild(theHub);
+    }
+
+    // Extract metadata for database
+    if (rdfBasic.getElementsByTagName("bf:mainTitle").length > 0){
+      xmlVoidDataTitle = rdfBasic.getElementsByTagName("bf:mainTitle")[0].innerHTML;
+    } else if (rdfBasic.getElementsByTagName("bfsimple:prefTitle").length > 0){
+      xmlVoidDataTitle = rdfBasic.getElementsByTagName("bfsimple:prefTitle")[0].innerHTML;
+    } else {
+      console.warn('no title found for db');
+    }
+
+    // Extract contributor information
+    if (rdfBasic.getElementsByTagName("bf:PrimaryContribution").length > 0){
+      if (rdfBasic.getElementsByTagName("bf:PrimaryContribution")[0].getElementsByTagName("rdfs:label").length > 0){
+        xmlVoidDataContributor = rdfBasic.getElementsByTagName("bf:PrimaryContribution")[0].getElementsByTagName("rdfs:label")[0].innerHTML;
+      }
+    } else {
+      if (rdfBasic.getElementsByTagName("bf:Contribution").length > 0){
+        if (rdfBasic.getElementsByTagName("bf:Contribution")[0].getElementsByTagName("rdfs:label").length > 0){
+          xmlVoidDataContributor = rdfBasic.getElementsByTagName("bf:Contribution")[0].getElementsByTagName("rdfs:label")[0].innerHTML;
+        } else {
+          console.warn('no PrimaryContribution or Contribution found for db');
+        }
+      } else {
+        console.warn('no PrimaryContribution or Contribution found for db');
+      }
+    }
+
+    // Extract LCCN
+    if (rdfBasic.getElementsByTagName("bf:Instance").length > 0){
+      let i = rdfBasic.getElementsByTagName("bf:Instance")[0];
+      
+      // Find LCCN in bf:identifiedBy
+      for (let c of i.children){
+        if (c.tagName === 'bf:identifiedBy'){
+          // Look for bf:Lccn elements
+          if (c.getElementsByTagName("bf:Lccn").length > 0){
+            let lccnEl = c.getElementsByTagName("bf:Lccn")[0];
+            
+            // Check if it has a status
+            if (lccnEl.getElementsByTagName("bf:Status").length == 0){
+              // No status element, use this LCCN
+              xmlVoidDataLccn = lccnEl.innerText || lccnEl.textContent;
+            } else if (lccnEl.getElementsByTagName("bf:Status").length > 0){
+              // If it has a status, check if it's canceled
+              if (lccnEl.getElementsByTagName("bf:Status")[0].hasAttribute('rdf:about') && 
+                  lccnEl.getElementsByTagName("bf:Status")[0].attributes['rdf:about'].value == 'http://id.loc.gov/vocabulary/mstatus/cancinv'){
+                continue;
+              }
+              
+              // Use this LCCN if not canceled
+              for (let cc of lccnEl.children){
+                if (cc.tagName == 'rdf:value'){
+                  xmlVoidDataLccn = cc.innerText || cc.textContent;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Create dataset description element
+    let datasetDescriptionEl = document.createElementNS(this.namespace.void, 'void:DatasetDescription');
+    datasetDescriptionEl.setAttributeNS("http://www.w3.org/2000/xmlns/", `xmlns:void`, this.namespace.void);
+    datasetDescriptionEl.setAttributeNS("http://www.w3.org/2000/xmlns/", `xmlns:lclocal`, this.namespace.lclocal);
+
+    // Add metadata elements
+    let el;
+    for (let x of xmlVoidDataRtsUsed){
+      el = document.createElementNS(this.namespace.lclocal, 'lclocal:rtsused');
+      el.innerHTML = escapeHTML(x);
+      datasetDescriptionEl.appendChild(el);
+    }
+    for (let x of xmlVoidDataType){
+      el = document.createElementNS(this.namespace.lclocal, 'lclocal:profiletypes');
+      el.innerHTML = escapeHTML(x);
+      datasetDescriptionEl.appendChild(el);
+    }
+    el = document.createElementNS(this.namespace.lclocal, 'lclocal:title');
+    el.innerHTML = escapeHTML(xmlVoidDataTitle);
+    datasetDescriptionEl.appendChild(el);
+    el = document.createElementNS(this.namespace.lclocal, 'lclocal:contributor');
+    el.innerHTML = escapeHTML(xmlVoidDataContributor);
+    datasetDescriptionEl.appendChild(el);
+    el = document.createElementNS(this.namespace.lclocal, 'lclocal:lccn');
+    el.innerHTML = escapeHTML(xmlVoidDataLccn);
+    datasetDescriptionEl.appendChild(el);
+    el = document.createElementNS(this.namespace.lclocal, 'lclocal:user');
+    el.innerHTML = escapeHTML(profile.user);
+    datasetDescriptionEl.appendChild(el);
+    el = document.createElementNS(this.namespace.lclocal, 'lclocal:status');
+    el.innerHTML = escapeHTML(profile.status);
+    datasetDescriptionEl.appendChild(el);
+    el = document.createElementNS(this.namespace.lclocal, 'lclocal:eid');
+    el.innerHTML = escapeHTML(profile.eId);
+    datasetDescriptionEl.appendChild(el);
+    el = document.createElementNS(this.namespace.lclocal, 'lclocal:typeid');
+    el.innerHTML = escapeHTML(profile.id);
+    datasetDescriptionEl.appendChild(el);
+    el = document.createElementNS(this.namespace.lclocal, 'lclocal:procinfo');
+    el.innerHTML = escapeHTML(orginalProfile.procInfo);
+    datasetDescriptionEl.appendChild(el);
+    for (let x of xmlVoidExternalID){
+      el = document.createElementNS(this.namespace.lclocal, 'lclocal:externalid');
+      el.innerHTML = escapeHTML(x);
+      datasetDescriptionEl.appendChild(el);
+    }
+
+    // Format XML output
+    // Only serialize the rdf DOM node directly, do not use ensureRoot or prettifyXmlJS for the main RDF output
+    let strXml = this.serializePreservingNamespaces(rdf);
+    let strXmlBasic = this.serializePreservingNamespaces(rdfBasic);
+    let strXmlFormatted = strXml; // Optionally, you can prettify for display, but do not break the structure
+
+    // Build BF2MARC package
+    let bf2MarcXmlElRdf = this.createElByBestNS('http://www.w3.org/1999/02/22-rdf-syntax-ns#RDF');
+    for (let el of rdfBasic.getElementsByTagName("bf:Work")){ bf2MarcXmlElRdf.appendChild(el); }
+    for (let el of rdfBasic.getElementsByTagName("bf:Instance")){ bf2MarcXmlElRdf.appendChild(el); }
+    for (let el of rdfBasic.getElementsByTagName("bf:Item")){ bf2MarcXmlElRdf.appendChild(el); }
+    let strBf2MarcXmlElBib = (new XMLSerializer()).serializeToString(bf2MarcXmlElRdf);
+
+    // clean it up a bit for the component
+    if (strXmlFormatted.trim().length > 0) {
+      strXmlFormatted = this.cleanOrganizationElement(strXmlFormatted);
+    }
+    if (strXmlBasic.trim().length > 0) {
+      strXmlBasic = this.cleanOrganizationElement(strXmlBasic);
+    }
+    if (strXml.trim().length > 0) {
+      strXml = this.cleanOrganizationElement(strXml);
+    }
+    if (strBf2MarcXmlElBib.trim().length > 0) {
+      strBf2MarcXmlElBib = this.cleanOrganizationElement(strBf2MarcXmlElBib);
+      strBf2MarcXmlElBib = this.ensureOrganizationLabels(strBf2MarcXmlElBib);
+    }
+
+    // After all XML is built, deduplicate assigners in all AdminMetadata elements in the final DOM trees
+    const deduplicateAllAdminMetadataAssigners = (xmlDoc) => {
+      if (!xmlDoc) return;
+      // Use TreeWalker to traverse all nodes, including nested ones
+      const walker = document.createTreeWalker(
+        xmlDoc,
+        NodeFilter.SHOW_ELEMENT,
+        {
+          acceptNode: (node) => node.nodeName === 'bf:AdminMetadata' ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP
+        },
+        false
+      );
+      let node = walker.nextNode();
+      while (node) {
+        this.deduplicateAssignersInAdminMetadata(node);
+        node = walker.nextNode();
+      }
+    };
+    deduplicateAllAdminMetadataAssigners(rdf);
+    deduplicateAllAdminMetadataAssigners(rdfBasic);
+    deduplicateAllAdminMetadataAssigners(bf2MarcXmlElRdf);
+
+    // Return the XML in various formats
+    return {
+      xmlDom: rdf,
+      xmlStringFormatted: strXmlFormatted,
+      xlmString: strXml,
+      bf2Marc: strBf2MarcXmlElBib,
+      xlmStringBasic: strXmlBasic,
+      voidTitle: xmlVoidDataTitle,
+      voidContributor: xmlVoidDataContributor,
+      componentXmlLookup: componentXmlLookup
+    };
   }
-}
+},
+
+  /**
+  * return the MARC transformation from the back end
+  *
+  * @return {string} - the MARC string of output
+  */
+  marcPreview: async function(){
+    try {
+      let xml = await this.buildXML(useProfileStore().activeProfile);
+      if (!xml) {
+        console.error("XML generation failed");
+        return {
+          default: null,
+          versions: [{
+            version: "error",
+            results: { error: "Failed to generate XML" },
+            default: true,
+            error: true
+          }]
+        };
+      }
+
+      let preview;
+      if (!usePreferenceStore().returnValue('--b-edit-main-splitpane-opac-marc-html')){
+        preview = await utilsNetwork.marcPreview(xml.bf2Marc, false);
+      } else {
+        preview = await utilsNetwork.marcPreview(xml.bf2Marc, true);
+      }
+
+      // Further refine sanitization to remove malformed subfields and unnecessary content
+      if (preview && Array.isArray(preview)) {
+        preview = preview.map(version => {
+          if (version.marcRecord) {
+            // Remove XML tags
+            version.marcRecord = version.marcRecord.replace(/<[^>]*>/g, '').trim();
+
+            // Remove malformed subfields (e.g., $d with no content or invalid indicators)
+            version.marcRecord = version.marcRecord.replace(/\$[a-z] \$d\s+/g, '').replace(/ind1="\s*" ind2="\s*"/g, '');
+
+            // Remove unnecessary content like URLs in subfields where not expected
+            version.marcRecord = version.marcRecord.replace(/\$[a-z] http[^\s]+/g, '');
+
+            // Ensure proper MARC structure (e.g., add missing indicators or subfield delimiters)
+            version.marcRecord = version.marcRecord.replace(/\$\s+/g, ' $');
+
+            // Ensure proper handling of the 082 field
+            version.marcRecord = version.marcRecord.replace(/(082\s+\d{2}\s+\$a\s+[^$]+)\s+\$2\s*>/g, '$1 $2 21');
+
+            // Remove any completely empty subfields
+            version.marcRecord = version.marcRecord.replace(/\$[a-z]\s*>/g, '');
+
+            // Remove malformed indicators and subfields
+            version.marcRecord = version.marcRecord.replace(/ind1="\s*" ind2="\s*"/g, '').replace(/\$[a-z]\s+\$d\s+/g, '');
+          }
+          return version;
+        });
+      }
+
+      // If preview is null or empty, return an error
+      if (!preview || (Array.isArray(preview) && preview.length === 0)) {
+        return {
+          default: null,
+          versions: [{
+            version: "error",
+            results: { error: "Empty response from MARC preview service" },
+            default: true,
+            error: true
+          }]
+        };
+      }
+
+      // clean it up a bit for the component
+      let versions = preview.map((v) => { return v.version }).sort().reverse();
+      let newResults = [];
+      let selectedDefault = false;
+      for (let v of versions){
+        let toAdd = preview.filter(p => p.version === v)[0];
+        
+        // Check for valid result structure before proceeding
+        if (!toAdd || !toAdd.results) {
+          console.error(`Invalid preview item for version ${v}:`, toAdd);
+          continue;
+        }
+        
+        // Determine default version - pick first one with stdout
+        if (toAdd.results && toAdd.results.stdout && !selectedDefault){
+          toAdd.default = true;
+          selectedDefault = true;
+        } else {
+          toAdd.default = false;
+        }
+
+        // Mark errors appropriately
+        if (!toAdd.results.stdout || toAdd.results.stderr){
+          toAdd.error = true;
+          
+          // Add error details if available
+          if (toAdd.results.stderr) {
+            toAdd.errorDetails = toAdd.results.stderr;
+          }
+        } else {
+          toAdd.error = false;
+        }
+        
+        newResults.push(toAdd);
+      }
+
+      // If we have no results that look valid, add an error version
+      if (newResults.length === 0 || !selectedDefault) {
+        newResults.unshift({
+          version: "error",
+          results: { error: "No valid MARC data found in response", details: JSON.stringify(preview) },
+          default: true,
+          error: true
+        });
+      }
+
+      // Get the default version
+      let defaultVer = newResults.find(p => p.default === true);
+      if (defaultVer) {
+        defaultVer = defaultVer.version;
+      } else {
+        defaultVer = null;
+      }
+
+      return {
+        default: defaultVer,
+        versions: newResults,
+      };
+    } catch (error) {
+      console.error("Unhandled error in marcPreview:", error);
+      return {
+        default: null,
+        versions: [{
+          version: "error",
+          results: { 
+            error: error.message || "Unknown error in MARC preview",
+            stack: error.stack
+          },
+          default: true,
+          error: true
+        }]
+      };
+    }
+  },
+
+  /**
+   * Ensures the assigner in AdminMetadata is fully populated. If missing or blank, replaces with default.
+   * @param {Element} adminMetadataEl - The bf:AdminMetadata element to check/fix
+   */
+  fixAssignerInAdminMetadata: function(adminMetadataEl) {
+    try {
+      if (!adminMetadataEl) {
+        console.warn('fixAssignerInAdminMetadata: called with null/undefined element');
+        return;
+      }
+      let assigner = adminMetadataEl.querySelector('bf\\:assigner');
+      let needsFix = false;
+      if (!assigner) {
+        needsFix = true;
+      } else {
+        // Check if Organization is blank (no rdf:about and no label)
+        let org = assigner.querySelector('bf\\:Organization');
+        if (!org || (!org.getAttribute('rdf:about') && !org.querySelector('rdfs\\:label'))) {
+          needsFix = true;
+          assigner.remove();
+        }
+      }
+      if (needsFix) {
+        const newAssigner = this.buildDefaultAssignerElement();
+        adminMetadataEl.appendChild(newAssigner);
+        console.info('fixAssignerInAdminMetadata: added default assigner');
+      }
+    } catch (e) {
+      console.error('fixAssignerInAdminMetadata error:', e);
+    }
+  },
+
+  /**
+   * Deduplicate assigner elements in a bf:AdminMetadata element, keeping only one and ensuring it has a label.
+   * @param {Element} adminMetadataEl - The bf:AdminMetadata element to clean
+   */
+  deduplicateAssignersInAdminMetadata: function(adminMetadataEl) {
+    if (!adminMetadataEl) return;
+    // Remove all assigner elements
+    const assigners = Array.from(adminMetadataEl.querySelectorAll('bf\\:assigner'));
+    assigners.forEach(el => el.remove());
+    // Add a single, well-formed assigner
+    const newAssigner = this.buildDefaultAssignerElement();
+    adminMetadataEl.appendChild(newAssigner);
+  },
+
+  splitComplexSubjects: function(data){
+    const parser = new DOMParser();
+    const xml = parser.parseFromString(data, "application/xml");
+    let subjects = xml.getElementsByTagName("bf:subject");
+    for (let subject of subjects){
+        let componentList = subject.getElementsByTagName("madsrdf:componentList");
+        if (componentList.length > 0){
+            // Remove all children from the componentList
+            while (componentList[0].firstChild) {
+                componentList[0].removeChild(componentList[0].firstChild);
+            }
+            // Get the main label and marcKey from the parent Topic
+            let topic = subject.getElementsByTagName("bf:Topic")[0];
+            if (!topic) continue;
+            let label = topic.getElementsByTagName("rdfs:label")[0]?.textContent || "";
+            let marcKey = topic.getElementsByTagName("bflc:marcKey")[0]?.textContent || "";
+            // If the label contains --, split it
+            let terms = label.split("--");
+            let subfields = marcKey.slice(5).match(/\$[axyzv]{1}/g) || [];
+            for (let i = 0; i < terms.length; i++) {
+                // Determine the type and element for the new component
+                let type, elementType;
+                switch(subfields[i]){
+                    case "$x":
+                        type = "madsrdf:Topic";
+                        elementType = "madsrdf:TopicElement";
+                        break;
+                    case "$v":
+                        type = "madsrdf:GenreForm";
+                        elementType = "madsrdf:GenreFormElement";
+                        break;
+                    case "$y":
+                        type = "madsrdf:Temporal";
+                        elementType = "madsrdf:TemporalElement";
+                        break;
+                    case "$z":
+                        type = "madsrdf:Geographic";
+                        elementType = "madsrdf:GeographicElement";
+                        break;
+                    case "$a":
+                    default:
+                        type = "madsrdf:Topic";
+                        elementType = "madsrdf:TopicElement";
+                }
+                // Build <madsrdf:Authority>
+                let authority = xml.createElementNS("http://www.loc.gov/mads/rdf/v1#", "madsrdf:Authority");
+                // <madsrdf:authoritativeLabel>
+                let authLabelElement = xml.createElementNS("http://www.loc.gov/mads/rdf/v1#", "madsrdf:authoritativeLabel");
+                authLabelElement.textContent = terms[i];
+                authority.appendChild(authLabelElement);
+                // <madsrdf:elementList>
+                let elementList = xml.createElementNS("http://www.loc.gov/mads/rdf/v1#", "madsrdf:elementList");
+                let element = xml.createElementNS("http://www.loc.gov/mads/rdf/v1#", elementType);
+                let elementValue = xml.createElementNS("http://www.loc.gov/mads/rdf/v1#", "madsrdf:elementValue");
+                elementValue.textContent = terms[i];
+                element.appendChild(elementValue);
+                elementList.appendChild(element);
+                authority.appendChild(elementList);
+                componentList[0].appendChild(authority);
+            }
+        }
+    }
+    // Return the updated XML as a string
+    return new XMLSerializer().serializeToString(xml);
+},
+
+};
 
 export default utilsExport;
