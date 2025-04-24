@@ -196,82 +196,61 @@
 
 <template>
 
+  <!-- Add v-if check for activeProfile and rtOrder -->
+  <template v-if="activeProfile && activeProfile.rtOrder">
+    <div v-for="profileName in activeProfile.rtOrder" class="sidebar" :key="profileName">
 
-  <div v-for="profileName in activeProfile.rtOrder" class="sidebar" :key="profileName">
+        <!-- Add check for activeProfile.rt[profileName] -->
+        <div v-if="activeProfile.rt[profileName] && activeProfile.rt[profileName].noData != true">
+            <div :class="{'container-type-icon': true, 'sidebar-spacer': (profileName.split(':').slice(-1)[0] == 'Instance' || profileName.split(':').slice(-1)[0] == 'Item')}">
+                    <svg v-if="profileName.split(':').slice(-1)[0] == 'Work'" width="1.5em" height="1.1em" version="1.1" xmlns="http://www.w3.org/2000/svg">
+                      <circle :fill="preferenceStore.returnValue('--c-general-icon-work-color')" cx="0.55em" cy="0.6em" r="0.45em"/>
+                    </svg>
+                    <svg v-if="profileName.includes('Instance')" :fill="preferenceStore.returnValue('--c-general-icon-instance-color')" width="20px" height="20px" version="1.1" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                     <path  d="m5 50l45-45 45 45-45 45z"/>
+                    </svg>
+                    <svg v-if="profileName.includes(':Item')"  viewBox="0 -32 50 72" version="1.1" xmlns="http://www.w3.org/2000/svg">
+                      <rect width="40px" height="40px" class="item-icon" />
+                    </svg>
+                    <svg  v-if="profileName.endsWith(':Hub')" version="1.1" viewBox="0 0 150 150" xmlns="http://www.w3.org/2000/svg">
+                      <path fill="royalblue" d="m62.113 24.66 1.9023-15.238 18.875 32.691-7.5469 20.004 15.238 1.9023-32.691 18.875-20.004-7.5469-1.9023 15.238-18.875-32.691 7.5469-20.004-15.238-1.9023 32.691-18.875zm-17.684 15.695-4.0781 15.215 15.215 4.0781 4.0781-15.215z" fill-rule="evenodd"/>
+                    </svg>
+                    <span class="sidebar-header-text" v-if="profileName.split(':').slice(-1)[0] == 'Work'">{{$t("message.wordWork")}}</span>
+                    <span class="sidebar-header-text" v-if="profileName.split(':').slice(-1)[0] == 'Instance'">{{$t("message.wordInstance")}}</span>
+                    <span class="sidebar-header-text" v-if="profileName.split(':').slice(-1)[0] == 'Item'">{{$t("message.wordItem")}}</span>
+                    <span class="sidebar-header-text" v-if="profileName.split(':').slice(-1)[0] == 'Hub'">{{$t("message.wordHub")}}</span>
+            </div>
 
-      <div v-if="activeProfile.rt[profileName].noData != true">
-          <div :class="{'container-type-icon': true, 'sidebar-spacer': (profileName.split(':').slice(-1)[0] == 'Instance' || profileName.split(':').slice(-1)[0] == 'Item')}">
-                  <svg v-if="profileName.split(':').slice(-1)[0] == 'Work'" width="1.5em" height="1.1em" version="1.1" xmlns="http://www.w3.org/2000/svg">
-                    <circle :fill="preferenceStore.returnValue('--c-general-icon-work-color')" cx="0.55em" cy="0.6em" r="0.45em"/>
-                  </svg>
-                  <svg v-if="profileName.includes('Instance')" :fill="preferenceStore.returnValue('--c-general-icon-instance-color')" width="20px" height="20px" version="1.1" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-                   <path  d="m5 50l45-45 45 45-45 45z"/>
-                  </svg>
-                  <svg v-if="profileName.includes(':Item')"  viewBox="0 -32 50 72" version="1.1" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="40px" height="40px" class="item-icon" />
-                  </svg>
-                  <svg  v-if="profileName.endsWith(':Hub')" version="1.1" viewBox="0 0 150 150" xmlns="http://www.w3.org/2000/svg">
-                    <path fill="royalblue" d="m62.113 24.66 1.9023-15.238 18.875 32.691-7.5469 20.004 15.238 1.9023-32.691 18.875-20.004-7.5469-1.9023 15.238-18.875-32.691 7.5469-20.004-15.238-1.9023 32.691-18.875zm-17.684 15.695-4.0781 15.215 15.215 4.0781 4.0781-15.215z" fill-rule="evenodd"/>
-                  </svg>
-                  <span class="sidebar-header-text" v-if="profileName.split(':').slice(-1)[0] == 'Work'">{{$t("message.wordWork")}}</span>
-                  <span class="sidebar-header-text" v-if="profileName.split(':').slice(-1)[0] == 'Instance'">{{$t("message.wordInstance")}}</span>
-                  <span class="sidebar-header-text" v-if="profileName.split(':').slice(-1)[0] == 'Item'">{{$t("message.wordItem")}}</span>
-                  <span class="sidebar-header-text" v-if="profileName.split(':').slice(-1)[0] == 'Hub'">{{$t("message.wordHub")}}</span>
-          </div>
+        </div>
 
-      </div>
-
-      <ul class="sidebar-opac-ul" role="list">
-          <template  v-for="(profileCompoent,idx) in activeProfile.rt[profileName].ptOrder" >
-            <li v-if="activeProfile.rt[profileName].pt[profileCompoent].hasData && !activeProfile.rt[profileName].pt[profileCompoent].deleted"  @click.stop="activeComponent = activeProfile.rt[profileName].pt[profileCompoent]"  class="sidebar-opac-li sidebar-opac-li-empty" >
-                    <a style="font-size:0.95em" href="#" @click.stop="activeComponent = activeProfile.rt[profileName].pt[profileCompoent]" class="sidebar-property-ul-alink">
-                        {{activeProfile.rt[profileName].pt[profileCompoent].propertyLabel}}
-                    </a>
-                    <div style="" class="sidebar-opac-li-value" v-for="value in buildDisplayObjects(activeProfile.rt[profileName].pt[profileCompoent].userValue)">
-                        <template v-if="value.uri !== null">
-                          <a :href="value.uri" target="_blank">
+        <!-- Add checks for activeProfile.rt[profileName].ptOrder and pt -->
+        <ul v-if="activeProfile.rt[profileName] && activeProfile.rt[profileName].ptOrder && activeProfile.rt[profileName].pt" class="sidebar-opac-ul" role="list">
+            <template  v-for="(profileCompoent,idx) in activeProfile.rt[profileName].ptOrder" >
+              <li v-if="activeProfile.rt[profileName].pt[profileCompoent] && activeProfile.rt[profileName].pt[profileCompoent].hasData && !activeProfile.rt[profileName].pt[profileCompoent].deleted"  @click.stop="activeComponent = activeProfile.rt[profileName].pt[profileCompoent]"  class="sidebar-opac-li sidebar-opac-li-empty" >
+                      <a style="font-size:0.95em" href="#" @click.stop="activeComponent = activeProfile.rt[profileName].pt[profileCompoent]" class="sidebar-property-ul-alink">
+                          {{activeProfile.rt[profileName].pt[profileCompoent].propertyLabel}}
+                      </a>
+                      <div style="" class="sidebar-opac-li-value" v-for="value in buildDisplayObjects(activeProfile.rt[profileName].pt[profileCompoent].userValue)">
+                          <template v-if="value.uri !== null">
+                            <a :href="value.uri" target="_blank">
+                              <div class="sidebar-opac-li-value-text" v-for="l in value.label">{{l}}</div>
+                            </a>
+                          </template>
+                          <template v-else>
                             <div class="sidebar-opac-li-value-text" v-for="l in value.label">{{l}}</div>
-                          </a>
-                        </template>
-                        <template v-else>
-                          <div class="sidebar-opac-li-value-text" v-for="l in value.label">{{l}}</div>
 
-                        </template>
+                          </template>
 
-                    </div>
-            </li>
-          </template>
-        </ul>
-
-
-  <!--
-      <div v-if="activeProfile.rt[profileName].noData != true">
-          <div :class="{'container-type-icon': true, 'sidebar-spacer': (profileName.split(':').slice(-1)[0] == 'Instance' || profileName.split(':').slice(-1)[0] == 'Item')}">
-                  <svg v-if="profileName.split(':').slice(-1)[0] == 'Work'" width="1.5em" height="1.1em" version="1.1" xmlns="http://www.w3.org/2000/svg">
-                    <circle :fill="preferenceStore.returnValue('--c-general-icon-work-color')" cx="0.55em" cy="0.6em" r="0.45em"/>
-                  </svg>
-                  <svg v-if="profileName.includes('Instance')" :fill="preferenceStore.returnValue('--c-general-icon-instance-color')" width="20px" height="20px" version="1.1" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-                   <path  d="m5 50l45-45 45 45-45 45z"/>
-                  </svg>
-                  <svg v-if="profileName.includes(':Item')"  viewBox="0 -32 50 72" version="1.1" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="40px" height="40px" class="item-icon" />
-                  </svg>
-                  <svg  v-if="profileName.endsWith(':Hub')" version="1.1" viewBox="0 -20 100 100" xmlns="http://www.w3.org/2000/svg">
-                    <path fill="royalblue" d="m62.113 24.66 1.9023-15.238 18.875 32.691-7.5469 20.004 15.238 1.9023-32.691 18.875-20.004-7.5469-1.9023 15.238-18.875-32.691 7.5469-20.004-15.238-1.9023 32.691-18.875zm-17.684 15.695-4.0781 15.215 15.215 4.0781 4.0781-15.215z" fill-rule="evenodd"/>
-                  </svg>
-                  <span class="sidebar-header-text" v-if="profileName.split(':').slice(-1)[0] == 'Work'">{{$t("message.wordWork")}}</span>
-                  <span class="sidebar-header-text" v-if="profileName.split(':').slice(-1)[0] == 'Instance'">{{$t("message.wordInstance")}}</span>
-                  <span class="sidebar-header-text" v-if="profileName.split(':').slice(-1)[0] == 'Item'">{{$t("message.wordItem")}}</span>
-                  <span class="sidebar-header-text" v-if="profileName.split(':').slice(-1)[0] == 'Hub'">{{$t("message.wordHub")}}</span>
-          </div>
-
-
-
-
-      </div> -->
-  </div>
-
-
+                      </div>
+              </li>
+            </template>
+          </ul>
+    </div>
+  </template> <!-- End of v-if="activeProfile && activeProfile.rtOrder" -->
+  <template v-else>
+      <!-- Optional: Show a loading state or message -->
+      <div>Loading OPAC preview...</div>
+  </template>
 
 </template>
 

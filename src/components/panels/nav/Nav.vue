@@ -429,15 +429,11 @@
                   this.layoutHash = layoutList[idx]
                   this.activateLayout(layout)
                 },
-                emoji: layout.profileId == this.activeProfile.id ? "heavy_check_mark" : "x",
-                title: layout.profileId == this.activeProfile.id ? "Layout Matches Profile." : "Can't use ''" + layout.profileId  + "'' layout with ''" + this.activeProfile.id + "'' profile."
+                emoji: this.activeProfile && layout.profileId == this.activeProfile.id ? "heavy_check_mark" : "x",
+                title: this.activeProfile && layout.profileId == this.activeProfile.id ? "Layout Matches Profile." : `Can't use '${layout.profileId}' layout with '${this.activeProfile ? this.activeProfile.id : 'N/A'}' profile.`
               })
             }
            }
-
-          //  menu.push(
-          //     !this.createLayoutMode ? { text: "Layouts",  menu: layoutsMenu } : { text: "Save Layout", click: () => { this.saveLayout() }}
-          //   )
 
            if (!this.createLayoutMode){
             menu.push(
@@ -485,53 +481,66 @@
           }
           )
           menu.push(
-
- 
-
             {
- 
-
               text: "Validate",
- 
-
               icon: "check",
- 
-
               click: () => {
- 
-
                 this.showValidateModal = true;
- 
-
                 this.$nextTick(()=>{
- 
-
                   this.$refs.validatemodal.post()
- 
-
                 })
- 
-
               }
- 
-
             }
- 
-
           )
           menu.push(
             {
               text: "Post",
               icon: (this.activeProfilePosted) ? "mark_email_read" : "sailing",
-              click: () => {
-                this.showPostModal = true;
-                this.$nextTick(()=>{
-                  this.$refs.postmodal.post();
-                  this.profileStore.saveRecord()
-                  this.activeProfilePosted = true
-                })
-              },
               class: (this.activeProfilePosted) ? "record-posted" : "record-unposted",
+              menu: [
+                {
+                  text: "Work + Instance",
+                  click: () => {
+                    this.showPostModal = true;
+                    this.$nextTick(() => {
+                      this.$refs.postmodal.postType = 'default';
+                      this.$refs.postmodal.post();
+                      if (this.activeProfile) {
+                        this.profileStore.saveRecord();
+                        this.activeProfilePosted = true;
+                      }
+                    });
+                  }
+                },
+                {
+                  text: "Work Only",
+                  click: () => {
+                    this.showPostModal = true;
+                    this.$nextTick(() => {
+                      this.$refs.postmodal.postType = 'work';
+                      this.$refs.postmodal.post();
+                      if (this.activeProfile) {
+                        this.profileStore.saveRecord();
+                        this.activeProfilePosted = true;
+                      }
+                    });
+                  }
+                },
+                {
+                  text: "Instance Only",
+                  click: () => {
+                    this.showPostModal = true;
+                    this.$nextTick(() => {
+                      this.$refs.postmodal.postType = 'instance';
+                      this.$refs.postmodal.post();
+                      if (this.activeProfile) {
+                        this.profileStore.saveRecord();
+                        this.activeProfilePosted = true;
+                      }
+                    });
+                  }
+                }
+              ]
             }
           )
 
@@ -587,7 +596,7 @@
           }
         }
 
-        if (this.activeProfile.id && this.$route.name == 'Edit'){
+        if (this.activeProfile && this.activeProfile.id && this.$route.name == 'Edit'){
           menu.push(
             {
               text: "Profile: " + this.activeProfile.id,
@@ -595,7 +604,7 @@
               
             }
           )
-          }
+        }
 
         menu.push(
 

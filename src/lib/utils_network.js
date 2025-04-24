@@ -304,22 +304,32 @@ const utilsNetwork = {
         }
 
         if (url.includes('.rdf') || url.includes('.xml')){
-          data =  await response.text()
-        }else{
-          data =  await response.json()
+          data = await response.text()
+        } else {
+          // Check if response is empty before parsing
+          const responseText = await response.text();
+          if (!responseText || responseText.trim() === '') {
+            console.warn("Empty response received from URL:", url);
+            return false;
+          }
+          
+          try {
+            data = JSON.parse(responseText);
+          } catch (parseError) {
+            console.error("JSON parse error for URL:", url, "Error:", parseError.message);
+            console.debug("Response text:", responseText);
+            return false;
+          }
         }
-        return  data;
-      }catch(err){
-        //alert("There was an error retriving the record from:",url)
-
+        return data;
+      } catch(err) {
         if (err.name == 'AbortError'){
           // don't do anything
           // console.error("There was an error retriving the record from ", url, ". Likely from the search being aborted because the user was typing.");
-        }else{
-          console.error(err)
+        } else {
+          console.error("Network error for URL:", url, "Error:", err);
         }
-        return false
-        // Handle errors here
+        return false;
       }
     },
 

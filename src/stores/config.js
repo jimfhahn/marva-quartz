@@ -22,7 +22,7 @@ export const useConfigStore = defineStore('config', {
         instancepublish: "https://quartz.bibframe.app/util/publish/staging/instance",
         bfdb: "https://id.loc.gov/",
         validate: 'https://quartz.bibframe.app/validate',
-        profiles: "https://quartz.bibframe.app/assets/profiles.json",
+        profiles: "profiles.json",
         starting: "https://quartz.bibframe.app/assets/starting.json",
         id: 'https://id.loc.gov/',
         env: "staging",

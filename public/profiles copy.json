@@ -1713,6 +1713,71 @@
                     "repeatable": "true",
                     "type": "resource"
                 },
+                { "propertyLabel": "Classification",
+                  "propertyURI": "http://id.loc.gov/ontologies/bibframe/classification",
+                  "resourceTemplates": [],
+                  "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:LCC"
+                  ],
+                  "useValuesFrom": [],
+                  "valueDataType": {},
+                  "defaults": []
+                },
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "resource"
+                },
+                {
+                  "mandatory": "false",
+                  "repeatable": "true",
+                  "type": "resource",
+                  "resourceTemplates": [],
+                  "valueConstraint": {
+                      "valueTemplateRefs": [
+                          "lc:RT:bf2:Identifiers:Barcode"
+                      ],
+                      "useValuesFrom": [],
+                      "defaults": [],
+                      "valueDataType": {}
+                  },
+                  "propertyURI": "http://id.loc.gov/ontologies/bibframe/identifiedBy",
+                  "propertyLabel": "Barcode"
+              },
+              {
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "resource",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                    "valueTemplateRefs": [
+                        "lc:RT:bf2:Item:Access"
+                    ],
+                    "useValuesFrom": [],
+                    "defaults": [],
+                    "valueDataType": {}
+                },
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
+                "propertyLabel": "Access Policy",
+                "remark": "Alma Policy"
+            },
+            {
+              "mandatory": "false",
+              "repeatable": "true",
+              "type": "resource",
+              "resourceTemplates": [],
+              "valueConstraint": {
+                  "valueTemplateRefs": [
+                      "lc:RT:bf2:Item:Use"
+                  ],
+                  "useValuesFrom": [],
+                  "defaults": [],
+                  "valueDataType": {}
+              },
+              "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
+              "propertyLabel": "Use Policy",
+              "remark": "Alma Physical Material Type"
+          },
                 {
                     "propertyLabel": "URL of Item",
                     "propertyURI": "http://id.loc.gov/ontologies/bibframe/electronicLocator",
@@ -1740,7 +1805,7 @@
                         "valueDataType": {"dataTypeURI": "http://id.loc.gov/ontologies/bibframe/Contribution"}
                     },
                     "propertyURI": "http://id.loc.gov/ontologies/bibframe/contribution",
-                    "propertyLabel": "Contributor"
+                    "propertyLabel": "Collection/Contribution"
                 },
                 {
                     "propertyLabel": "Notes about the Item",
@@ -1755,23 +1820,6 @@
                     "mandatory": "false",
                     "repeatable": "true",
                     "type": "resource"
-                },
-                {
-                    "mandatory": "false",
-                    "repeatable": "true",
-                    "type": "resource",
-                    "resourceTemplates": [],
-                    "valueConstraint": {
-                        "valueTemplateRefs": [
-                            "lc:RT:bf2:Item:Enumeration",
-                            "lc:RT:bf2:Item:Chronology"
-                        ],
-                        "useValuesFrom": [],
-                        "valueDataType": "",
-                        "defaults": []
-                    },
-                    "propertyLabel": "Enumeration and chronology of Item",
-                    "propertyURI": "http://id.loc.gov/ontologies/bibframe/enumerationAndChronology"
                 },
                 {
                     "mandatory": "false",
@@ -8634,7 +8682,7 @@
                 "resourceTemplates": [],
                 "valueConstraint": {
                   "valueTemplateRefs": [],
-                  "useValuesFrom": [
+                 "useValuesFrom": [
                     "http://id.loc.gov/vocabulary/msoundcontent"
                   ],
                   "valueDataType": {

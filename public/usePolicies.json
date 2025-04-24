@@ -1,0 +1,22 @@
+[
+  {
+    "@id": "local:accessPolicy1",
+    "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
+    "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "Policy Option 1" } ]
+  },
+  {
+    "@id": "local:accessPolicy2",
+    "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
+    "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "Policy Option 2" } ]
+  },
+  {
+    "@id": "local:accessPolicy3",
+    "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
+    "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "In library use only" } ]
+  },
+  {
+    "@id": "local:accessPolicy4",
+    "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
+    "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "Ask at Reference Desk" } ]
+  }
+]

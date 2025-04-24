@@ -20,7 +20,13 @@
         left: 0,
         postResults: {},
         posting: false,
-
+        postType: 'default', // Default is both work and instance
+        postOptions: [
+          { value: 'default', label: 'Work + Instance' },
+          { value: 'work', label: 'Work Only' },
+          { value: 'instance', label: 'Instance Only' }
+        ],
+        showDropdown: false,
 
         initalHeight: 400,
         initalLeft: (window.innerWidth / 2) - 450,
@@ -32,25 +38,42 @@
       ...mapWritableState(useProfileStore, ['showPostModal']),
       activeProfile() {
         return this.profileStore.activeProfile
+      },
+      selectedOptionLabel() {
+        const option = this.postOptions.find(opt => opt.value === this.postType);
+        return option ? option.label : 'Work + Instance';
       }
     },
 
     methods: {
       done: function() {
-        this.showPostModal = false
+        this.showPostModal = false;
+        this.showDropdown = false;
+      },
+
+      toggleDropdown: function() {
+        this.showDropdown = !this.showDropdown;
+        console.log("Dropdown toggled:", this.showDropdown); // Add logging
+      },
+
+      selectOption: function(option) {
+        this.postType = option.value;
+        console.log("Option selected:", option.label); // Add logging
+        this.showDropdown = false;
       },
 
       post: async function() {
         this.$refs.errorHolder.style.height = this.initalHeight + 'px';
         this.posting = true;
+        this.showDropdown = false;
         // Clear previous results
         this.postResults = {};
         try {
-          // publishRecord now receives xmlString and type
+          // publishRecord now receives xmlString, profile and type
           const response = await this.profileStore.publishRecord(
             await this.generateXML(this.activeProfile),
             this.activeProfile,
-            'default'
+            this.postType // Use the selected postType
           );
           this.postResults = response;
           if (response.publish && response.publish.status !== 'published') {
@@ -183,10 +206,21 @@
         xmlString = xmlString.replace(/&quot;/g, '');
         return xmlString;
       },
+
+      handleOutsideClick(e) {
+        if (this.showDropdown && !e.target.closest('.dropdown-wrapper') && !e.target.closest('.bar-menu')) {
+          this.showDropdown = false;
+        }
+      },
     },
 
     mounted() {
-      // ...existing code...
+      // Add a click event listener to close dropdown when clicking outside
+      document.addEventListener('click', this.handleOutsideClick);
+    },
+    beforeUnmount() {
+      // Clean up the event listener when component is unmounted
+      document.removeEventListener('click', this.handleOutsideClick);
     }
   }
 </script>
@@ -201,6 +235,36 @@
   >
     <div class="login-modal" id="error-holder" ref="errorHolder">
       <h1 v-if="posting">Posting please wait...</h1>
+
+      <div v-if="!posting && Object.keys(postResults).length === 0">
+        <h2>Post Options</h2>
+        
+        <div class="post-type-selector">
+          <div class="dropdown-wrapper" @click.stop="toggleDropdown">
+            <div class="selected-option">{{ selectedOptionLabel }}</div>
+            <div class="dropdown-arrow">▼</div>
+            
+            <div v-if="showDropdown" class="bar-menu menu">
+              <div class="extended-hover-zone"></div>
+              <div class="bar-menu-items">
+                <div 
+                  v-for="option in postOptions" 
+                  :key="option.value" 
+                  class="bar-menu-item"
+                  @click.stop="selectOption(option)"
+                >
+                  <span class="label">{{ option.label }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="button-container">
+          <button @click="post" class="post-button">Post</button>
+          <button @click="done" class="cancel-button">Cancel</button>
+        </div>
+      </div>
 
       <div v-if="!posting && Object.keys(postResults).length !== 0">
         <div v-if="postResults.publish && postResults.publish.status === 'published'" style="margin: 0.5em 0; background-color: #90ee9052; padding: 0.5em; border-radius: 0.25em;">
@@ -236,7 +300,7 @@
         </div>
       </div>
 
-      <button @click="done">Close</button>
+      <button v-if="!posting && Object.keys(postResults).length !== 0" @click="done">Close</button>
     </div>
   </VueFinalModal>
 </template>
@@ -302,5 +366,92 @@
   }
   button {
     font-size: 1.5em;
+  }
+
+  /* Dropdown styles */
+  .post-type-selector {
+    margin: 1.5em 0;
+    position: relative;
+  }
+  
+  .dropdown-wrapper {
+    position: relative;
+    width: 250px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background-color: white;
+    cursor: pointer;
+    padding: 0.5em 1em;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .selected-option {
+    font-size: 1.2em;
+  }
+  
+  .dropdown-arrow {
+    font-size: 0.8em;
+  }
+  
+  .bar-menu {
+    position: absolute;
+    width: 100%;
+    z-index: 1000;
+    margin-top: 2px;
+    left: 0;
+    top: 100%;
+  }
+  
+  .bar-menu-items {
+    background-color: white;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    overflow: visible;
+  }
+  
+  .bar-menu-item {
+    padding: 0.5em 1em;
+    cursor: pointer;
+    font-size: 1.2em;
+  }
+  
+  .bar-menu-item:hover {
+    background-color: #f0f0f0;
+  }
+  
+  .extended-hover-zone {
+    position: absolute;
+    top: -10px;
+    left: 0;
+    right: 0;
+    height: 10px;
+  }
+  
+  .button-container {
+    display: flex;
+    justify-content: flex-start;
+    gap: 1em;
+    margin-top: 1em;
+  }
+  
+  .post-button {
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    padding: 0.5em 1em;
+    cursor: pointer;
+  }
+  
+  .cancel-button {
+    background-color: #f44336;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    padding: 0.5em 1em;
+    cursor: pointer;
   }
 </style>

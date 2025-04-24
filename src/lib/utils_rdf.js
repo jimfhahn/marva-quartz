@@ -1,5 +1,8 @@
 import {useConfigStore} from "../stores/config";
 import {useProfileStore} from "../stores/profile";
+import utilsNetwork from './utils_network';
+// Import utilsExport to use existing component creation utilities
+import utilsExport from './utils_export';
 
 
 // we will use the built in DOMParser() in the browser
@@ -20,8 +23,6 @@ const XMLParser = returnDOMParser()
 
 // will be set below when used, so we only need to set it once
 let rtLookup = null
-
-import utilsNetwork from './utils_network';
 
 
 const utilsRDF = {
@@ -486,31 +487,48 @@ const utilsRDF = {
    * Generates RDF markup for entity references
    * @param {Object} entity - The entity to generate markup for
    * @param {String} elementName - The element name to wrap the entity in
-   * @return {String} - The RDF markup string
+   * @param {Boolean} [returnElement=false] - If true, returns DOM Element instead of string
+   * @return {String|Element} - The RDF markup string or DOM Element
    */
-  generateEntityMarkup: function(entity, elementName) {
-    if (!entity) return '';
+  generateEntityMarkup: function(entity, elementName, returnElement = false) {
+    if (!entity) return returnElement ? document.createElement('div') : '';
+    
+    // Create XML elements using the existing utility
+    const serializer = new XMLSerializer();
     
     // Special handling for Wikidata entities with MADS RDF types
     if (entity.uri && entity.uri.includes('wikidata.org') && entity.useMADSRDF && entity.type) {
       let rdfType = entity.typeFull || `http://www.loc.gov/mads/rdf/v1#${entity.type}`;
       let entityType = entity.type || 'Topic';
       
-      return `<madsrdf:${entityType} rdf:about="${entity.uri}">
-  <rdf:type rdf:resource="${rdfType}" />
-  <rdfs:label xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#">${entity.title || entity.label || ''}</rdfs:label>
-</madsrdf:${entityType}>`;
+      const entityEl = utilsExport.createElByBestNS(`madsrdf:${entityType}`);
+      entityEl.setAttributeNS(this.namespace.rdf, 'rdf:about', entity.uri);
+      
+      const typeEl = utilsExport.createElByBestNS('rdf:type');
+      typeEl.setAttributeNS(this.namespace.rdf, 'rdf:resource', rdfType);
+      entityEl.appendChild(typeEl);
+      
+      const labelEl = utilsExport.createRdfsLabel(entity.title || entity.label || '');
+      entityEl.appendChild(labelEl);
+      
+      return returnElement ? entityEl : serializer.serializeToString(entityEl);
     }
     
     // Regular entity handling
     const element = elementName || 'bf:Agent';
-    const typeAttribute = entity.typeFull ? 
-      `\n  <rdf:type rdf:resource="${entity.typeFull}" />` : '';
+    const entityEl = utilsExport.createElByBestNS(element);
+    entityEl.setAttributeNS(this.namespace.rdf, 'rdf:about', entity.uri);
     
-    return `<${element} rdf:about="${entity.uri}">
-  ${typeAttribute}
-  <rdfs:label xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#">${entity.title || entity.label || ''}</rdfs:label>
-</${element}>`;
+    if (entity.typeFull) {
+      const typeEl = utilsExport.createElByBestNS('rdf:type');
+      typeEl.setAttributeNS(this.namespace.rdf, 'rdf:resource', entity.typeFull);
+      entityEl.appendChild(typeEl);
+    }
+    
+    const labelEl = utilsExport.createRdfsLabel(entity.title || entity.label || '');
+    entityEl.appendChild(labelEl);
+    
+    return returnElement ? entityEl : serializer.serializeToString(entityEl);
   },
 
 }

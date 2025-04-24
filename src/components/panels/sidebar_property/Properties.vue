@@ -304,6 +304,11 @@ import { isReadonly } from 'vue';
       },
 
       jumpToElement: function(profileName, elementName){
+        // Add check for activeProfile
+        if (!this.activeProfile || !this.activeProfile.rt || !this.activeProfile.rt[profileName] || !this.activeProfile.rt[profileName].pt) {
+          console.warn("jumpToElement: activeProfile or necessary properties not available yet.");
+          return;
+        }
         //if it's hidden show it
         let removed
         if (this.preferenceStore.returnValue('--c-general-ad-hoc')){
@@ -315,7 +320,7 @@ import { isReadonly } from 'vue';
         try {
           this.activeComponent = this.activeProfile.rt[profileName].pt[elementName]
         } catch(err){
-          console.warning("Coudln't jump to component: ", elementName, "--", err)
+          console.warn("Coudln't jump to component: ", elementName, "--", err)
         }
       },
 
@@ -341,61 +346,139 @@ import { isReadonly } from 'vue';
 </script>
 
 <template>
-  <template  v-if="preferenceStore.returnValue('--b-edit-main-splitpane-properties-accordion') == true">
-    <AccordionList  :open-multiple-items="false">
+  <!-- Add v-if check for activeProfile and rtOrder -->
+  <template v-if="activeProfile && activeProfile.rtOrder">
+    <template v-if="preferenceStore.returnValue('--b-edit-main-splitpane-properties-accordion') == true">
+      <AccordionList :open-multiple-items="false">
+        <template v-for="profileName in activeProfile.rtOrder" :key="profileName">
+          <AccordionItem v-if="activeProfile.rt[profileName] && activeProfile.rt[profileName].noData != true"
+                        style="color: white;" 
+                        :id="'accordion_'+profileName" 
+                        default-closed>
+            <template #summary>
+              <div :class="{'container-type-icon': true }">
+                <svg v-if="profileName.split(':').slice(-1)[0] == 'Work'" width="1.5em" height="1.1em" version="1.1" xmlns="http://www.w3.org/2000/svg">
+                  <circle :fill="preferenceStore.returnValue('--c-general-icon-work-color')" cx="0.55em" cy="0.6em" r="0.45em"/>
+                </svg>
+                <svg v-if="profileName.includes('Instance')" :fill="preferenceStore.returnValue('--c-general-icon-instance-color')" style="margin-right: 7px;" width="18px" height="18px" version="1.1" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                  <path d="m5 50l45-45 45 45-45 45z"/>
+                </svg>
+                <svg v-if="profileName.includes(':Item')" style="margin-right: 1px;" width="1.5em" height="1.1em" version="1.1" xmlns="http://www.w3.org/2000/svg">
+                  <rect :fill="preferenceStore.returnValue('--c-edit-main-splitpane-edit-background-color-item')" width="0.85em" height="0.85em" x=".1em" y="0.1em" />
+                </svg>
+                <svg v-if="profileName.endsWith(':Hub')" version="1.1" viewBox="0 -20 100 100" xmlns="http://www.w3.org/2000/svg">
+                  <path fill="royalblue" d="m62.113 24.66 1.9023-15.238 18.875 32.691-7.5469 20.004 15.238 1.9023-32.691 18.875-20.004-7.5469-1.9023 15.238-18.875-32.691 7.5469-20.004-15.238-1.9023 32.691-18.875zm-17.684 15.695-4.0781 15.215 15.215 4.0781 4.0781-15.215z" fill-rule="evenodd"/>
+                </svg>
+                <span class="sidebar-header-text" v-if="profileName.split(':').slice(-1)[0] == 'Work'">{{$t("message.wordWork")}}</span>
+                <span class="sidebar-header-text" v-if="profileName.split(':').slice(-1)[0].indexOf('Instance') > -1">
+                  <template v-if="activeProfile.rt[profileName]['@type'] && activeProfile.rt[profileName]['@type'] == 'http://id.loc.gov/ontologies/bflc/SecondaryInstance'">Secondary</template>
+                  {{$t("message.wordInstance")}}
+                </span>
+                <span class="sidebar-header-text" v-if="profileName.split(':').slice(-1)[0].indexOf('Item')>-1">{{$t("message.wordItem")}}</span>
+                <span class="sidebar-header-text" v-if="profileName.split(':').slice(-1)[0].indexOf('Hub')>-1">{{$t("message.wordHub")}}</span>
+              </div>
+            </template>
 
-      <template v-for="profileName in activeProfile.rtOrder" :key="profileName">
-      <!-- <div v-for="profileName in activeProfile.rtOrder" class="sidebar" :key="profileName"> -->
-
-        <template v-if="activeProfile.rt[profileName].noData != true">
-                <AccordionItem style="color: white;" :id="'accordion_'+profileName" default-closed>
-                  <template #summary>
-
-                    <div :class="{'container-type-icon': true }">
-                            <svg v-if="profileName.split(':').slice(-1)[0] == 'Work'" width="1.5em" height="1.1em" version="1.1" xmlns="http://www.w3.org/2000/svg">
-                              <circle :fill="preferenceStore.returnValue('--c-general-icon-work-color')" cx="0.55em" cy="0.6em" r="0.45em"/>
-                            </svg>
-                            <svg v-if="profileName.includes('Instance')" :fill="preferenceStore.returnValue('--c-general-icon-instance-color')" style="margin-right: 7px;" width="18px" height="18px" version="1.1" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-                             <path  d="m5 50l45-45 45 45-45 45z"/>
-                            </svg>
-                            <svg v-if="profileName.includes(':Item')" style="margin-right: 1px;" width="1.5em" height="1.1em" version="1.1" xmlns="http://www.w3.org/2000/svg">
-                              <rect :fill="preferenceStore.returnValue('--c-edit-main-splitpane-edit-background-color-item')"  width="0.85em" height="0.85em" x=".1em" y="0.1em" />
-                            </svg>
-                            <svg  v-if="profileName.endsWith(':Hub')" version="1.1" viewBox="0 -20 100 100" xmlns="http://www.w3.org/2000/svg">
-                              <path fill="royalblue" d="m62.113 24.66 1.9023-15.238 18.875 32.691-7.5469 20.004 15.238 1.9023-32.691 18.875-20.004-7.5469-1.9023 15.238-18.875-32.691 7.5469-20.004-15.238-1.9023 32.691-18.875zm-17.684 15.695-4.0781 15.215 15.215 4.0781 4.0781-15.215z" fill-rule="evenodd"/>
-                            </svg>
-                            <span class="sidebar-header-text" v-if="profileName.split(':').slice(-1)[0] == 'Work'">{{$t("message.wordWork")}}</span>
-                            <span class="sidebar-header-text" v-if="profileName.split(':').slice(-1)[0].indexOf('Instance') > -1">
-                              <template v-if="activeProfile.rt[profileName]['@type'] && activeProfile.rt[profileName]['@type'] == 'http://id.loc.gov/ontologies/bflc/SecondaryInstance'">Secondary</template>
-                              {{$t("message.wordInstance")}}
-                            </span>
-                            <span class="sidebar-header-text" v-if="profileName.split(':').slice(-1)[0].indexOf('Item')>-1">{{$t("message.wordItem")}}</span>
-                            <span class="sidebar-header-text" v-if="profileName.split(':').slice(-1)[0].indexOf('Hub')>-1">{{$t("message.wordHub")}}</span>
-                    </div>
-
+            <!-- Property list with proper scoping -->
+            <div class="accordion-item-content-wrapper">
+              <ul class="sidebar-property-ul">
+                <template v-if="activeProfile.rt[profileName] && activeProfile.rt[profileName].ptOrder && activeProfile.rt[profileName].ptOrder.length > 0">
+                  <template v-for="element in activeProfile.rt[profileName].ptOrder" :key="element">
+                    <li 
+                      v-if="
+                        activeProfile.rt[profileName].pt && 
+                        activeProfile.rt[profileName].pt[element] && 
+                        !hideAdminField(activeProfile.rt[profileName].pt[element], profileName) && 
+                        !activeProfile.rt[profileName].pt[element].deleted && 
+                        !hideProps.includes(activeProfile.rt[profileName].pt[element].propertyURI)
+                      "
+                      @click.stop="jumpToElement(profileName, element)" 
+                      :class="[
+                        'sidebar-property-li sidebar-property-li-empty', 
+                        {'user-populated': hasData(activeProfile.rt[profileName].pt[element]) == 'user'}, 
+                        {'system-populated': hasData(activeProfile.rt[profileName].pt[element]) == 'system'}, 
+                        {'not-populated-hide': preferenceStore.returnValue('--c-general-ad-hoc') && 
+                                              emptyComponents[profileName] && 
+                                              emptyComponents[profileName].includes(element) && 
+                                              !layoutActive}
+                      ]"
+                    >
+                      <a href="#" @click.stop="jumpToElement(profileName, element)" class="sidebar-property-ul-alink">
+                        <template v-if="preferenceStore.returnValue('--b-edit-main-splitpane-properties-number-labels')">
+                          {{ activeProfile.rt[profileName].ptOrder.indexOf(element) }}
+                        </template>
+                        <span v-if="replacePropertyWithValue(activeProfile.rt[profileName].pt[element].propertyURI)">
+                          {{ returnHeadingLabel(activeProfile.rt[profileName].pt[element]) }}
+                        </span>
+                        <span v-else>
+                          {{ activeProfile.rt[profileName].pt[element].propertyLabel }}
+                        </span>
+                      </a>
+                      
+                      <template v-if="
+                        preferenceStore.returnValue('--b-edit-main-splitpane-properties-show-types') && 
+                        activeProfile.rt[profileName].pt[element].valueConstraint && 
+                        activeProfile.rt[profileName].pt[element].valueConstraint.valueTemplateRefs && 
+                        activeProfile.rt[profileName].pt[element].valueConstraint.valueTemplateRefs.length > 1
+                      ">
+                        <ul class="sidebar-property-ul sidebar-property-ul-sub-ul">
+                          <li 
+                            class="sidebar-property-li sidebar-property-li-sub-li" 
+                            v-for="(t, idx) in returnTemplateTypes(activeProfile.rt[profileName].pt[element].valueConstraint.valueTemplateRefs)"
+                            :key="idx"
+                          >
+                            <a tabindex="-1" href="#" class="sidebar-property-ul-alink sidebar-property-ul-alink-sublink">{{ t }}</a>
+                          </li>
+                        </ul>
+                      </template>
+                    </li>
                   </template>
+                </template>
+                <li v-else class="sidebar-property-li">Loading properties...</li>
+              </ul>
+            </div>
+          </AccordionItem>
+        </template>
+      </AccordionList>
+    </template>
 
+    <!-- Rest of the template remains unchanged -->
+    <template v-if="preferenceStore.returnValue('--b-edit-main-splitpane-properties-accordion') == false">
+      <div v-for="profileName in activeProfile.rtOrder" class="sidebar" :key="profileName">
+        <!-- Add check for activeProfile.rt[profileName] -->
+        <div v-if="activeProfile.rt[profileName] && activeProfile.rt[profileName].noData != true">
+            <div :class="{'container-type-icon': true, 'sidebar-spacer': (profileName.split(':').slice(-1)[0] == 'Instance' || profileName.split(':').slice(-1)[0] == 'Item')}">
+                    <svg v-if="profileName.split(':').slice(-1)[0] == 'Work'" width="1.5em" height="1.1em" version="1.1" xmlns="http://www.w3.org/2000/svg">
+                      <circle :fill="preferenceStore.returnValue('--c-general-icon-work-color')" cx="0.55em" cy="0.6em" r="0.45em"/>
+                    </svg>
+                    <svg v-if="profileName.includes('Instance')" :fill="preferenceStore.returnValue('--c-general-icon-instance-color')" width="20px" height="20px" version="1.1" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                     <path  d="m5 50l45-45 45 45-45 45z"/>
+                    </svg>
+                    <svg v-if="profileName.includes(':Item')"  viewBox="0 -32 50 72" version="1.1" xmlns="http://www.w3.org/2000/svg">
+                      <rect width="40px" height="40px" class="item-icon" />
+                    </svg>
+                    <svg  v-if="profileName.endsWith(':Hub')" version="1.1" viewBox="0 -20 100 100" xmlns="http://www.w3.org/2000/svg">
+                      <path fill="royalblue" d="m62.113 24.66 1.9023-15.238 18.875 32.691-7.5469 20.004 15.238 1.9023-32.691 18.875-20.004-7.5469-1.9023 15.238-18.875-32.691 7.5469-20.004-15.238-1.9023 32.691-18.875zm-17.684 15.695-4.0781 15.215 15.215 4.0781 4.0781-15.215z" fill-rule="evenodd"/>
+                    </svg>
+                    <span class="sidebar-header-text" v-if="profileName.split(':').slice(-1)[0] == 'Work'">{{$t("message.wordWork")}}</span>
+                    <span class="sidebar-header-text" v-if="profileName.split(':').slice(-1)[0] == 'Instance'">{{$t("message.wordInstance")}}</span>
+                    <span class="sidebar-header-text" v-if="profileName.split(':').slice(-1)[0] == 'Item'">{{$t("message.wordItem")}}</span>
+                    <span class="sidebar-header-text" v-if="profileName.split(':').slice(-1)[0] == 'Hub'">{{$t("message.wordHub")}}</span>
+            </div>
 
-                  <ul class="sidebar-property-ul" role="list">
-                          <draggable
-                            v-model="activeProfile.rt[profileName].ptOrder"
-                            group="people"
-                            @start="drag=true"
-                            @end="drag=false"
-                            @change="change"
-                            item-key="id">
-                            <template #item="{element}">
-                              <template v-if="!hideAdminField(activeProfile.rt[profileName].pt[element], profileName) && !activeProfile.rt[profileName].pt[element].deleted && !hideProps.includes(activeProfile.rt[profileName].pt[element].propertyURI) && ( (layoutActive && layoutActiveFilter['properties'][profileName] && includeInLayout(activeProfile.rt[profileName].pt[element].id, layoutActiveFilter['properties'][profileName])) || !layoutActive || (createLayoutMode && layoutActive))">
-                                <li @click.stop="jumpToElement(profileName, element)" :class="['sidebar-property-li sidebar-property-li-empty', {'user-populated': (hasData(activeProfile.rt[profileName].pt[element]) == 'user')} , {'system-populated': (hasData(activeProfile.rt[profileName].pt[element])) == 'system'}  , {'not-populated-hide': (preferenceStore.returnValue('--c-general-ad-hoc') && emptyComponents[profileName] && emptyComponents[profileName].includes(element) && !layoutActive )}]">
-                                  <a href="#" @click.stop="jumpToElement(profileName, element)" class="sidebar-property-ul-alink">
+            <ul class="sidebar-property-ul">
+                            <draggable
+                              v-model="activeProfile.rt[profileName].ptOrder"
+                              group="people"
+                              @start="drag=true"
+                              @end="drag=false"
+                              item-key="id">
+                              <template #item="{element}">
+                                <!-- Add checks for activeProfile.rt[profileName].pt[element] -->
+                                <li v-if="activeProfile.rt[profileName] && activeProfile.rt[profileName].pt && activeProfile.rt[profileName].pt[element]" @click.stop="activeComponent = activeProfile.rt[profileName].pt[element]" class="sidebar-property-li sidebar-property-li-empty">
+                                  <a href="#" @click.stop="activeComponent = activeProfile.rt[profileName].pt[element]" class="sidebar-property-ul-alink">
                                       <template v-if="preferenceStore.returnValue('--b-edit-main-splitpane-properties-number-labels')">{{activeProfile.rt[profileName].ptOrder.indexOf(element)}}</template>
-                                      <span v-if="replacePropertyWithValue(activeProfile.rt[profileName].pt[element].propertyURI)">
-                                        {{ returnHeadingLabel(activeProfile.rt[profileName].pt[element]) }}
-                                      </span>
-                                      <span v-else>
-                                        {{activeProfile.rt[profileName].pt[element].propertyLabel}}
-                                      </span>
-
+                                      {{activeProfile.rt[profileName].pt[element].propertyLabel}}
                                   </a>
                                   <template v-if="preferenceStore.returnValue('--b-edit-main-splitpane-properties-show-types')">
                                     <template v-if="activeProfile.rt[profileName].pt[element].valueConstraint.valueTemplateRefs.length>1">
@@ -406,227 +489,98 @@ import { isReadonly } from 'vue';
                                         </ul>
                                     </template>
                                   </template>
-                                </li>
-                              </template>
+                              </li>
                              </template>
-                          </draggable>
-
-
-
-
-
-<!--
-
-                          <li v-for="(profileCompoent,idx) in activeProfile.rt[profileName].ptOrder" @click.stop="activeComponent = activeProfile.rt[profileName].pt[profileCompoent]" :key="profileCompoent" class="sidebar-property-li sidebar-property-li-empty" >
-                                <a href="#" @click.stop="activeComponent = activeProfile.rt[profileName].pt[profileCompoent]" class="sidebar-property-ul-alink">
-                                    <template v-if="preferenceStore.returnValue('--b-edit-main-splitpane-properties-number-labels')">{{idx}}</template>
-                                    {{activeProfile.rt[profileName].pt[profileCompoent].propertyLabel}}
-                                </a>
-                                <template v-if="preferenceStore.returnValue('--b-edit-main-splitpane-properties-show-types')">
-                                  <template v-if="activeProfile.rt[profileName].pt[profileCompoent].valueConstraint.valueTemplateRefs.length>1">
-                                      <ul class="sidebar-property-ul sidebar-property-ul-sub-ul">
-                                          <li class="sidebar-property-li sidebar-property-li-sub-li" :key="t" v-for="t in returnTemplateTypes(activeProfile.rt[profileName].pt[profileCompoent].valueConstraint.valueTemplateRefs)">
-                                            <a tabindex="-1" href="#" class="sidebar-property-ul-alink sidebar-property-ul-alink-sublink" >{{t}}</a>
-                                          </li>
-                                      </ul>
-                                  </template>
-                                </template>
-                        </li> -->
-
-
-
-                    </ul>
-
-
-
-                </AccordionItem>
-
-
-
-
-        </template>
-      </template>
-    </AccordionList>
-
-
-
-
-
-
-  </template>
-  <template v-if="preferenceStore.returnValue('--b-edit-main-splitpane-properties-accordion') == false">
-
-    <div v-for="profileName in activeProfile.rtOrder" class="sidebar" :key="profileName">
-
-      <div v-if="activeProfile.rt[profileName].noData != true">
-          <div :class="{'container-type-icon': true, 'sidebar-spacer': (profileName.split(':').slice(-1)[0] == 'Instance' || profileName.split(':').slice(-1)[0] == 'Item')}">
-                  <svg v-if="profileName.split(':').slice(-1)[0] == 'Work'" width="1.5em" height="1.1em" version="1.1" xmlns="http://www.w3.org/2000/svg">
-                    <circle :fill="preferenceStore.returnValue('--c-general-icon-work-color')" cx="0.55em" cy="0.6em" r="0.45em"/>
-                  </svg>
-                  <svg v-if="profileName.includes('Instance')" :fill="preferenceStore.returnValue('--c-general-icon-instance-color')" width="20px" height="20px" version="1.1" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-                   <path  d="m5 50l45-45 45 45-45 45z"/>
-                  </svg>
-                  <svg v-if="profileName.includes(':Item')"  viewBox="0 -32 50 72" version="1.1" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="40px" height="40px" class="item-icon" />
-                  </svg>
-                  <svg  v-if="profileName.endsWith(':Hub')" version="1.1" viewBox="0 -20 100 100" xmlns="http://www.w3.org/2000/svg">
-                    <path fill="royalblue" d="m62.113 24.66 1.9023-15.238 18.875 32.691-7.5469 20.004 15.238 1.9023-32.691 18.875-20.004-7.5469-1.9023 15.238-18.875-32.691 7.5469-20.004-15.238-1.9023 32.691-18.875zm-17.684 15.695-4.0781 15.215 15.215 4.0781 4.0781-15.215z" fill-rule="evenodd"/>
-                  </svg>
-                  <span class="sidebar-header-text" v-if="profileName.split(':').slice(-1)[0] == 'Work'">{{$t("message.wordWork")}}</span>
-                  <span class="sidebar-header-text" v-if="profileName.split(':').slice(-1)[0] == 'Instance'">{{$t("message.wordInstance")}}</span>
-                  <span class="sidebar-header-text" v-if="profileName.split(':').slice(-1)[0] == 'Item'">{{$t("message.wordItem")}}</span>
-                  <span class="sidebar-header-text" v-if="profileName.split(':').slice(-1)[0] == 'Hub'">{{$t("message.wordHub")}}</span>
+                            </draggable>
+              </ul>
           </div>
+        </div>
+    </template>
 
-          <ul class="sidebar-property-ul" role="list">
-
-                          <draggable
-                            v-model="activeProfile.rt[profileName].ptOrder"
-                            group="people"
-                            @start="drag=true"
-                            @end="drag=false"
-                            item-key="id">
-                            <template #item="{element}">
-
-                              <li @click.stop="activeComponent = activeProfile.rt[profileName].pt[element]" class="sidebar-property-li sidebar-property-li-empty">
-
-                                <a href="#" @click.stop="activeComponent = activeProfile.rt[profileName].pt[element]" class="sidebar-property-ul-alink">
-                                    <template v-if="preferenceStore.returnValue('--b-edit-main-splitpane-properties-number-labels')">{{activeProfile.rt[profileName].ptOrder.indexOf(element)}}</template>
-                                    {{activeProfile.rt[profileName].pt[element].propertyLabel}}
-                                </a>
-                                <template v-if="preferenceStore.returnValue('--b-edit-main-splitpane-properties-show-types')">
-                                  <template v-if="activeProfile.rt[profileName].pt[element].valueConstraint.valueTemplateRefs.length>1">
-                                      <ul class="sidebar-property-ul sidebar-property-ul-sub-ul">
-                                          <li class="sidebar-property-li sidebar-property-li-sub-li" :key="t" v-for="t in returnTemplateTypes(activeProfile.rt[profileName].pt[element].valueConstraint.valueTemplateRefs)">
-                                            <a tabindex="-1" href="#" class="sidebar-property-ul-alink sidebar-property-ul-alink-sublink" >{{t}}</a>
-                                          </li>
-                                      </ul>
-                                  </template>
-                                </template>
-                              </li>
-                             </template>
-                          </draggable>
-
-
-
-
-
-<!--               <li v-for="(profileCompoent,idx) in activeProfile.rt[profileName].ptOrder" @click.stop="activeComponent = activeProfile.rt[profileName].pt[profileCompoent]" :key="profileCompoent" class="sidebar-property-li sidebar-property-li-empty" >
-                    <a href="#" @click.stop="activeComponent = activeProfile.rt[profileName].pt[profileCompoent]" class="sidebar-property-ul-alink">
-                        <template v-if="preferenceStore.returnValue('--b-edit-main-splitpane-properties-number-labels')">{{idx}}</template>
-                        {{activeProfile.rt[profileName].pt[profileCompoent].propertyLabel}}
-                    </a>
-                    <template v-if="preferenceStore.returnValue('--b-edit-main-splitpane-properties-show-types')">
-                      <template v-if="activeProfile.rt[profileName].pt[profileCompoent].valueConstraint.valueTemplateRefs.length>1">
-                          <ul class="sidebar-property-ul sidebar-property-ul-sub-ul">
-                              <li class="sidebar-property-li sidebar-property-li-sub-li" :key="t" v-for="t in returnTemplateTypes(activeProfile.rt[profileName].pt[profileCompoent].valueConstraint.valueTemplateRefs)">
-                                <a tabindex="-1" href="#" class="sidebar-property-ul-alink sidebar-property-ul-alink-sublink" >{{t}}</a>
-                              </li>
-                          </ul>
-                      </template>
-                    </template>
-            </li>
- -->
-
-
-
-
-        </ul>
-
-
-      </div>
-    </div>
-
-  </template>
-
-
-
-  <template v-if="preferenceStore.returnValue('--b-edit-main-splitpane-properties-component-library') == true">
-
-    <AccordionList  :open-multiple-items="true">
-
-      <template v-for="(clProfile, idx) in returnComponentLibrary" :key="clProfile">
-        <AccordionItem style="color: white;" :id="'accordion_'+clProfile.profileId" default-closed>
+    <!-- Component Library Section -->
+    <template v-if="activeProfile && preferenceStore.returnValue('--b-edit-main-splitpane-properties-component-library') == true">
+      <AccordionList :open-multiple-items="true">
+        <AccordionItem v-for="(clProfile, idx) in returnComponentLibrary" 
+                       :key="idx" 
+                       style="color: white;" 
+                       :id="'accordion_'+clProfile.profileId" 
+                       default-closed>
           <template #summary>
-            <div> <span class="material-icons" style="font-size: 18px;padding-left: 2px;">library_add</span> <span style="vertical-align: text-bottom;" class="sidebar-header-text">{{ clProfile.type == 'default' ? 'Defaults' : 'Library' }}: {{ clProfile.type == 'default' ? '' : clProfile.label }}</span></div>
+            <div>
+              <span class="material-icons" style="font-size: 18px;padding-left: 2px;">library_add</span>
+              <span style="vertical-align: text-bottom;" class="sidebar-header-text">
+                {{ clProfile.type == 'default' ? 'Defaults' : 'Library' }}: {{ clProfile.type == 'default' ? '' : clProfile.label }}
+              </span>
+            </div>
           </template>
-          <ul class="sidebar-property-ul" role="list">
-            <template v-for="(group, idx) in clProfile.groupsOrder" >
+          
+          <!-- Component Library content -->
+          <ul class="sidebar-property-ul">
+            <template v-for="(group, groupIdx) in clProfile.groupsOrder" :key="groupIdx">
               <div class="component-group">
-                <template v-if="clProfile.groups[group].length>1">
+                <template v-if="clProfile.groups[group] && clProfile.groups[group].length > 1">
                   <li class="component-librart-group-line"></li>
                 </template>
 
-                <template v-for="component in clProfile.groups[group]">
-                   <li class="sidebar-property-li sidebar-property-li-cl ">
+                <template v-if="clProfile.groups[group]">
+                  <li v-for="(component, compIdx) in clProfile.groups[group]" 
+                      :key="compIdx" 
+                      class="sidebar-property-li sidebar-property-li-cl">
+                    <button :class="{'material-icons': true, 'component-library-settings-button': true, 'component-library-settings-button-invert': (activeComponentLibrary == component.id)}" 
+                            @click="configComponentLibrary(component.id)">
+                      settings_applications
+                    </button>
 
-                  <button :class="{'material-icons' : true, 'component-library-settings-button': true, 'component-library-settings-button-invert': (activeComponentLibrary == component.id)  }" @click="configComponentLibrary(component.id)">settings_applications</button>
-
-
-
-                  <div class="component-library-item-container sidebar-property-li-empty" @click="addComponentLibrary($event,component.id)" >
-                    <a href="#" @click="addComponentLibrary($event,component.id)">{{ component.label }}</a>
-                  </div>
+                    <div class="component-library-item-container sidebar-property-li-empty" 
+                         @click="addComponentLibrary($event, component.id)">
+                      <a href="#" @click="addComponentLibrary($event, component.id)">{{ component.label }}</a>
+                    </div>
+                    
                     <template v-if="activeComponentLibrary == component.id && clProfile.type != 'default'">
                       <div class="component-library-settings">
-
-                          <button class="material-icons simptip-position-right" data-tooltip="DELETE" @click="delComponentLibrary($event,component.id)">delete_forever</button>
-                          <button class="material-icons simptip-position-right" data-tooltip="RENAME" @click="renameComponentLibrary($event,component.id,component.label)">new_label</button>
-                          <select @change="configComponentLibraryAssignGroup($event,component.id)">
-                            <option value="" :selected="(component.groupId===null)">No Group</option>
-                            <option value="A" :selected="(component.groupId==='A')">Group A</option>
-                            <option value="B" :selected="(component.groupId==='B')">Group B</option>
-                            <option value="C" :selected="(component.groupId==='C')">Group C</option>
-                            <option value="D" :selected="(component.groupId==='D')">Group D</option>
-                            <option value="E" :selected="(component.groupId==='E')">Group E</option>
-                            <option value="F" :selected="(component.groupId==='F')">Group F</option>
-                            <option value="G" :selected="(component.groupId==='G')">Group G</option>
-                            <option value="H" :selected="(component.groupId==='H')">Group H</option>
-                            <option value="I" :selected="(component.groupId==='I')">Group I</option>
-                            <option value="J" :selected="(component.groupId==='J')">Group J</option>
-                            <option value="K" :selected="(component.groupId==='K')">Group K</option>
-                            <option value="L" :selected="(component.groupId==='L')">Group L</option>
-                            <option value="M" :selected="(component.groupId==='M')">Group M</option>
-                            <option value="N" :selected="(component.groupId==='N')">Group N</option>
-                            <option value="O" :selected="(component.groupId==='O')">Group O</option>
-                            <option value="P" :selected="(component.groupId==='P')">Group P</option>
-                            <option value="Q" :selected="(component.groupId==='Q')">Group Q</option>
-                            <option value="R" :selected="(component.groupId==='R')">Group R</option>
-                            <option value="S" :selected="(component.groupId==='S')">Group S</option>
-                            <option value="T" :selected="(component.groupId==='T')">Group T</option>
-                            <option value="U" :selected="(component.groupId==='U')">Group U</option>
-                            <option value="V" :selected="(component.groupId==='V')">Group V</option>
-                            <option value="W" :selected="(component.groupId==='W')">Group W</option>
-                            <option value="X" :selected="(component.groupId==='X')">Group X</option>
-                            <option value="Y" :selected="(component.groupId==='Y')">Group Y</option>
-                            <option value="Z" :selected="(component.groupId==='Z')">Group Z</option>
-                          </select>
-
-
+                        <button class="material-icons simptip-position-right" 
+                                data-tooltip="DELETE" 
+                                @click="delComponentLibrary($event, component.id)">
+                          delete_forever
+                        </button>
+                        <button class="material-icons simptip-position-right" 
+                                data-tooltip="RENAME" 
+                                @click="renameComponentLibrary($event, component.id, component.label)">
+                          new_label
+                        </button>
+                        <select @change="configComponentLibraryAssignGroup($event, component.id)">
+                          <option value="" :selected="(component.groupId === null)">No Group</option>
+                          <option v-for="letter in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'" 
+                                  :key="letter" 
+                                  :value="letter" 
+                                  :selected="(component.groupId === letter)">
+                            Group {{ letter }}
+                          </option>
+                        </select>
                       </div>
                     </template>
                   </li>
                 </template>
 
-                <template v-if="clProfile.groups[group].length>1">
-                  <button class="component-librart-group-button" @click="addComponentLibraryGroup(clProfile.groups[group][0].groupId)"><span class="material-icons">arrow_upward</span>Add {{clProfile.type != 'default' ? 'Group' : ''}} {{ clProfile.groups[group][0].groupId }} <span class="material-icons">arrow_upward</span></button>
+                <template v-if="clProfile.groups[group] && clProfile.groups[group].length > 1 && clProfile.groups[group][0]">
+                  <button class="component-librart-group-button" 
+                          @click="addComponentLibraryGroup(clProfile.groups[group][0].groupId)">
+                    <span class="material-icons">arrow_upward</span>
+                    Add {{clProfile.type != 'default' ? 'Group' : ''}} {{ clProfile.groups[group][0].groupId }}
+                    <span class="material-icons">arrow_upward</span>
+                  </button>
                 </template>
               </div>
             </template>
-
           </ul>
-
         </AccordionItem>
-
-      </template>
-    </AccordionList>
+      </AccordionList>
+    </template>
+  </template> <!-- End of v-if="activeProfile && activeProfile.rtOrder" -->
+  <template v-else>
+    <!-- Optional: Show a loading state or message -->
+    <div>Loading properties...</div>
   </template>
-
-
-
-
-
-
 
 </template>
 
@@ -696,6 +650,10 @@ import { isReadonly } from 'vue';
     background-color: var(--acco-lightest);
     border-top: none;
     padding: 12px;
+  }
+  .accordion-item-content-wrapper {
+    padding: 0;
+    margin: 0;
   }
 </style>
 

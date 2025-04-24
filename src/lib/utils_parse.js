@@ -353,18 +353,45 @@ const utilsParse = {
   sniffNoteType(xml){
     for (let child of xml.children){
       if (child.tagName == 'bf:note'){
-        if ( child.innerHTML.indexOf("bf:language")>-1){
-          child.setAttribute('local:pthint', 'lc:RT:bf2:LangNote')
-        }else{
-          // leave blank?
+        if (child.innerHTML.trim() === ''){
+          // Remove empty <bf:note> tags
+          xml.removeChild(child);
+        } else if (child.innerHTML.indexOf("bf:language") > -1){
+          child.setAttribute('local:pthint', 'lc:RT:bf2:LangNote');
         }
       }
     }
-    return xml
+
+    // Now specifically fix barcode structure in items after processing all children
+    const items = xml.querySelectorAll('bf\\:Item');
+    items.forEach(item => {
+      // Find the standalone rdf:value and bf:Barcode elements
+      const rdfValue = Array.from(item.children).find(el => el.tagName === 'rdf:value');
+      const barcode = Array.from(item.children).find(el => el.tagName === 'bf:Barcode');
+
+      if (rdfValue && barcode) {
+        // Remove both incorrect elements
+        item.removeChild(rdfValue);
+        item.removeChild(barcode);
+
+        // Create new properly structured barcode element
+        const newBarcode = xml.ownerDocument.createElement('bf:Barcode');
+        const newRdfValue = xml.ownerDocument.createElement('rdf:value');
+
+        // Use the original text but replace zeros with the actual input
+        const inputText = document.getElementById('barcode-input')?.value || '';
+        newRdfValue.textContent = inputText || barcode.textContent;
+
+        // Add rdf:value as a child of bf:Barcode
+        newBarcode.appendChild(newRdfValue);
+        item.appendChild(newBarcode);
+      }
+    });
+
+    return xml;
   },
 
   /**
-  * For our hub profile we broke out the different title types, sniff for which profile to use
   *
   * @param {Node} xml - the XML payload
   * @return {Node}
@@ -1212,7 +1239,7 @@ const utilsParse = {
                                 //     <bf:source>
                                 //       <bf:Source rdf:about="http://id.loc.gov/vocabulary/genreFormSchemes/fast">
                                 //         <bf:code>fast</bf:code>
-                                //       </bf:Source>
+                                //       </bf:source>
                                 //     </bf:source>
                                 //     <bf:identifiedBy>
                                 //       <bf:Identifier>
@@ -1499,7 +1526,7 @@ const utilsParse = {
                                 let ggggChildData = {'@guid': short.generate()}
 
                                 if (ggggChild.innerHTML != null && gggggChild.innerHTML.trim() != ''){
-                                  ggggChildData[ggggChildProperty] = unEscapeHTML(ggggChild.innerHTML)
+                                  ggggChildData[ggggChildProperty] = unEscapeHTML(gggggChild.innerHTML)
 
                                   // does it have a data type or lang
                                   if (ggggChild.attributes && ggggChild.attributes['rdf:datatype']){
