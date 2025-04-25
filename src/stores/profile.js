@@ -1178,6 +1178,30 @@ export const useProfileStore = defineStore({
         console.error('setValueSimple: activeProfile not available.');
         return;
       }
+      
+      // locate the correct pt to work on in the activeProfile
+      let pt = utilsProfile.returnPt(this.activeProfile,componentGuid);
+
+      // *** ADD THIS CHECK ***
+      // If the target property is rdfs:label, treat this lookup selection as setting a literal value using the label.
+      if (pt && pt.propertyURI === 'http://www.w3.org/2000/01/rdf-schema#label') {
+        // NOTE: Ensure the 'label' argument passed here is *just* the display label,
+        // not "Label (URI)". This might require a fix in the calling component (LookupSimple.vue).
+        // Extract just the label part if it includes the URI, e.g., "Policy Option 1 (local:accessPolicy1)" -> "Policy Option 1"
+        let literalValue = label;
+        const uriMatch = label.match(/^(.*)\s+\(.*\)$/); 
+        if (uriMatch && uriMatch[1]) {
+          literalValue = uriMatch[1];
+        }
+
+        console.log(`setValueSimple detected rdfs:label target. Calling setValueLiteral with value: "${literalValue}"`);
+        this.setValueLiteral(componentGuid, fieldGuid, propertyPath, literalValue, null); // Pass label as the value, no language
+        this.dataChanged(); // Ensure data change is triggered
+        return; // Stop executing the rest of setValueSimple
+      }
+      // *** END OF ADDED CHECK ***
+
+
       console.log("componentGuid, fieldGuid, propertyPath, URI, label")
       console.log(componentGuid, fieldGuid, propertyPath, URI, label)
       propertyPath = JSON.parse(JSON.stringify(propertyPath))
@@ -1186,8 +1210,6 @@ export const useProfileStore = defineStore({
 
       let lastProperty = propertyPath.at(-1).propertyURI
       // locate the correct pt to work on in the activeProfile
-      let pt = utilsProfile.returnPt(this.activeProfile,componentGuid)
-
       if (pt !== false){
 
         pt.hasData = true

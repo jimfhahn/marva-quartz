@@ -1,8 +1,9 @@
 [
   {
     "@id": "local:accessPolicy1",
-    "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
-    "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "Policy Option 1" } ]
+     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
+     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "Policy Option 1" } ]
+
   },
   {
     "@id": "local:accessPolicy2",

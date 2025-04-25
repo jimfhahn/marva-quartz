@@ -1247,14 +1247,172 @@ createElByBestNS: function(nsOrQualified, maybeLocal) {
 
         xmlLog.push(['Set userValue to:', JSON.parse(JSON.stringify(userValue))]);
 
+        // <START> Special handling for usageAndAccessPolicy
+        if (ptObj.propertyURI === 'http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy') {
+          console.log('--- Debugging usageAndAccessPolicy Lookup (Attempt 4 - More Robust Profile Store Lookup) ---');
+          const policyType = userValue['@type'];
+          let policyId = null;
+          let labelText = null;
+          const rdfsLabelURI = 'http://www.w3.org/2000/01/rdf-schema#label';
+          const madsAuthLabelURI = 'http://www.loc.gov/mads/rdf/v1#authoritativeLabel';
+
+          // Attempt to extract the @id from the nested structure observed in logs
+          try {
+            if (userValue[rdfsLabelURI] &&
+                userValue[rdfsLabelURI][0] &&
+                userValue[rdfsLabelURI][0]['@id']) {
+              policyId = userValue[rdfsLabelURI][0]['@id'];
+            } else if (userValue['@id']) { // Fallback if @id is directly present
+              policyId = userValue['@id'];
+            }
+            console.log(`Extracted policyId: ${policyId}`);
+          } catch (e) {
+            xmlLog.push(`Error extracting policyId for usageAndAccessPolicy: ${e.message}`);
+            console.error(`Error extracting policyId: ${e.message}`);
+          }
+
+          console.log(`Extracted policyType: ${policyType}`);
+
+          // If we have an ID and Type, proceed with creating the policy XML structure
+          if (policyId && policyType) {
+            try {
+              // Get access to the profile store
+              const profileStore = useProfileStore();
+              
+              // Try multiple approaches to find the policy data
+              let lookupData = [];
+              let policyData = null;
+              
+              // Method 1: Directly fetch policies from appropriate JSON file based on policy type
+              console.log(`Looking up policy data directly from JSON based on type: ${policyType}`);
+              const isAccessPolicy = policyType.includes('AccessPolicy');
+              const fileUrl = isAccessPolicy ? '/accessPolicies.json' : '/usePolicies.json';
+              
+              try {
+                // Try to fetch the policy data from the appropriate file
+                const response = await fetch(fileUrl);
+                if (response.ok) {
+                  lookupData = await response.json();
+                  console.log(`Loaded ${lookupData.length} policies from ${fileUrl}`);
+                  
+                  // Find the policy with matching ID
+                  policyData = lookupData.find(p => p['@id'] === policyId);
+                  if (policyData) {
+                    console.log(`Found policy data directly from JSON file:`, policyData);
+                  }
+                }
+              } catch (fetchError) {
+                console.warn(`Error fetching policy data from ${fileUrl}:`, fetchError);
+              }
+              
+              // Method 2: If direct fetch failed, try to find it in the profile store
+              if (!policyData) {
+                // Look through all profiles for a matching property template
+                console.log(`Searching all profiles for policy data...`);
+                
+                const allProfileIds = Object.keys(profileStore.profiles);
+                for (const profileId of allProfileIds) {
+                  const profile = profileStore.profiles[profileId];
+                  if (!profile || !profile.rt) continue;
+                  
+                  // Search all resource templates
+                  for (const rtKey in profile.rt) {
+                    if (!profile.rt[rtKey].pt) continue;
+                    
+                    // Search all property templates
+                    for (const ptKey in profile.rt[rtKey].pt) {
+                      const propTemplate = profile.rt[rtKey].pt[ptKey];
+                      
+                      // Check if this is a usageAndAccessPolicy property template
+                      if (propTemplate.propertyURI === 'http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy' &&
+                          propTemplate.valueConstraint?.useValuesFrom?.[0]?.data) {
+                        // Check if the data contains our policy
+                        const ptLookupData = propTemplate.valueConstraint.useValuesFrom[0].data;
+                        console.log(`Found potential lookup data in ${profileId}.${rtKey}.${ptKey}, ${ptLookupData.length} items`);
+                        
+                        const foundPolicy = ptLookupData.find(p => p['@id'] === policyId);
+                        if (foundPolicy) {
+                          policyData = foundPolicy;
+                          console.log(`Found policy data in profile ${profileId}:`, policyData);
+                          break;
+                        }
+                      }
+                    }
+                    if (policyData) break;
+                  }
+                  if (policyData) break;
+                }
+              }
+              
+              // Method 3: Hardcoded fallback labels for common policies
+              if (!policyData) {
+                console.log(`Trying fallback hardcoded labels for known policies`);
+                
+                // Map of known policy IDs to labels
+                const knownPolicies = {
+                  'local:accessPolicy1': 'Free to access',
+                  'local:accessPolicy2': 'Access restricted',
+                  'local:accessPolicy3': 'Accessible online',
+                  'local:accessPolicy4': 'For use in library only',
+                  'local:accessPolicy5': 'Limited circulation, long loan period',
+                  'local:accessPolicy6': 'No restrictions on access',
+                  'local:usePolicy1': 'Copyright constraints',
+                  'local:usePolicy2': 'Free to use',
+                  'local:usePolicy3': 'License restrictions',
+                  'local:usePolicy4': 'No commercial use',
+                  'local:usePolicy5': 'No known legal restrictions',
+                  'local:usePolicy6': 'Permission to use explicitly granted by publisher'
+                };
+                
+                if (policyId in knownPolicies) {
+                  // Create a synthetic policy data object
+                  policyData = {
+                    '@id': policyId,
+                    [madsAuthLabelURI]: [{ '@value': knownPolicies[policyId] }]
+                  };
+                  console.log(`Using hardcoded label for ${policyId}: ${knownPolicies[policyId]}`);
+                }
+              }
+
+              // If we found the policy data through any method, extract the label
+              if (policyData) {
+                if (policyData[madsAuthLabelURI] && policyData[madsAuthLabelURI][0] && policyData[madsAuthLabelURI][0]['@value']) {
+                  labelText = policyData[madsAuthLabelURI][0]['@value'];
+                  console.log(`Successfully extracted labelText: '${labelText}'`);
+                  xmlLog.push(`Special handling for usageAndAccessPolicy: ID=${policyId}, Type=${policyType}, Found Label='${labelText}'`);
+
+                  // Build the XML structure
+                  const outerEl = this.createElByBestNS(ptObj.propertyURI);
+                  const innerEl = this.createElByBestNS(policyType);
+                  const labelEl = this.createRdfsLabel(labelText);
+
+                  innerEl.appendChild(labelEl);
+                  outerEl.appendChild(innerEl);
+                  rootEl.appendChild(outerEl);
+                  componentXmlLookup[`${rt}-${pt}`] = formatXML(outerEl.outerHTML);
+                  console.log('--- Finished Debugging usageAndAccessPolicy Lookup (Success) ---');
+                  continue; // Skip the rest of the loop for this property
+                } else {
+                  console.error('Found policyData, but label structure is unexpected:', JSON.stringify(policyData, null, 2));
+                }
+              } else {
+                console.error(`Could not find policy data for ID: ${policyId}`);
+              }
+            } catch (lookupError) {
+              xmlLog.push(`Error during policy lookup/XML creation for usageAndAccessPolicy: ${lookupError.message}`);
+              console.error(`Error during policy lookup/XML creation: ${lookupError.message}`, lookupError);
+            }
+          } else {
+            xmlLog.push(`Special handling for usageAndAccessPolicy: Missing policyId or policyType in userValue: ${JSON.stringify(userValue)}`);
+            console.warn(`Missing policyId (${policyId}) or policyType (${policyType})`);
+          }
+          console.log('--- Finished Debugging usageAndAccessPolicy Lookup (End) ---');
+        }
+        // <END> Special handling for usageAndAccessPolicy
+
         if (this.ignoreProperties.indexOf(ptObj.propertyURI) > -1){
           xmlLog.push(`Skipping it because it is in the ignoreProperties list`);
           continue;
-        }
-
-        // Handle admin metadata updates if needed
-        if (pt.includes('http://id.loc.gov/ontologies/bibframe/adminMetadata')){
-          // ...existing admin metadata processing...
         }
 
         xmlLog.push(['Set userValue to:', JSON.parse(JSON.stringify(userValue))]);
@@ -1542,7 +1700,6 @@ createElByBestNS: function(nsOrQualified, maybeLocal) {
     for (let URI in tleLookup['Instance']){
       let instance = (new XMLSerializer()).serializeToString(tleLookup['Instance'][URI]);
       instance = xmlParser.parseFromString(instance, "text/xml").children[0];
-      rdfBasic.appendChild(instance);
       // Add hasItem relationships
       let items = this.returnHasItem(URI, orginalProfile, tleLookup);
       if (items.length > 0){
