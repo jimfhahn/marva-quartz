@@ -599,12 +599,34 @@
                         "propertyTemplates": [
                             {
                                 "mandatory": "false",
-                                "repeatable": "true",
-                                "type": "literal",
+                                "repeatable": "false",
+                                "type": "lookup",
                                 "resourceTemplates": [],
                                 "valueConstraint": {
                                     "valueTemplateRefs": [],
-                                    "useValuesFrom": [],
+                                    "useValuesFrom": ["/library.json"],
+                                    "defaults": [],
+                                    "valueDataType": ""
+                                },
+                                "propertyURI": "http://www.w3.org/2000/01/rdf-schema#label",
+                                "propertyLabel": "Storing or shelving location",
+                                "remark": ""
+                            }
+                        ],
+                        "id": "lc:RT:bf2:Item:physicalLocation",
+                        "resourceURI": "http://id.loc.gov/ontologies/bibframe/physicalLocation",
+                        "resourceLabel": "Library"
+                    },
+                    {
+                        "propertyTemplates": [
+                            {
+                                "mandatory": "false",
+                                "repeatable": "true",
+                                "type": "lookup",
+                                "resourceTemplates": [],
+                                "valueConstraint": {
+                                    "valueTemplateRefs": [],
+                                    "useValuesFrom": ["/library.json"],
                                     "defaults": [],
                                     "valueDataType": ""
                                 },
@@ -1508,7 +1530,7 @@
                                 "propertyURI": "http://id.loc.gov/ontologies/bibframe/physicalLocation",
                                 "resourceTemplates": [],
                                 "valueConstraint": {
-                                    "valueTemplateRefs": [],
+                                    "valueTemplateRefs": ["lc:RT:bf2:Item:physicalLocation"],
                                     "useValuesFrom": [],
                                     "valueDataType": "http://www.w3.org/2001/XMLSchema#string",
                                     "defaults": []
@@ -1529,7 +1551,7 @@
                                 },
                                 "mandatory": "false",
                                 "repeatable": "true",
-                                "type": "resource"
+                                "type": "literal"
                             },
                             {
                                 "propertyLabel": "Classification",
