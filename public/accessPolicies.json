@@ -1,211 +1,201 @@
 [
   {
-    "@id": "alma:itemPolicy",
-     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
-     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "bound jrnl" } ]
-
+    "@id": "alma:itemPolicy:bound_jrnl",
+    "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
+    "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "bound jrnl" } ]
   },
   {
-    "@id": "alma:itemPolicy",
+    "@id": "alma:itemPolicy:bd",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "bd" } ]
   },
   {
-    "@id": "alma:itemPolicy",
+    "@id": "alma:itemPolicy:lap_lock",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "lap lock" } ]
   },
   {
-    "@id": "alma:itemPolicy",
+    "@id": "alma:itemPolicy:twoweek",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "twoweek" } ]
   },
   {
-    "@id": "alma:itemPolicy",
-     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
-     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "book/seria" } ]
-
+    "@id": "alma:itemPolicy:book_seria",
+    "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
+    "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "book/seria" } ]
   },
   {
-    "@id": "alma:itemPolicy",
+    "@id": "alma:itemPolicy:non_circ",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "non-circ" } ]
   },
   {
-    "@id": "alma:itemPolicy",
+    "@id": "alma:itemPolicy:in_library_use_only",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "In library use only" } ]
   },
   {
-    "@id": "alma:itemPolicy",
+    "@id": "alma:itemPolicy:reference",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "reference" } ]
   },
   {
-    "@id": "alma:itemPolicy",
-     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
-     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "3DAY" } ]
-
+    "@id": "alma:itemPolicy:3DAY",
+    "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
+    "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "3DAY" } ]
   },
   {
-    "@id": "alma:itemPolicy",
+    "@id": "alma:itemPolicy:laptop",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "laptop" } ]
   },
   {
-    "@id": "alma:itemPolicy",
+    "@id": "alma:itemPolicy:reserve",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "reserve" } ]
   },
   {
-    "@id": "alma:itemPolicy",
+    "@id": "alma:itemPolicy:special",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "special" } ]
   },
   {
-    "@id": "alma:itemPolicy",
-     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
-     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "slide" } ]
-
+    "@id": "alma:itemPolicy:slide",
+    "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
+    "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "slide" } ]
   },
   {
-    "@id": "alma:itemPolicy",
+    "@id": "alma:itemPolicy:lawbad",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "lawbad" } ]
   },
   {
-    "@id": "alma:itemPolicy",
+    "@id": "alma:itemPolicy:microform",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "microform" } ]
   },
   {
-    "@id": "alma:itemPolicy",
+    "@id": "alma:itemPolicy:bestseller",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "bestseller" } ]
   },
   {
-    "@id": "alma:itemPolicy",
-     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
-     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "children's" } ]
-
+    "@id": "alma:itemPolicy:childrens",
+    "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
+    "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "children's" } ]
   },
   {
-    "@id": "alma:itemPolicy",
+    "@id": "alma:itemPolicy:music",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "music" } ]
   },
   {
-    "@id": "alma:itemPolicy",
+    "@id": "alma:itemPolicy:video",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "video" } ]
   },
   {
-    "@id": "alma:itemPolicy",
+    "@id": "alma:itemPolicy:audio",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "audio" } ]
   },
   {
-    "@id": "alma:itemPolicy",
-     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
-     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "equipment" } ]
-
+    "@id": "alma:itemPolicy:equipment",
+    "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
+    "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "equipment" } ]
   },
   {
-    "@id": "alma:itemPolicy",
+    "@id": "alma:itemPolicy:key",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "key" } ]
   },
   {
-    "@id": "alma:itemPolicy",
+    "@id": "alma:itemPolicy:ten_hour",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "ten hour" } ]
   },
   {
-    "@id": "alma:itemPolicy",
+    "@id": "alma:itemPolicy:laptop_bag",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "laptop bag" } ]
   },
   {
-    "@id": "alma:itemPolicy",
-     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
-     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "ez" } ]
-
+    "@id": "alma:itemPolicy:ez",
+    "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
+    "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "ez" } ]
   },
   {
-    "@id": "alma:itemPolicy",
+    "@id": "alma:itemPolicy:cdrom",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "cdrom" } ]
   },
   {
-    "@id": "alma:itemPolicy",
+    "@id": "alma:itemPolicy:RELAIS",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "RELAIS" } ]
   },
   {
-    "@id": "alma:itemPolicy",
+    "@id": "alma:itemPolicy:4HR",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "4HR" } ]
   },
   {
-    "@id": "alma:itemPolicy",
-     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
-     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "6HR" } ]
-
+    "@id": "alma:itemPolicy:6HR",
+    "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
+    "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "6HR" } ]
   },
   {
-    "@id": "alma:itemPolicy",
+    "@id": "alma:itemPolicy:24HR",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "24HR" } ]
   },
   {
-    "@id": "alma:itemPolicy",
+    "@id": "alma:itemPolicy:7Days",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "7Days" } ]
   },
   {
-    "@id": "alma:itemPolicy",
+    "@id": "alma:itemPolicy:2HR_Restricted",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "2HR Restricted" } ]
   },
   {
-    "@id": "alma:itemPolicy",
-     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
-     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "LAPNONCIRC" } ]
-
+    "@id": "alma:itemPolicy:LAPNONCIRC",
+    "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
+    "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "LAPNONCIRC" } ]
   },
   {
-    "@id": "alma:itemPolicy",
+    "@id": "alma:itemPolicy:threeday",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "threeday" } ]
   },
   {
-    "@id": "alma:itemPolicy",
+    "@id": "alma:itemPolicy:threehour",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "threehour" } ]
   },
   {
-    "@id": "alma:itemPolicy",
+    "@id": "alma:itemPolicy:InHouseView",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "InHouseView" } ]
   },
   {
-    "@id": "alma:itemPolicy",
-     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
-     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "3hrLapKiosk" } ]
-
+    "@id": "alma:itemPolicy:3hrLapKiosk",
+    "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
+    "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "3hrLapKiosk" } ]
   },
   {
-    "@id": "alma:itemPolicy",
+    "@id": "alma:itemPolicy:InterLibraryLoan",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "InterLibraryLoan" } ]
   },
   {
-    "@id": "alma:itemPolicy",
+    "@id": "alma:itemPolicy:4hr_Kiosk_VPRes_Macbook",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "4hr Kiosk VPRes Macbook" } ]
   },
   {
-    "@id": "alma:itemPolicy",
+    "@id": "alma:itemPolicy:4hr_Kiosk_VPRes_Charger",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "4hr Kiosk VPRes Charger" } ]
   }

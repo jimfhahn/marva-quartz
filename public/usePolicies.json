@@ -1,566 +1,566 @@
 [
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:BOOK",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "BOOK" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:ISSUE",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "ISSUE" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:SCORE",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "SCORE" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:MANUSCRIPT",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "MANUSCRIPT" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:DVD",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "DVD" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:CD",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "CD" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:CDROM",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "CDROM" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:RECORD",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "RECORD" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:KEYS",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "KEYS" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:LPTOP",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "LPTOP" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:LAPTOPACCESSORY",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "LAPTOPACCESSORY" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:EQUIP",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "EQUIP" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:ISSBD",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "ISSBD" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:AUDIOCASSETTE",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "AUDIOCASSETTE" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:VIDEOCASSETTE",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "VIDEOCASSETTE" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:GRAPHIC",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "GRAPHIC" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:MAP",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "MAP" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:MICROFORM",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "MICROFORM" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:OTHER",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "OTHER" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:HEAD",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "HEAD" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:KIT",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "KIT" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:FICHE",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "FICHE" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:FILM",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "FILM" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:DVDRM",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "DVDRM" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:DISK",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "DISK" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:REALIA",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "REALIA" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:PICTURE",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "PICTURE" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:LRDSC",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "LRDSC" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:IPAD",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "IPAD" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:FSADT",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "FSADT" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:CHARG",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "CHARG" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:CALC",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "CALC" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:FLIPV",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "FLIPV" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:ARTORIG",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "ARTORIG" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:ARTREPRO",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "ARTREPRO" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:CHART",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "CHART" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:DIORAMA",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "DIORAMA" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:FILMSTRIP",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "FILMSTRIP" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:FLASHCARD",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "FLASHCARD" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:GAME",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "GAME" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:MICROSLIDE",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "MICROSLIDE" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:MODEL",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "MODEL" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:SLIDE",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "SLIDE" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:TOY",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "TOY" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:TECHDRAWING",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "TECHDRAWING" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:TRANSPARENCY",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "TRANSPARENCY" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:LETTER",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "LETTER" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:PHOTOGRAPH",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "PHOTOGRAPH" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:THESIS",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "THESIS" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:MIXED",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "MIXED" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:AUDIOBOOK",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "AUDIOBOOK" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:PAMPHLET",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "PAMPHLET" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:OVERSIZE",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "OVERSIZE" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:EPHEMERA",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "EPHEMERA" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:CASE",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "CASE" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:ROOM",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "ROOM" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:VIDEODISC",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "VIDEODISC" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:SPECIALTHESIS",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "SPECIALTHESIS" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:PHDTHESIS",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "PHDTHESIS" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:MASTERTHESIS",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "MASTERTHESIS" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:BACHLORTHESIS",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "BACHLORTHESIS" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:OVERSIZESCORE",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "OVERSIZESCORE" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:VRECORD",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "VRECORD" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:PLAYAWAY",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "PLAYAWAY" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:ARTICLE",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "ARTICLE" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:ATLAS",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "ATLAS" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:AUDIORECORDER",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "AUDIORECORDER" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:BLURAY",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "BLURAY" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:BLURAYDVD",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "BLURAYDVD" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:CAMERA",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "CAMERA" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:CAMRECORDER",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "CAMRECORDER" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:EREADER",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "EREADER" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:GOVRECORD",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "GOVRECORD" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:LOOSELEAF",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "LOOSELEAF" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:LP",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "LP" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:MICROCARD",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "MICROCARD" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:MOBILEDEVICE",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "MOBILEDEVICE" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:NEWSPAPER",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "NEWSPAPER" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:PROJECTOR",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "PROJECTOR" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:TABLET",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "TABLET" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:VIDEOGAME",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "VIDEOGAME" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:MMFILM",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "MMFILM" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:BOX",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "BOX" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:FILMREEL",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "FILMREEL" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:OTHERVM",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "OTHERVM" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:FLOPPY_DISK",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "FLOPPY_DISK" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:ITEM_WITH_FLOPPY_DISK",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "ITEM_WITH_FLOPPY_DISK" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:ITEM_WITH_CD",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "ITEM_WITH_CD" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:ITEM_WITH_AUDIO_CASSETTE",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "ITEM_WITH_AUDIO_CASSETTE" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:DAT",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "DAT" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:GLOBE",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "GLOBE" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:MICROOPAQUE",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "MICROOPAQUE" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:MOTIONPICTURE",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "MOTIONPICTURE" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:PHONODISC",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "PHONODISC" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:VRECORD_OTHER",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "VRECORD_OTHER" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:RARE",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "RARE" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:MICROFICHE_MASTER",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "MICROFICHE_MASTER" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:STANDARD_RECORD",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "STANDARD_RECORD" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:VERTICAL_CUT_DISC",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "VERTICAL_CUT_DISC" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:CARDBOARD_RECORD",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "CARDBOARD_RECORD" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:MAGNETIC_TAPE",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "MAGNETIC_TAPE" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:PIANO_ROLL",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "PIANO_ROLL" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:ARCHIVAL_MATERIAL",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "ARCHIVAL_MATERIAL" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:PHONOGRAPH_CYLINDER",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "PHONOGRAPH_CYLINDER" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:BROADSIDE",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "BROADSIDE" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:POSTER",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "POSTER" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:AUDIOVM",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "AUDIOVM" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:HATHIMATERIAL",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "HATHIMATERIAL" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:MUSICINSTRUMENT",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "MUSICINSTRUMENT" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:LOCKER",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "LOCKER" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:MICROPHONE",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "MICROPHONE" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:FASCICULE",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "FASCICULE" } ]
   },
   {
-    "@id": "alma:physicalMaterialType",
+    "@id": "alma:physicalMaterialType:ADDITIONAL1",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "ADDITIONAL1" } ]
   }

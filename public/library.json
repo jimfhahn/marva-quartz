@@ -1,177 +1,177 @@
 [
   {
-    "@id": "alma:library",
+    "@id": "alma:library:AnnenLib",
      "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "AnnenLib" } ]
 
   },
   {
-    "@id": "alma:library",
+    "@id": "alma:library:ArchArcLib",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "ArchArcLib" } ]
   },
   {
-    "@id": "alma:library",
+    "@id": "alma:library:AreaStud",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "AreaStud" } ]
   },
   {
-    "@id": "alma:library",
+    "@id": "alma:library:AthLib",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "AthLib" } ]
   },
   {
-    "@id": "alma:library",
+    "@id": "alma:library:BatesCntr",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "BatesCntr" } ]
   },
   {
-    "@id": "alma:library",
+    "@id": "alma:library:BiomLib",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "BiomLib" } ]
   },
   {
-    "@id": "alma:library",
+    "@id": "alma:library:ChemLib",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "ChemLib" } ]
   },
   {
-    "@id": "alma:library",
+    "@id": "alma:library:CHD",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "CHD" } ]
   },
   {
-    "@id": "alma:library",
+    "@id": "alma:library:DENTLOCKER",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "DENTLOCKER" } ]
   },
   {
-    "@id": "alma:library",
+    "@id": "alma:library:DentalLib",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "DentalLib" } ]
   },
   {
-    "@id": "alma:library",
+    "@id": "alma:library:EduCommons",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "EduCommons" } ]
   },
   {
-    "@id": "alma:library",
+    "@id": "alma:library:EMPTY",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "EMPTY" } ]
   },
   {
-    "@id": "alma:library",
+    "@id": "alma:library:FisherFAL",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "FisherFAL" } ]
   },
   {
-    "@id": "alma:library",
+    "@id": "alma:library:HSPLib",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "HSPLib" } ]
   },
   {
-    "@id": "alma:library",
+    "@id": "alma:library:PersonalCopy",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "PersonalCopy" } ]
   },
   {
-    "@id": "alma:library",
+    "@id": "alma:library:ROTCLib",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "ROTCLib" } ]
   },
   {
-    "@id": "alma:library",
+    "@id": "alma:library:KislakCntr",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "KislakCntr" } ]
   },
   {
-    "@id": "alma:library",
+    "@id": "alma:library:Libra",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "Libra" } ]
   },
   {
-    "@id": "alma:library",
+    "@id": "alma:library:KatzLib",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "KatzLib" } ]
   },
   {
-    "@id": "alma:library",
+    "@id": "alma:library:LippLib",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "LippLib" } ]
   },
   {
-    "@id": "alma:library",
+    "@id": "alma:library:VPLOCKER",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "VPLOCKER" } ]
   },
   {
-    "@id": "alma:library",
+    "@id": "alma:library:MPALib",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "MPALib" } ]
   },
   {
-    "@id": "alma:library",
+    "@id": "alma:library:ArborLib",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "ArborLib" } ]
   },
   {
-    "@id": "alma:library",
+    "@id": "alma:library:MuseumLib",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "MuseumLib" } ]
   },
   {
-    "@id": "alma:library",
+    "@id": "alma:library:NonCircLib",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "NonCircLib" } ]
   },
   {
-    "@id": "alma:library",
+    "@id": "alma:library:MusicLib",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "MusicLib" } ]
   },
   {
-    "@id": "alma:library",
+    "@id": "alma:library:PAHospLib",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "PAHospLib" } ]
   },
   {
-    "@id": "alma:library",
+    "@id": "alma:library:RES_SHARE",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "RES_SHARE" } ]
   },
   {
-    "@id": "alma:library",
+    "@id": "alma:library:UnivArcLib",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "UnivArcLib" } ]
   },
   {
-    "@id": "alma:library",
+    "@id": "alma:library:MuseArcLib",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "MuseArcLib" } ]
   },
   {
-    "@id": "alma:library",
+    "@id": "alma:library:VanPeltLib",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "VanPeltLib" } ]
   },
   {
-    "@id": "alma:library",
+    "@id": "alma:library:VetNBLib",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "VetNBLib" } ]
   },
   {
-    "@id": "alma:library",
+    "@id": "alma:library:VetPennLib",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "VetPennLib" } ]
   },
   {
-    "@id": "alma:library",
+    "@id": "alma:library:WeigleInfo",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "WeigleInfo" } ]
   },
   {
-    "@id": "alma:library",
+    "@id": "alma:library:ZUnavailable",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "ZUnavailable" } ]
   }
