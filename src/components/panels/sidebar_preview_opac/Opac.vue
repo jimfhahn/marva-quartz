@@ -312,7 +312,7 @@
 
 .sidebar-property-li-empty::before{
   content: "• ";
-  color: v-bind("preferenceStore.returnValue('--c-edit-main-splitpane-opac-empty-indicator-color')") !important;
+  color: v-bind("preferenceStore.returnValue('--c-edit-main-splitpane-properties-empty-indicator-color')") !important;
 
 }
 
@@ -351,7 +351,15 @@
   stroke:rgb(0,0,0)
 }
 
-
-
-
+.empty-indicator{
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 1em;
+  background-color: v-bind("preferenceStore.returnValue('--c-edit-main-splitpane-properties-empty-indicator-color')") !important;
+}
+.populated-indicator{
+  width: 10px;
+}
 </style>

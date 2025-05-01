@@ -1,11 +1,12 @@
-// Add the missing import statements at the top of the file
 import {useConfigStore} from "../stores/config";
 import {useProfileStore} from "../stores/profile";
 import {usePreferenceStore} from "../stores/preference";
 import utilsRDF from './utils_rdf';
+import utilsMisc from './utils_misc';
 import utilsNetwork from './utils_network';
-import { parse as parseEDTF } from 'edtf';
-
+import utilsProfile from './utils_profile';
+import { parse as parseEDTF } from 'edtf'
+import { md5 } from "hash-wasm";
 
 const escapeHTML = str => str.replace(/[&<>'"]/g,
   tag => ({
@@ -536,31 +537,6 @@ const utilsExport = {
       // Set the text content
       if (typeof val === 'string' || typeof val === 'number') {
         pEl.textContent = val;
-        
-        // Handle datatype - either provided explicitly, determined by EDTF validation, or other logic
-        if (!this.checkForEDTFDatatype){ this.checkForEDTFDatatype = useConfigStore().checkForEDTFDatatype }
-
-        if (userValue['@datatype']){
-          pEl.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:datatype', userValue['@datatype'])
-        } else if (this.checkForEDTFDatatype.indexOf(property) > -1) {
-          let dataType = false
-          // try to parse the value if it parses use the edtf data type
-          try { parseEDTF(userValue[property]); dataType = "http://id.loc.gov/datatypes/edtf" } catch { dataType = false }
-          if (dataType){
-            pEl.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:datatype', dataType)
-          }
-        }
-        
-        // Handle language attribute if present
-        if (userValue['@language']){
-          pEl.setAttribute('xml:lang', userValue['@language'])
-        }
-        
-        // Handle parseType attribute if present
-        if (userValue['@parseType']){
-          pEl.setAttribute('rdf:parseType', userValue['@parseType'])
-        }
-        
         return pEl;
       } else if (val && typeof val === 'object' && val['@value']) {
         pEl.textContent = val['@value'];
@@ -1543,132 +1519,180 @@ const utilsExport = {
                 componentXmlLookup[`${rt}-${pt}`] = formatXML(p.outerHTML);
             }
         } else if (ptObj.propertyURI === 'http://id.loc.gov/ontologies/bibframe/physicalLocation') {
-            console.log('--- Simple physicalLocation handling ---');
-            // Try extracting ID/Label more robustly from userValue
-            let locationId = null;
-            let locationLabel = null;
+            // Special handling for physicalLocation
+            console.log('--- Special handling for physicalLocation ---');
+            let locationId = userValue && userValue['@id'] ? userValue['@id'] : (userValue && userValue.uri ? userValue.uri : null);
 
-            if (typeof userValue === 'string') {
-                // If userValue is just a string, assume it's the label
-                locationLabel = userValue;
-                console.log(`[physicalLocation] Using direct string value as label: ${locationLabel}`);
-            } else if (userValue && typeof userValue === 'object') {
-                // Look for @id first
-                locationId = userValue['@id'] || userValue.uri;
-
-                // If no ID, look for nested label structures (like those causing the problem)
-                if (!locationId) {
-                     const rdfsLabelURI = 'http://www.w3.org/2000/01/rdf-schema#label';
-                     if (userValue[rdfsLabelURI] && userValue[rdfsLabelURI][0]) {
-                         if (userValue[rdfsLabelURI][0]['@id']) {
-                             locationId = userValue[rdfsLabelURI][0]['@id']; // Found ID inside label object
-                         } else if (userValue[rdfsLabelURI][0]['@value']) {
-                             locationLabel = userValue[rdfsLabelURI][0]['@value']; // Found label value inside label object
-                         }
-                     }
-                     // Check for doubly nested physicalLocation structure seen in logs
-                     else if (userValue[ptObj.propertyURI] && userValue[ptObj.propertyURI][0] && userValue[ptObj.propertyURI][0][rdfsLabelURI] && userValue[ptObj.propertyURI][0][rdfsLabelURI][0] && userValue[ptObj.propertyURI][0][rdfsLabelURI][0]['@id']) {
-                         locationId = userValue[ptObj.propertyURI][0][rdfsLabelURI][0]['@id'];
-                     }
-                }
-            }
-
-            if (!locationLabel && locationId) {
+            if (locationId) {
                 console.log(`[physicalLocation] Processing ID: ${locationId}`);
-                // Extract location label from ID
-                if (locationId.includes('alma:library:')) {
-                    const match = locationId.match(/alma:library:([^:]+)/);
-                    if (match && match[1]) {
-                        locationLabel = match[1];
-                    }
-                }
-                // Fallback if extraction fails
-                if (!locationLabel) {
-                    locationLabel = locationId.split(':').pop() || locationId;
-                }
-            }
+                let locationLabel = null;
+                let lookupSource = 'None';
 
-            if (locationLabel) {
-                // Create a simple element with direct text content
-                const locationEl = this.createElByBestNS(ptObj.propertyURI);
-                locationEl.textContent = locationLabel;
-                // Remove existing incorrect ones before adding
-                const existing = Array.from(rootEl.querySelectorAll('bf\\:physicalLocation')); // Corrected selector
-                existing.forEach(el => el.parentNode?.removeChild(el));
-                rootEl.appendChild(locationEl);
-                componentXmlLookup[`${rt}-${pt}`] = formatXML(locationEl.outerHTML);
-                console.log(`Created physicalLocation with text: ${locationLabel}`);
+                try {
+                    // 1. Try lookup library
+                    if (utilsNetwork.lookupLibrary && Array.isArray(utilsNetwork.lookupLibrary)) {
+                        const entry = utilsNetwork.lookupLibrary.find(e => e['@id'] === locationId);
+                        if (entry && entry['http://www.loc.gov/mads/rdf/v1#authoritativeLabel']?.[0]?.['@value']) {
+                            locationLabel = entry['http://www.loc.gov/mads/rdf/v1#authoritativeLabel'][0]['@value'];
+                            lookupSource = 'lookupLibrary';
+                            console.log(`[physicalLocation] Found label in lookupLibrary: '${locationLabel}'`);
+                        }
+                    }
+
+                    // 2. If not found, try extracting from URI structure
+                    if (!locationLabel && locationId.includes('alma:library:')) {
+                        const match = locationId.match(/alma:library:([^:]+)/);
+                        if (match && match[1]) {
+                            locationLabel = match[1];
+                            lookupSource = 'URI Extraction';
+                            console.log(`[physicalLocation] Extracted label from URI: '${locationLabel}'`);
+                        }
+                    }
+
+                    // Create the XML element
+                    const locationEl = this.createElByBestNS(ptObj.propertyURI);
+                    // let labelEl; // No longer creating a separate label element
+
+                    let labelText = null;
+                    if (locationLabel) {
+                        labelText = locationLabel;
+                        console.log(`[physicalLocation] Using label text: '${labelText}' (Source: ${lookupSource})`);
+                    } else {
+                        // Fallback: Use simplified ID as text
+                        console.warn(`[physicalLocation] Could not find/extract authoritative label for ID: ${locationId}. Using simplified ID as text.`);
+                        labelText = locationId.split(':').pop() || locationId;
+                        console.log(`[physicalLocation] Using fallback label text: '${labelText}'`);
+                    }
+
+                    // Set the text content directly on the physicalLocation element
+                    locationEl.textContent = labelText;
+
+                    // locationEl.appendChild(labelEl); // Removed appending label element
+                    rootEl.appendChild(locationEl);
+                } catch (error) {
+                    console.error(`[physicalLocation] Error processing: ${error}`);
+                    // Minimal fallback on error
+                    const locationEl = this.createElByBestNS(ptObj.propertyURI);
+                    locationEl.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:resource', locationId); // Fallback to resource on error
+                    rootEl.appendChild(locationEl);
+                    componentXmlLookup[`${rt}-${pt}`] = formatXML(locationEl.outerHTML);
+                }
+                console.log('--- End special handling for physicalLocation ---');
+                continue; // Skip standard processing
             } else {
-                console.log('[physicalLocation] No valid ID or Label found in userValue.', userValue);
+                 console.log('[physicalLocation] No ID found in userValue.');
             }
-            continue; // Skip standard processing
         } else if (ptObj.propertyURI === 'http://id.loc.gov/ontologies/bibframe/sublocation') {
-            console.log('--- Simplified sublocation handling ---');
+            console.log('--- Special handling for sublocation (Revised) ---');
 
-            // Extract sublocation value more robustly
-            let sublocationLabel = null;
-            let sublocationId = null; // Keep track of ID if found
-
-            if (typeof userValue === 'string') {
-                sublocationLabel = userValue;
-            } else if (userValue && typeof userValue === 'object') {
-                sublocationId = userValue['@id']; // Check for ID first
-
-                // Look for label in various structures
-                const rdfsLabelURI = 'http://www.w3.org/2000/01/rdf-schema#label';
-                if (userValue.rdfsLabel) { // Direct property
-                    sublocationLabel = userValue.rdfsLabel;
-                } else if (userValue[rdfsLabelURI] && userValue[rdfsLabelURI][0]) { // Nested label object
-                    if (userValue[rdfsLabelURI][0]['@value']) {
-                        sublocationLabel = userValue[rdfsLabelURI][0]['@value'];
-                    } else if (userValue[rdfsLabelURI][0]['@id']) {
-                        sublocationId = userValue[rdfsLabelURI][0]['@id']; // Get ID if label value is missing
+            // 1. Remove any existing sublocation elements from this item first
+            const existingSublocationElements = Array.from(rootEl.querySelectorAll('bf\\:sublocation'));
+            if (existingSublocationElements.length > 0) {
+                console.log(`[sublocation] Removing ${existingSublocationElements.length} existing sublocation elements before processing.`);
+                existingSublocationElements.forEach(el => {
+                    if (el.parentNode) {
+                       el.parentNode.removeChild(el);
                     }
-                }
-                // Check for the structure <bf:sublocation><bf:Sublocation><rdfs:label>stor</rdfs:label>...
-                else if (userValue['bf:Sublocation'] && userValue['bf:Sublocation'][0] && userValue['bf:Sublocation'][0][rdfsLabelURI] && userValue['bf:Sublocation'][0][rdfsLabelURI][0] && userValue['bf:Sublocation'][0][rdfsLabelURI][0]['@value']) {
-                     sublocationLabel = userValue['bf:Sublocation'][0][rdfsLabelURI][0]['@value'];
-                }
-                 // Check for the structure <bf:sublocation><bf:Sublocation><rdfs:label rdf:resource="..."></rdfs:label>...
-                else if (userValue['bf:Sublocation'] && userValue['bf:Sublocation'][0] && userValue['bf:Sublocation'][0][rdfsLabelURI] && userValue['bf:Sublocation'][0][rdfsLabelURI][0] && userValue['bf:Sublocation'][0][rdfsLabelURI][0]['@id']) {
-                     sublocationId = userValue['bf:Sublocation'][0][rdfsLabelURI][0]['@id'];
-                }
-
-
-                // If we only found an ID, extract label from it
-                if (!sublocationLabel && sublocationId) {
-                    console.log(`[sublocation] Extracted ID: ${sublocationId}`);
-                    const idParts = sublocationId.split(':');
-                    sublocationLabel = idParts[idParts.length - 1]; // e.g., 'stor'
-                }
+                });
             }
 
-
-            // If we found a label, create the element with the desired structure
-            if (sublocationLabel) {
-                // Remove any existing sublocation elements first
-                const existingSublocationElements = Array.from(rootEl.querySelectorAll('bf\\:sublocation')); // Correct selector
-                if (existingSublocationElements.length > 0) {
-                    console.log(`[sublocation] Removing ${existingSublocationElements.length} existing elements.`);
-                    existingSublocationElements.forEach(el => el.parentNode?.removeChild(el));
+            // 2. Determine the primary userValue object to process
+            //    (Handle cases where userValue might be nested or an array)
+            let primaryUserValue = null;
+            if (Array.isArray(userValue)) {
+                if (userValue.length > 0) {
+                    primaryUserValue = userValue[0]; // Process only the first item if it's an array
+                    console.log('[sublocation] userValue is an array, processing only the first item.');
                 }
+            } else if (typeof userValue === 'object' && userValue !== null) {
+                primaryUserValue = userValue; // Process the object directly
+            }
 
-                // Create with exactly the structure you want:
-                const sublocationEl = this.createElByBestNS(ptObj.propertyURI); // bf:sublocation
-                const sublocationNode = this.createElByBestNS('bf:Sublocation'); // bf:Sublocation
-                const labelNode = this.createRdfsLabel(sublocationLabel); // rdfs:label
+            if (!primaryUserValue) {
+                console.log('[sublocation] No valid primaryUserValue found to process.');
+                continue; // Skip if no data
+            }
 
-                sublocationNode.appendChild(labelNode);
-                sublocationEl.appendChild(sublocationNode);
-                rootEl.appendChild(sublocationEl); // Add the whole structure
+            console.log('[sublocation] Processing primaryUserValue:', JSON.stringify(primaryUserValue, null, 2));
 
-                componentXmlLookup[`${rt}-${pt}`] = formatXML(sublocationEl.outerHTML);
-                console.log(`Created sublocation with label: ${sublocationLabel}`);
+            // 3. Extract ID and Label from the primaryUserValue
+            let sublocationId = null;
+            let sublocationLabel = null;
+            const rdfsLabelURI = 'http://www.w3.org/2000/01/rdf-schema#label';
+            const madsAuthLabelURI = 'http://www.loc.gov/mads/rdf/v1#authoritativeLabel';
+
+            try {
+                 // Try direct extraction first (based on observed log structure)
+                if (primaryUserValue[rdfsLabelURI] && primaryUserValue[rdfsLabelURI][0]) {
+                    const labelObj = primaryUserValue[rdfsLabelURI][0];
+                    sublocationId = labelObj["@id"];
+                     if (labelObj[rdfsLabelURI] && labelObj[rdfsLabelURI][0] && labelObj[rdfsLabelURI][0][rdfsLabelURI]) {
+                         sublocationLabel = labelObj[rdfsLabelURI][0][rdfsLabelURI];
+                     }
+                }
+                // Fallback ID extraction methods
+                if (!sublocationId) {
+                    if (primaryUserValue['@id']) sublocationId = primaryUserValue['@id'];
+                    else if (primaryUserValue.uri) sublocationId = primaryUserValue.uri;
+                }
+            } catch (e) {
+                console.warn(`[sublocation] Error during ID/label extraction: ${e.message}`);
+            }
+
+            // 4. Process if an ID was found
+            if (sublocationId) {
+                console.log(`[sublocation] Processing ID: ${sublocationId}`);
+                let lookupSource = 'None';
+
+                try {
+                    // Lookup label if not extracted directly
+                    if (!sublocationLabel) {
+                        // Assuming utilsNetwork.lookupLibrary is available and populated
+                        if (typeof utilsNetwork !== 'undefined' && utilsNetwork.lookupLibrary && Array.isArray(utilsNetwork.lookupLibrary)) {
+                            const entry = utilsNetwork.lookupLibrary.find(e => e['@id'] === sublocationId);
+                            if (entry && entry[madsAuthLabelURI]?.[0]?.['@value']) {
+                                sublocationLabel = entry[madsAuthLabelURI][0]['@value'];
+                                lookupSource = 'Lookup Library';
+                            }
+                        }
+                    } else {
+                        lookupSource = 'Direct Extraction';
+                    }
+
+                    // 5. Create and append *only one* sublocation element
+                    const sublocationEl = this.createElByBestNS(ptObj.propertyURI);
+                    let labelEl;
+
+                    if (sublocationLabel) {
+                        labelEl = this.createRdfsLabel(sublocationLabel);
+                        console.log(`[sublocation] Creating label element with text: '${sublocationLabel}' (Source: ${lookupSource})`);
+                    } else {
+                        // Fallback label from ID
+                        let displayLabel = sublocationId.split(':').pop() || sublocationId;
+                        labelEl = this.createRdfsLabel(displayLabel);
+                        console.warn(`[sublocation] Could not find/extract label for ID: ${sublocationId}. Using fallback text: '${displayLabel}'`);
+                    }
+
+                    sublocationEl.appendChild(labelEl);
+                    rootEl.appendChild(sublocationEl); // Append the single new sublocation
+                    componentXmlLookup[`${rt}-${pt}`] = formatXML(sublocationEl.outerHTML);
+                    console.log('[sublocation] Successfully added single sublocation element.');
+
+                } catch (error) {
+                    console.error(`[sublocation] Error processing ID ${sublocationId}: ${error}`);
+                    // Fallback: Add sublocation with rdf:resource if processing fails
+                    const sublocationEl = this.createElByBestNS(ptObj.propertyURI);
+                    sublocationEl.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:resource', sublocationId);
+                    rootEl.appendChild(sublocationEl);
+                    componentXmlLookup[`${rt}-${pt}`] = formatXML(sublocationEl.outerHTML);
+                    console.error('[sublocation] Added fallback sublocation with rdf:resource due to error.');
+                }
             } else {
-                console.log('[sublocation] Could not determine sublocation label from userValue:', userValue);
+                 console.log('[sublocation] No ID found in primaryUserValue. Skipping sublocation creation.');
             }
 
-            continue; // Skip standard processing
+            console.log('--- End special handling for sublocation (Revised) ---');
+            continue; // Continue skipping default PT processing
         } else if (ptObj.type === 'literal-lang') {
           // ...existing code...
         }
@@ -1690,53 +1714,53 @@ const utilsExport = {
       if (rootElName === "Item") {
           console.log("[Item Cleanup] Starting cleanup for Item element:", rootEl.outerHTML);
 
-          // --- Physical Location Cleanup (using getElementsByTagNameNS) ---
-          // Use getElementsByTagNameNS for robust namespace handling
-          const physicalLocationsManual = Array.from(rootEl.getElementsByTagNameNS(utilsRDF.namespace.bf, 'physicalLocation'));
-          console.log(`[Item Cleanup] Found ${physicalLocationsManual.length} potential physicalLocation elements using getElementsByTagNameNS.`);
+          // --- Physical Location Cleanup (using querySelectorAll for robustness) ---
+          // Find ALL potential physicalLocation elements, regardless of nesting depth initially
+          const physicalLocationsManual = Array.from(rootEl.querySelectorAll('bf\\:physicalLocation'));
+          console.log(`[Item Cleanup] Manually found ${physicalLocationsManual.length} potential physicalLocation elements.`);
 
-          const physicalLocations = physicalLocationsManual;
-          let finalLocationLabelText = null;
-          let lookupSource = 'None';
+          // --- Physical Location Cleanup (using manually found elements) ---
+          const physicalLocations = physicalLocationsManual; // Use manually found elements
+          let finalLocationLabelText = null; // Store the correct label text if found
+          let lookupSource = 'None'; // Track where the label came from
 
           if (physicalLocations.length > 0) {
               console.log(`[Item Cleanup] Found ${physicalLocations.length} physicalLocation elements. Consolidating...`);
 
               // Try to find the correct label from the potentially incorrect structures
               for (const pl of physicalLocations) {
-                  // ... (rest of the logic to find the best label remains largely the same)
-                  // ... but update internal selectors if they were also failing ...
                   console.log('[Item Debug] Processing physicalLocation for cleanup:', pl.outerHTML);
                   let potentialLabel = null;
-                  let resourceId = null;
+                  let resourceId = null; // Variable to store the found resource ID
 
-                  // Check for direct text content first, as this is the desired final state
-                  if (pl.childNodes.length === 1 && pl.firstChild.nodeType === Node.TEXT_NODE && pl.firstChild.textContent.trim()) {
-                      potentialLabel = pl.firstChild.textContent.trim();
-                      lookupSource = 'Direct Text';
-                      console.log(`[Item Debug] Found direct text label: ${potentialLabel}`);
-                      // If we find the direct text version, prioritize it
-                      finalLocationLabelText = potentialLabel;
-                      break; // Found the best possible version
-                  }
-
-                  // Check for the nested structure with rdf:resource
-                  const nestedPl = pl.getElementsByTagNameNS(utilsRDF.namespace.bf, 'physicalLocation')[0]; // Find nested bf:physicalLocation
+                  // Check for the specific nested structure: <bf:physicalLocation><bf:physicalLocation><rdfs:label rdf:resource="..."></rdfs:label></bf:physicalLocation></bf:physicalLocation>
+                  const nestedPl = pl.querySelector(':scope > bf\\:physicalLocation'); // Look for direct child
                   if (nestedPl) {
-                      const labelInsideNested = nestedPl.getElementsByTagNameNS(utilsRDF.namespace.rdfs, 'label')[0]; // Find nested rdfs:label
+                      console.log('[Item Debug] Found nested bf:physicalLocation:', nestedPl.outerHTML);
+                      const labelInsideNested = nestedPl.querySelector(':scope > rdfs\\:label[rdf\\:resource]'); // Look for direct child label with resource
                       if (labelInsideNested) {
-                          resourceId = labelInsideNested.getAttributeNS(utilsRDF.namespace.rdf, 'resource') || labelInsideNested.getAttribute('rdf:resource');
+                          console.log('[Item Debug] Found nested rdfs:label[rdf:resource]:', labelInsideNested.outerHTML);
+                          // Try getting the attribute with namespace first
+                          resourceId = labelInsideNested.getAttributeNS(utilsRDF.namespace.rdf, 'resource');
+                          console.log(`[Item Debug] resourceId from getAttributeNS: ${resourceId}`);
+                          // Fallback if NS version fails
+                          if (!resourceId) {
+                              resourceId = labelInsideNested.getAttribute('rdf:resource');
+                              console.log(`[Item Debug] resourceId from getAttribute (fallback): ${resourceId}`);
+                          }
+
                           if (resourceId) {
                               console.log(`[Item Cleanup] Found nested structure with resource: ${resourceId}`);
-                              // --- Logic to get label from resourceId ---
+                              // --- Logic to get label from resourceId (adapted from special handling block) ---
                               let locationLabel = null;
+                              // lookupSource = 'None'; // Reset lookupSource for this attempt - MOVED outside loop
                               try {
                                   // 1. Try lookup library
                                   if (utilsNetwork.lookupLibrary && Array.isArray(utilsNetwork.lookupLibrary)) {
                                       const entry = utilsNetwork.lookupLibrary.find(e => e['@id'] === resourceId);
                                       if (entry && entry['http://www.loc.gov/mads/rdf/v1#authoritativeLabel']?.[0]?.['@value']) {
                                           locationLabel = entry['http://www.loc.gov/mads/rdf/v1#authoritativeLabel'][0]['@value'];
-                                          lookupSource = 'lookupLibrary';
+                                          lookupSource = 'lookupLibrary'; // Update lookupSource here
                                           console.log(`[Item Cleanup/LocationLookup] Found label in lookupLibrary: '${locationLabel}'`);
                                       }
                                   }
@@ -1745,90 +1769,69 @@ const utilsExport = {
                                       const match = resourceId.match(/alma:library:([^:]+)/);
                                       if (match && match[1]) {
                                           locationLabel = match[1];
-                                          lookupSource = 'URI Extraction';
+                                          lookupSource = 'URI Extraction'; // Update lookupSource here
                                           console.log(`[Item Cleanup/LocationLookup] Extracted label from URI: '${locationLabel}'`);
                                       }
                                   }
                                   // 3. Fallback
                                   if (!locationLabel) {
                                       locationLabel = resourceId.split(':').pop() || resourceId;
-                                      lookupSource = 'Fallback ID Parsing';
+                                      lookupSource = 'Fallback ID Parsing'; // Update lookupSource here
                                       console.log(`[Item Cleanup/LocationLookup] Using fallback label: '${locationLabel}'`);
                                   }
                               } catch (lookupError) {
                                   console.error(`[Item Cleanup/LocationLookup] Error looking up label for ${resourceId}: ${lookupError}`);
                                   locationLabel = resourceId.split(':').pop() || resourceId; // Fallback on error
-                                  lookupSource = 'Error Fallback';
+                                  lookupSource = 'Error Fallback'; // Update lookupSource here
                               }
                               potentialLabel = locationLabel;
                               // --- End label lookup logic ---
                           } else {
-                               console.warn('[Item Debug] Could not extract resourceId from nested label element.');
+                               console.warn('[Item Debug] Could not extract resourceId from label element.');
                           }
                       } else {
-                           console.warn('[Item Debug] Did not find rdfs:label inside nested bf:physicalLocation.');
+                           console.warn('[Item Debug] Did not find rdfs:label[rdf:resource] inside nested bf:physicalLocation.');
                       }
                   } else {
-                       // Check for direct rdfs:label with rdf:resource (non-nested)
-                       const directLabelWithResource = pl.getElementsByTagNameNS(utilsRDF.namespace.rdfs, 'label')[0];
-                       if (directLabelWithResource) {
-                           resourceId = directLabelWithResource.getAttributeNS(utilsRDF.namespace.rdf, 'resource') || directLabelWithResource.getAttribute('rdf:resource');
-                           if (resourceId) {
-                               console.log(`[Item Cleanup] Found direct structure with resource: ${resourceId}`);
-                               // --- Logic to get label from resourceId ---
-                               let locationLabel = null;
-                               try {
-                                  // 1. Try lookup library
-                                  if (utilsNetwork.lookupLibrary && Array.isArray(utilsNetwork.lookupLibrary)) {
-                                      const entry = utilsNetwork.lookupLibrary.find(e => e['@id'] === resourceId);
-                                      if (entry && entry['http://www.loc.gov/mads/rdf/v1#authoritativeLabel']?.[0]?.['@value']) {
-                                          locationLabel = entry['http://www.loc.gov/mads/rdf/v1#authoritativeLabel'][0]['@value'];
-                                          lookupSource = 'lookupLibrary';
-                                          console.log(`[Item Cleanup/LocationLookup] Found label in lookupLibrary: '${locationLabel}'`);
-                                      }
-                                  }
-                                  // 2. If not found, try extracting from URI structure
-                                  if (!locationLabel && resourceId.includes('alma:library:')) {
-                                      const match = resourceId.match(/alma:library:([^:]+)/);
-                                      if (match && match[1]) {
-                                          locationLabel = match[1];
-                                          lookupSource = 'URI Extraction';
-                                          console.log(`[Item Cleanup/LocationLookup] Extracted label from URI: '${locationLabel}'`);
-                                      }
-                                  }
-                                  // 3. Fallback
-                                  if (!locationLabel) {
-                                      locationLabel = resourceId.split(':').pop() || resourceId;
-                                      lookupSource = 'Fallback ID Parsing';
-                                      console.log(`[Item Cleanup/LocationLookup] Using fallback label: '${locationLabel}'`);
-                                  }
-                               } catch (lookupError) {
-                                  console.error(`[Item Cleanup/LocationLookup] Error looking up label for ${resourceId}: ${lookupError}`);
-                                  locationLabel = resourceId.split(':').pop() || resourceId; // Fallback on error
-                                  lookupSource = 'Error Fallback';
-                               }
-                               potentialLabel = locationLabel;
-                               // --- End label lookup logic ---
-                           } else {
-                                console.warn('[Item Debug] Could not extract resourceId from direct label element.');
-                           }
-                       } else {
-                            console.warn('[Item Debug] Did not find nested bf:physicalLocation or direct rdfs:label[rdf:resource].');
-                       }
+                       console.warn('[Item Debug] Did not find nested bf:physicalLocation element.');
                   }
+                  // TODO: Add checks for other potential incorrect structures if needed
 
-                  // Keep the first valid label found if we haven't found the direct text version yet
-                  if (potentialLabel && !finalLocationLabelText) {
+                  if (potentialLabel) {
                       finalLocationLabelText = potentialLabel;
-                      console.log(`[Item Cleanup] Determined potential final location label: '${finalLocationLabelText}' (Source: ${lookupSource})`);
-                      // Don't break here, keep looking for the direct text version if possible
+                      console.log(`[Item Cleanup] Determined final location label: '${finalLocationLabelText}' (Source: ${lookupSource})`);
+                      break; // Found a label, no need to check further
+                  } else {
+                      console.warn('[Item Debug] No potentialLabel determined in this iteration for:', pl.outerHTML);
                   }
               } // <-- End of for loop
 
               // Remove ALL existing physicalLocation elements found initially
               physicalLocations.forEach(pl => {
+                  // Check if parentNode exists before attempting removal
                   if (pl.parentNode) {
-                      pl.parentNode.removeChild(pl);
+                      // Check if the parent is the root element we are processing
+                      if (pl.parentNode === rootEl) {
+                          rootEl.removeChild(pl);
+                      } else {
+                          // If the parent is not the rootEl, it might be nested.
+                          // We still want to remove it if it was part of the initial find.
+                          // Check if the parent itself is one of the elements we targeted for removal.
+                          if (physicalLocations.includes(pl.parentNode)) {
+                              // This case is complex: removing a parent while iterating might cause issues.
+                              // A safer approach might be to mark for removal and do it in a separate pass,
+                              // but for now, let's log and proceed cautiously.
+                              console.warn("[Item Cleanup] Attempting to remove nested physicalLocation whose parent is also targeted. Potential issue.", pl.outerHTML);
+                              pl.parentNode.removeChild(pl); // Try removing from its direct parent
+                          } else {
+                              console.warn("[Item Cleanup] physicalLocation parent is not rootEl during removal, might be expected if nested within non-physicalLocation.", pl.outerHTML);
+                              // It's possible it's nested inside something else that *isn't* being removed.
+                              // We should still remove it from its current parent.
+                              pl.parentNode.removeChild(pl);
+                          }
+                      }
+                  } else {
+                      console.warn("[Item Cleanup] physicalLocation has no parentNode during removal attempt.", pl.outerHTML);
                   }
               });
               console.log(`[Item Cleanup] Finished removing initially found physicalLocation elements.`);
@@ -1844,68 +1847,11 @@ const utilsExport = {
               }
 
           } else {
-              console.log(`[Item Cleanup] No physicalLocation elements found for item using getElementsByTagNameNS.`);
+              console.log(`[Item Cleanup] No physicalLocation elements found for item (using manual find).`);
           }
+      }
+      // <--- End added cleanup --->
 
-          // --- Sublocation Cleanup (using getElementsByTagNameNS) ---
-          const sublocationsManual = Array.from(rootEl.getElementsByTagNameNS(utilsRDF.namespace.bf, 'sublocation'));
-          console.log(`[Item Cleanup] Found ${sublocationsManual.length} potential sublocation elements using getElementsByTagNameNS.`);
-
-          if (sublocationsManual.length > 0) {
-              let finalSublocationLabel = null;
-              // Try to find the best label from existing structures
-              for (const sl of sublocationsManual) {
-                  // Use getElementsByTagNameNS for inner elements too
-                  const sublocationNode = sl.getElementsByTagNameNS(utilsRDF.namespace.bf, 'Sublocation')[0];
-                  if (sublocationNode) {
-                      const labelNode = sublocationNode.getElementsByTagNameNS(utilsRDF.namespace.rdfs, 'label')[0];
-                      if (labelNode) {
-                          // Prioritize the one with direct text content
-                          if (!labelNode.hasAttributeNS(utilsRDF.namespace.rdf, 'resource') && !labelNode.hasAttribute('rdf:resource') && labelNode.textContent) {
-                              finalSublocationLabel = labelNode.textContent.trim();
-                              console.log(`[Item Cleanup] Found final sublocation label (direct text): '${finalSublocationLabel}'`);
-                              break; // Found the best version
-                          }
-                          // Otherwise, store the label from the resource version as a fallback
-                          else if (!finalSublocationLabel) {
-                              let potentialLabelFromResource = null;
-                              const resourceId = labelNode.getAttributeNS(utilsRDF.namespace.rdf, 'resource') || labelNode.getAttribute('rdf:resource');
-                              if (resourceId) {
-                                  const idParts = resourceId.split(':');
-                                  potentialLabelFromResource = idParts[idParts.length - 1];
-                                  console.log(`[Item Cleanup] Found potential sublocation label (from resource): '${potentialLabelFromResource}'`);
-                              }
-                              // Use the text content if available, otherwise use the extracted resource label
-                              if (labelNode.textContent && labelNode.textContent.trim()) {
-                                  finalSublocationLabel = labelNode.textContent.trim();
-                              } else if (potentialLabelFromResource) {
-                                  finalSublocationLabel = potentialLabelFromResource;
-                              }
-                          }
-                      }
-                  }
-              }
-
-              // Remove all existing sublocation elements
-              sublocationsManual.forEach(sl => sl.parentNode?.removeChild(sl));
-
-              // If a label was found, create the single correct structure
-              if (finalSublocationLabel) {
-                  const sublocationEl = this.createElByBestNS('bf:sublocation');
-                  const sublocationNode = this.createElByBestNS('bf:Sublocation');
-                  const labelNode = this.createRdfsLabel(finalSublocationLabel);
-                  sublocationNode.appendChild(labelNode);
-                  sublocationEl.appendChild(sublocationNode);
-                  rootEl.appendChild(sublocationEl);
-                  console.log(`[Item Cleanup] Appended single clean sublocation with label: '${finalSublocationLabel}'`);
-              } else {
-                   console.warn(`[Item Cleanup] Could not determine a final label for sublocation. No element added.`);
-              }
-          } else {
-               console.log(`[Item Cleanup] No sublocation elements found for item using getElementsByTagNameNS.`);
-          }
-
-      } // <--- End Item cleanup --->
       // Add the completed root element to the lookup
       tleLookup[rootElName][profile.rt[rt].URI] = rootEl;
       xmlLog.push(`Finished building ${rootElName}`);
@@ -1986,20 +1932,6 @@ const utilsExport = {
     // Build basic version to save
     for (let URI in tleLookup['Work']){
       let theWork = (new XMLSerializer()).serializeToString(tleLookup['Work'][URI]);
-      theWork = xmlParser.parseFromString(theWork, "text/xml").children[0];
-      rdfBasic.appendChild(theWork);
-    }
-
-    for (let URI in tleLookup['Instance']){
-      let instance = (new XMLSerializer()).serializeToString(tleLookup['Instance'][URI]);
-      instance = xmlParser.parseFromString(instance, "text/xml").children[0];
-      
-      // Add hasItem relationships for basic version
-      let items = this.returnHasItem(URI, orginalProfile, tleLookup);
-      if (items.length > 0){
-        for (let item of items){
-          let p = this.createElByBestNS('bf:hasItem');
-          p.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:resource', item.getAttribute('rdf:about'));
           instance.appendChild(p);
         }
       }
@@ -2013,16 +1945,11 @@ const utilsExport = {
         if (workAbout) {
           p.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:resource', workAbout);
         }
+        // Optionally, append the work as a child if needed for other consumers
+        // p.appendChild(work);
         instance.appendChild(p);
       }
       rdfBasic.appendChild(instance);
-    }
-
-    // Add Items to rdfBasic - CRITICAL FOR ITEM RENDERING
-    for (let URI in tleLookup['Item']){
-      let item = (new XMLSerializer()).serializeToString(tleLookup['Item'][URI]);
-      item = xmlParser.parseFromString(item, "text/xml").children[0];
-      rdfBasic.appendChild(item);
     }
 
     // Build RDF centered around instance or work based on procInfo
@@ -2091,42 +2018,66 @@ const utilsExport = {
       theHub = xmlParser.parseFromString(theHub, "text/xml").children[0];
       rdf.appendChild(theHub);
     }
-    
-    // DIRECT ITEM HANDLING: Ensure all standalone Items are added directly to the RDF root
-    console.log("DEBUG: Processing standalone Items for direct inclusion in RDF root");
-    for (let URI in tleLookup['Item']){
-      // Skip if this URI doesn't exist or isn't an actual Item
-      if (!tleLookup['Item'][URI]) {
-        console.log(`DEBUG: Item ${URI} doesn't exist in tleLookup['Item']`);
-        continue;
+
+    // Extract metadata for database
+    if (rdfBasic.getElementsByTagName("bf:mainTitle").length > 0){
+      xmlVoidDataTitle = rdfBasic.getElementsByTagName("bf:mainTitle")[0].innerHTML;
+    } else if (rdfBasic.getElementsByTagName("bfsimple:prefTitle").length > 0){
+      xmlVoidDataTitle = rdfBasic.getElementsByTagName("bfsimple:prefTitle")[0].innerHTML;
+    } else {
+      console.warn('no title found for db');
+    }
+
+    // Extract contributor information
+    if (rdfBasic.getElementsByTagName("bf:PrimaryContribution").length > 0){
+      if (rdfBasic.getElementsByTagName("bf:PrimaryContribution")[0].getElementsByTagName("rdfs:label").length > 0){
+        xmlVoidDataContributor = rdfBasic.getElementsByTagName("bf:PrimaryContribution")[0].getElementsByTagName("rdfs:label")[0].innerHTML;
       }
-      
-      try {
-        // Ensure we have a proper Item element
-        console.log(`DEBUG: Processing Item ${URI} for inclusion`);
-        const item = tleLookup['Item'][URI].cloneNode(true); // Clone to avoid modifying original
-        
-        if (!item || !item.nodeType) {
-          console.log(`DEBUG: Item ${URI} is not a valid node`);
-          continue;
+    } else {
+      if (rdfBasic.getElementsByTagName("bf:Contribution").length > 0){
+        if (rdfBasic.getElementsByTagName("bf:Contribution")[0].getElementsByTagName("rdfs:label").length > 0){
+          xmlVoidDataContributor = rdfBasic.getElementsByTagName("bf:Contribution")[0].getElementsByTagName("rdfs:label")[0].innerHTML;
+        } else {
+          console.warn('no PrimaryContribution or Contribution found for db');
         }
-        
-        // Verify bf:Item is properly created
-        console.log(`DEBUG: Item ${URI} nodeName = ${item.nodeName}`);
-        
-        // Append directly to RDF root - this is the critical part
-        rdf.appendChild(item);
-        console.log(`DEBUG: Successfully added Item ${URI} directly to RDF root`);
-      } catch (error) {
-        console.error(`Error adding Item ${URI} to RDF root:`, error);
+      } else {
+        console.warn('no PrimaryContribution or Contribution found for db');
       }
     }
-    
-    // Create dataset description element - moved to after Item processing
+
+    // Extract LCCN
+    if (rdfBasic.getElementsByTagName("bf:Instance").length > 0){
+      let i = rdfBasic.getElementsByTagName("bf:Instance")[0];
+      // Find LCCN in bf:identifiedBy
+      for (let c of i.children){
+        if (c.tagName === 'bf:identifiedBy'){
+          // Look for bf:Lccn elements
+          if (c.getElementsByTagName("bf:Lccn").length > 0){
+            let lccnEl = c.getElementsByTagName("bf:Lccn")[0];
+            // Check if it has a status
+            if (lccnEl.getElementsByTagName("bf:Status").length == 0){
+              // No status element, use this LCCN
+              xmlVoidDataLccn = lccnEl.innerText || lccnEl.textContent;
+            } else if (lccnEl.getElementsByTagName("bf:Status").length > 0){
+              // If it has a status, check if it's canceled
+              if (lccnEl.getElementsByTagName("bf:Status")[0].hasAttribute('rdf:about') && 
+                  lccnEl.getElementsByTagName("bf:Status")[0].attributes['rdf:about'].value == 'http://id.loc.gov/vocabulary/mstatus/cancinv'){
+                continue;
+              }
+              // Use this LCCN if not canceled
+              for (let cc of lccnEl.children){
+                if (cc.tagName == 'rdf:value'){
+                  xmlVoidDataLccn = cc.innerText || cc.textContent;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Create dataset description element
     let datasetDescriptionEl = document.createElementNS(utilsRDF.namespace.void, 'void:DatasetDescription');
-    console.log(`DEBUG: Created DatasetDescription element with name: ${datasetDescriptionEl.nodeName}`);
-    
-    // Explicitly set namespaces for this element
     datasetDescriptionEl.setAttributeNS("http://www.w3.org/2000/xmlns/", `xmlns:void`, utilsRDF.namespace.void);
     datasetDescriptionEl.setAttributeNS("http://www.w3.org/2000/xmlns/", `xmlns:lclocal`, utilsRDF.namespace.lclocal);
 
@@ -2134,11 +2085,9 @@ const utilsExport = {
     let el;
     for (let x of xmlVoidDataRtsUsed){
       el = document.createElementNS(utilsRDF.namespace.lclocal, 'lclocal:rtsused');
-      el.textContent = escapeHTML(x);
+      el.innerHTML = escapeHTML(x);
       datasetDescriptionEl.appendChild(el);
     }
-    
-    // Add other metadata elements
     for (let x of xmlVoidDataType){
       el = document.createElementNS(utilsRDF.namespace.lclocal, 'lclocal:profiletypes');
       el.innerHTML = escapeHTML(x);
@@ -2173,24 +2122,13 @@ const utilsExport = {
       el.innerHTML = escapeHTML(x);
       datasetDescriptionEl.appendChild(el);
     }
-    
-    // CRITICAL: Actually append the DatasetDescription to the RDF document
-    console.log(`DEBUG: Appending DatasetDescription to root RDF document`);
-    rdf.appendChild(datasetDescriptionEl);
-    
+
     // Format XML output
-    // Only serialize after ALL elements have been added to the DOM
-    console.log(`DEBUG: Serializing final RDF document`);
+    // Only serialize the rdf DOM node directly, do not use ensureRoot or prettifyXmlJS for the main RDF output
     let strXml = this.serializePreservingNamespaces(rdf);
     let strXmlBasic = this.serializePreservingNamespaces(rdfBasic);
-    let strXmlFormatted = strXml;
-    
-    // Check that the serialization worked as expected
-    console.log(`DEBUG: RDF serialization length: ${strXml.length}`);
-    if (!strXml || strXml.length < 100) {
-      console.error("XML Serialization problem: Output is too short or empty");
-    }
-    
+    let strXmlFormatted = strXml; // Optionally, you can prettify for display, but do not break the structure
+
     // Build BF2MARC package
     let bf2MarcXmlElRdf = this.createElByBestNS('http://www.w3.org/1999/02/22-rdf-syntax-ns#RDF');
     for (let el of rdfBasic.getElementsByTagName("bf:Work")){ bf2MarcXmlElRdf.appendChild(el); }
@@ -2243,15 +2181,15 @@ const utilsExport = {
     // Return the XML in various formats
     return {
       xmlDom: rdf,
-      xmlStringFormatted: this.sanitizeXmlString(strXmlFormatted),
-      xlmString: this.sanitizeXmlString(strXml),
-      bf2Marc: this.sanitizeXmlString(strBf2MarcXmlElBib),
-      xlmStringBasic: this.sanitizeXmlString(strXmlBasic),
+      xmlStringFormatted: strXmlFormatted,
+      xlmString: strXml,
+      bf2Marc: strBf2MarcXmlElBib,
+      xlmStringBasic: strXmlBasic,
       voidTitle: xmlVoidDataTitle,
       voidContributor: xmlVoidDataContributor,
       componentXmlLookup: componentXmlLookup
     };
-  },
+  }, // Comma after buildXMLProcess
 
   /**
    * Fixes barcode structures in an XML document
@@ -2304,7 +2242,7 @@ const utilsExport = {
       console.error(`[fixBarcodeStructures] Error: ${error}`);
       return xmlDoc;
     }
-  },
+  }, // Comma after fixBarcodeStructures
   
   /**
    * Deduplicates assigners in AdminMetadata to ensure there's only one properly structured assigner
@@ -2369,149 +2307,7 @@ const utilsExport = {
     } catch (error) { 
       console.error("[deduplicateAssignersInAdminMetadata] Error:", error);
     }
-  },
-
-  /**
-   * Cleanup Item elements to fix common issues with physicalLocation and sublocation
-   * @param {Element} itemElement - The Item element to clean
-   * @return {Element} - The cleaned Item element
-   */
-  cleanupItemElement: function(itemElement) {
-    if (!itemElement || itemElement.tagName !== 'bf:Item') {
-      console.warn("[cleanupItemElement] Not an Item element, skipping cleanup");
-      return itemElement;
-    }
-    
-    try {
-      console.log("[cleanupItemElement] Starting cleanup for Item");
-      
-      // 1. Fix physicalLocation elements (remove double nesting)
-      const physicalLocations = Array.from(itemElement.querySelectorAll('bf\\:physicalLocation'));
-      if (physicalLocations.length > 0) {
-        console.log(`[cleanupItemElement] Found ${physicalLocations.length} physicalLocation elements`);
-        
-        // Find the innermost location with a resource or text content
-        let bestLocation = null;
-        let bestLocationValue = null;
-        let bestLocationResource = null;
-        
-        for (const location of physicalLocations) {
-          // Check if there's direct text content
-          const directText = location.childNodes.length === 1 && location.firstChild.nodeType === Node.TEXT_NODE
-            ? location.childNodes[0].nodeValue.trim()
-            : null;
-            
-          // Check for resource attribute
-          const resourceAttr = location.getAttribute('rdf:resource') || location.getAttributeNS(utilsRDF.namespace.rdf, 'resource');
-          
-          // Prioritize elements with direct text content
-          if (directText && (!bestLocationValue || bestLocation.childNodes.length > 1)) {
-            bestLocation = location;
-            bestLocationValue = directText;
-            bestLocationResource = null;
-          } 
-          // Then prioritize elements with resource attributes
-          else if (resourceAttr && !bestLocationValue && !bestLocationResource) {
-            bestLocation = location;
-            bestLocationValue = null;
-            bestLocationResource = resourceAttr;
-          }
-        }
-        
-        // Remove all existing locations
-        physicalLocations.forEach(location => {
-          if (location.parentNode) {
-            location.parentNode.removeChild(location);
-          }
-        });
-        
-        // Create a new clean location element
-        if (bestLocationValue || bestLocationResource) {
-          const newLocation = this.createElByBestNS('bf:physicalLocation');
-          
-          if (bestLocationValue) {
-            newLocation.textContent = bestLocationValue;
-          } else if (bestLocationResource) {
-            newLocation.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:resource', bestLocationResource);
-          }
-          
-          itemElement.appendChild(newLocation);
-        }
-      }
-      
-      // 2. Fix sublocation elements (remove duplicates, ensure proper structure)
-      const sublocations = Array.from(itemElement.querySelectorAll('bf\\:sublocation'));
-      if (sublocations.length > 0) {
-        console.log(`[cleanupItemElement] Found ${sublocations.length} sublocation elements`);
-        
-        let bestSublocation = null;
-        let bestSublocationValue = null;
-        
-        for (const sublocation of sublocations) {
-          // Look for proper structure first: bf:sublocation > bf:Sublocation > rdfs:label
-          const structuredLabel = sublocation.querySelector('bf\\:Sublocation > rdfs\\:label');
-          if (structuredLabel && structuredLabel.textContent) {
-            bestSublocation = sublocation;
-            bestSublocationValue = structuredLabel.textContent;
-            break;
-          }
-          
-          // Next, check for direct text content
-          if (!bestSublocationValue && sublocation.textContent && sublocation.textContent.trim()) {
-            bestSublocation = sublocation;
-            bestSublocationValue = sublocation.textContent.trim();
-          }
-        }
-        
-        // Remove all existing sublocations
-        sublocations.forEach(sublocation => {
-          if (sublocation.parentNode) {
-            sublocation.parentNode.removeChild(sublocation);
-          }
-        });
-        
-        // Create a new clean sublocation with proper structure
-        if (bestSublocationValue) {
-          const newSublocation = this.createElByBestNS('bf:sublocation');
-          const sublocationNode = this.createElByBestNS('bf:Sublocation');
-          const labelNode = this.createRdfsLabel(bestSublocationValue);
-          
-          sublocationNode.appendChild(labelNode);
-          newSublocation.appendChild(sublocationNode);
-          itemElement.appendChild(newSublocation);
-        }
-      }
-      
-      return itemElement;
-    } catch (error) {
-      console.error("[cleanupItemElement] Error during cleanup:", error);
-      return itemElement;
-    }
-  },
-
-  /**
-   * Sanitizes XML strings to remove parser errors and undefined values
-   * This helps prevent the <sourcetext> elements with undefined values from appearing in output
-   * @param {string} xmlString - The XML string to sanitize
-   * @return {string} The sanitized XML string
-   */
-  sanitizeXmlString: function(xmlString) {
-    if (!xmlString) return xmlString;
-    
-    try {
-      // Remove parser error elements and their content
-      xmlString = xmlString.replace(/<sourcetext[^>]*>[\s\S]*?<\/sourcetext>/g, '');
-      
-      // Remove undefined values that could cause parsing errors
-      xmlString = xmlString.replace(/undefined/g, '');
-      
-      return xmlString;
-    } catch (error) {
-      console.error("Error sanitizing XML:", error);
-      return xmlString; // Return original if error occurs
-    }
-  },
+  }
 };
-
 
 export default utilsExport;

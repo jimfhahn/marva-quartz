@@ -605,8 +605,7 @@
                                 "valueConstraint": {
                                     "valueTemplateRefs": [],
                                     "useValuesFrom": ["/library.json"],
-                                    "defaults": [],
-                                    "valueDataType": ""
+                                    "defaults": []
                                 },
                                 "propertyURI": "http://www.w3.org/2000/01/rdf-schema#label",
                                 "propertyLabel": "Storing or shelving location",
@@ -626,9 +625,8 @@
                                 "resourceTemplates": [],
                                 "valueConstraint": {
                                     "valueTemplateRefs": [],
-                                    "useValuesFrom": ["/library.json"],
-                                    "defaults": [],
-                                    "valueDataType": ""
+                                    "useValuesFrom": ["/subLocation.json"],
+                                    "defaults": []
                                 },
                                 "propertyURI": "http://www.w3.org/2000/01/rdf-schema#label",
                                 "propertyLabel": "Location",

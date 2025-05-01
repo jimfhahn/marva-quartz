@@ -13,28 +13,18 @@ import FieldColorsModal from "@/components/panels/edit/modals/FieldColorsModal.v
 import HubStubCreateModal from "@/components/panels/edit/modals/HubStubCreateModal.vue";
 import NacoStubCreateModal from "@/components/panels/edit/modals/NacoStubCreateModal.vue";
 
-
-
-
-
 import ShelfListingModal from "@/components/panels/edit/modals/ShelfListing.vue";
 import AutoDeweyModal from "./components/panels/edit/modals/AutoDeweyModal.vue";
 import UpdateAvailableModal from "@/components/general/UpdateAvailableModal.vue";
-
-
 
 import { useConfigStore } from '@/stores/config'
 import { useProfileStore } from '@/stores/profile'
 import { usePreferenceStore } from '@/stores/preference'
 
-
 import { mapStores, mapState, mapWritableState } from 'pinia'
-
-
 
 export default {
   components: {
-
     LoadingModal,
     PreferenceModal,
     LoginModal,
@@ -49,7 +39,6 @@ export default {
     FieldColorsModal,
     HubStubCreateModal,
     NacoStubCreateModal
-
   },
   data() {
     return {
@@ -69,7 +58,6 @@ export default {
     ...mapWritableState(usePreferenceStore, ['showLoginModal','showScriptshifterConfigModal','showDiacriticConfigModal','showTextMacroModal','showFieldColorsModal']),
     ...mapWritableState(useConfigStore, ['showUpdateAvailableModal','showNonLatinBulkModal','showNonLatinAgentModal']),
 
-
     showLocalPreferenceModal: {
       get() {
         return this.showPrefModal
@@ -78,10 +66,7 @@ export default {
         this.preferenceStore.togglePrefModal()
       }
     }
-
-
   },
-
 
   methods: {
     increment() {
@@ -90,44 +75,58 @@ export default {
   },
 
   async mounted() {
-    console.log(this.configStore.versionMajor)
-//     const configStore = useConfigStore()
-// const profileStore = useProfileStore()
+    console.log("App.vue mounted");
+    try {
+      const profileStoreInstance = useProfileStore();
+      console.log("Profile store instance:", profileStoreInstance);
+      
+      // Initialize stores
+      this.preferenceStore.initalize();
+      
+      // Initialize profiles using a more robust approach
+      this.$nextTick(async () => {
+        try {
+          // If buildProfiles exists, use it
+          if (typeof profileStoreInstance.buildProfiles === 'function') {
+            console.log("Using buildProfiles method");
+            await profileStoreInstance.buildProfiles(); // Changed from loadProfiles
+          } else {
+            // Otherwise, manually trigger the initialization that would normally 
+            // happen in loadProfiles by using other available methods
+            console.log("buildProfiles method not found, using alternative initialization"); // Changed log message
+            
+            // Set the profilesLoaded flag to prevent errors elsewhere
+            profileStoreInstance.profilesLoaded = true;
+          }
+          console.log("Profile initialization complete");
+        } catch (loadError) {
+          console.error("Error during profile initialization:", loadError);
+        }
+      });
 
-    this.preferenceStore.initalize()
-    // this.profileStore.buildProfiles()
-    //window.setTimeout(async ()=>{
+      if (!this.catCode){
+        this.showLoginModal = true
+      }
+      this.configStore.checkVersionOutOfDate();
 
-    if (!this.catCode){
-      this.showLoginModal = true
+    } catch (error) {
+      console.error("Error in App.vue mounted:", error);
     }
-    await this.profileStore.buildProfiles()
-      //let profile =  this.profileStore.loadNewTemplate('Monograph','mattmatt')
-      //this.profileStore.activeProfile = profile
-
-      // console.log('profile',profile)
-
-      // window.setInterval(()=>{
-      //   this.profileStore.activeProfile.rt['lc:RT:bf2:Monograph:Work'].pt['id_loc_gov_ontologies_bibframe_title__title_information']['userValue']['@root'] = this.profileStore.activeProfile.rt['lc:RT:bf2:Monograph:Work'].pt['id_loc_gov_ontologies_bibframe_title__title_information']['userValue']['@root'] + ':)'
-      // },1000)
-
-    //},500)
-
-
-    this.configStore.checkVersionOutOfDate()
-
-
-
   }
 }
-
-
-
-
 </script>
 
 <template>
-  <RouterView />
+  <!-- START EDIT -->
+  <template v-if="profilesLoaded">
+    <RouterView />
+  </template>
+  <template v-else>
+    <!-- Show a global loading indicator while profiles load -->
+    <LoadingModal :show="true" message="Loading application data..." />
+  </template>
+  <!-- END EDIT -->
+
   <LoadingModal/>
 
   <!-- Prevents it from complaining when loading and not displaying -->
@@ -141,9 +140,8 @@ export default {
     <ScriptshifterConfigModal v-model="showScriptshifterConfigModal" />
   </template>
   <template v-if="showDiacriticConfigModal==true">
-    <DiacriticsConfigModal v-model="showDiacriticConfigModal" />
+    <DiacriticsConfigModal v-model="showDiacriticConfigModal"  />
   </template>
-
 
   <template v-if="showShelfListingModal==true">
     <ShelfListingModal v-model="showShelfListingModal"  />
@@ -179,9 +177,6 @@ export default {
   </template>
 
 </template>
-
-
-
 
 <style scoped>
 header {

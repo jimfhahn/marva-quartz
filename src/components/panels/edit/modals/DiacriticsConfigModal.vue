@@ -260,11 +260,12 @@
             <template v-if="showPack == 'macroExpress'">
               <table>
                 <thead>
-                  <th>Enabled</th>
-                  <th></th>
-
-                  <th>Key Combo</th>
-                  <th>Description</th>
+                  <tr>
+                    <th>Enabled</th>
+                    <th></th>
+                    <th>Key Combo</th>
+                    <th>Description</th>
+                  </tr>
                 </thead>
                 <tbody>
                   <template v-for="(val,idx) in diacriticPacks.macroExpress">
@@ -295,11 +296,11 @@
 
               <table>
                 <thead>
-
-                  <th></th>
-
-                  <th>Key Combo</th>
-                  <th>Description</th>
+                  <tr>
+                    <th></th>
+                    <th>Key Combo</th>
+                    <th>Description</th>
+                  </tr>
                 </thead>
                 <tbody>
 

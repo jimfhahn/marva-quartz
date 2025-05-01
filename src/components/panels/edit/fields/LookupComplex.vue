@@ -10,34 +10,7 @@
 
 
 
-      <!-- <template v-if="complexLookupValues.length===0">
 
-          <span class="bfcode-display-mode-holder-label" :title="structure.propertyLabel">{{profileStore.returnBfCodeLabel(structure)}}:</span>
-          <input class="input-inline-mode can-select" @keyup="navKey" v-on:keydown.enter.prevent="submitField" v-model="searchValue" ref="lookupInput" @focusin="focused" type="text" @input="textInputEvent($event)" :data-guid="structure['@guid']" :disabled="readOnly" />
-
-
-      </template>
-      <template v-else>
-
-        <template v-for="(avl,idx) in complexLookupValues" class="">
-          <span class="bfcode-display-mode-holder-label" :title="structure.propertyLabel">{{profileStore.returnBfCodeLabel(structure)}}:</span>
-
-          <a href="#" class="inline-auth-link" @click="searchValue = avl.label; textInputEvent()">
-            <span v-if="avl.type" class="complex-lookup-inline-mode">
-              <span v-if="preferenceStore.returnValue('--b-edit-complex-use-value-icons')" class="complex-lookup-inline-mode-icon"><AuthTypeIcon  :small="true" :type="avl.type"/></span>
-            </span>
-            <span v-if="!avl.needsDereference" style="">{{avl.label}}<span class="uncontrolled" v-if="avl.isLiteral">(uncontrolled)</span><span v-if="!avl.isLiteral" title="Controlled Term" class="" style=""><span class="material-icons check-mark inline-mode-validation-icon">check_circle_outline</span></span></span>
-            <span v-else style="padding-right: 0.3em; font-weight: bold"><LabelDereference :URI="avl.URI"/><span v-if="!avl.isLiteral" title="Controlled Term" class=""><span class="material-icons check-mark inline-mode-validation-icon">check_circle_outline</span></span></span>
-          </a>
-
-
-        <a href="#" @click="removeValue(idx)" style="padding: 0 0 0 2.5px; text-decoration: none; font-size: 1em; cursor: pointer; color: gray;">x</a>
-
-        </template>
-        <input class="input-inline-mode can-select" style="width: 20px;" @keyup="navKey" v-on:keydown.enter.prevent="submitField" v-model="searchValue" ref="lookupInput" @focusin="focused" type="text" :data-guid="structure['@guid']" @input="textInputEvent($event)" :disabled="readOnly" />
-
-
-      </template> -->
 
 
     </template>
@@ -46,7 +19,7 @@
   </template>
 
   <template v-else>
-  <!-- <div>Complext Lookup ({{propertyPath.map((x)=>{return x.propertyURI}).join('->')}})</div> -->
+
       <form autocomplete="off" v-on:submit.prevent >
 
         <div class="lookup-fake-input" @click="focusClick()">
@@ -301,20 +274,6 @@ export default {
     inlineModeShouldDisplay(){
 
       return true
-
-      if (this.profileStore.inlinePropertyHasValue(this.guid, this.structure,this.propertyPath)){
-        return true
-      } else if (this.profileStore.inlineFieldIsToggledForDisplay(this.guid, this.structure)){
-        return true
-
-      }else{
-        // no value in it, but maybe its the "main" property, so display it anyway
-        if (this.profileStore.inlineIsMainProperty(this.guid, this.structure,this.propertyPath)){
-          return true
-        }
-      }
-
-      return false
 
     },
 

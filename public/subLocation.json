@@ -40,7 +40,7 @@
         "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "scsmithst" } ]
       },
     {
-        "@id": "alma:library:Libra:subLocation:newbrare"
+        "@id": "alma:library:Libra:subLocation:newbrare",
         "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
         "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "newbrare" } ]
       },
