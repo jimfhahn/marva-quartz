@@ -85,7 +85,7 @@
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "KislakCntr" } ]
   },
   {
-    "@id": "alma:library:Libra",
+    "@id": "Libra",
     "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
     "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "Libra" } ]
   },

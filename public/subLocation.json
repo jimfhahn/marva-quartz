@@ -5,7 +5,7 @@
         "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "storcrstxt" } ]
       },
     {
-        "@id": "alma:library:Libra:subLocation:stor",
+        "@id": "stor",
         "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
         "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "stor" } ]
       },

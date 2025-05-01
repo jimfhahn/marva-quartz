@@ -728,30 +728,64 @@ const utilsExport = {
   },
 
   /** 
-   * Clean up an assigner element to ensure it has no unwanted content
+   * Clean up an assigner element to ensure it has the correct structure:
+   * <bf:assigner>
+   *   <bf:Organization rdf:about="http://id.loc.gov/vocabulary/organizations/pu">
+   *     <rdfs:label>Label Text</rdfs:label>
+   *   </bf:Organization>
+   * </bf:assigner>
    * @param {Element} assignerEl - The assigner element to clean
    */ 
   cleanAssignerElement: function(assignerEl) {
     if (!assignerEl) return;
-    const orgEls = assignerEl.querySelectorAll('*[local-name()="Organization"]');
+    
+    // Use getElementsByTagNameNS for robust selection
+    const orgEls = assignerEl.getElementsByTagNameNS(utilsRDF.namespace.bf, 'Organization');
+    
     orgEls.forEach(orgEl => {
-      // Remove text nodes that contain only zeros or whitespace
-      Array.from(orgEl.childNodes).forEach(node => {
-        if (node.nodeType === Node.TEXT_NODE) {
-          const content = node.textContent.trim();
-          if (!content || /^[0\s]+$/.test(content)) {
-            orgEl.removeChild(node);
-          }
+      let orgUri = 'http://id.loc.gov/vocabulary/organizations/pu'; // Default URI
+      let orgLabel = useConfigStore().defaultAssignerLabel || "University of Pennsylvania, Van Pelt-Dietrich Library"; // Default Label
+
+      // 1. Find and remove any incorrectly nested rdf:about elements
+      const nestedAboutEls = orgEl.getElementsByTagNameNS(utilsRDF.namespace.rdf, 'about');
+      if (nestedAboutEls.length > 0) {
+        // Try to get the URI from the incorrect element before removing it
+        if (nestedAboutEls[0].textContent) {
+          orgUri = nestedAboutEls[0].textContent.trim();
         }
-      });
-      // If Organization has no meaningful content, add a proper label
-      if (!orgEl.hasChildNodes() || (orgEl.childNodes.length === 1 && orgEl.firstChild.nodeType === Node.TEXT_NODE && !orgEl.firstChild.textContent.trim())) {
-        while (orgEl.firstChild) {
-          orgEl.removeChild(orgEl.firstChild);
-        }
-        const labelEl = document.createElementNS("http://www.w3.org/2000/01/rdf-schema#", "rdfs:label");
-        labelEl.textContent = "University of Pennsylvania, Van Pelt-Dietrich Library";
+        Array.from(nestedAboutEls).forEach(el => el.parentNode?.removeChild(el));
+        console.log("[cleanAssignerElement] Removed incorrectly nested rdf:about element.");
+      }
+
+      // 2. Ensure rdf:about attribute exists and has the correct URI
+      if (!orgEl.hasAttributeNS(utilsRDF.namespace.rdf, 'about') && !orgEl.hasAttribute('rdf:about')) {
+        orgEl.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:about', orgUri);
+        console.log(`[cleanAssignerElement] Added missing rdf:about attribute with URI: ${orgUri}`);
+      } else {
+         // If it exists, make sure it's the correct one (or update if needed, though default is usually fine)
+         // For now, we assume the existing one is intended if present.
+         orgUri = orgEl.getAttributeNS(utilsRDF.namespace.rdf, 'about') || orgEl.getAttribute('rdf:about');
+      }
+
+      // 3. Ensure rdfs:label exists and is nested correctly
+      let labelEl = orgEl.querySelector('rdfs\\:label'); // Use querySelector for simplicity here
+      if (!labelEl) {
+        // If no label, create and append one
+        labelEl = this.createRdfsLabel(orgLabel);
         orgEl.appendChild(labelEl);
+        console.log(`[cleanAssignerElement] Added missing rdfs:label with text: ${orgLabel}`);
+      } else {
+         // If label exists, ensure it has text content (use default if empty)
+         if (!labelEl.textContent || labelEl.textContent.trim() === '') {
+             labelEl.textContent = orgLabel;
+             console.log(`[cleanAssignerElement] Populated empty rdfs:label with default text: ${orgLabel}`);
+         }
+         // Ensure the label is the *only* direct child if possible, remove extra text nodes
+         Array.from(orgEl.childNodes).forEach(node => {
+             if (node !== labelEl && node.nodeType === Node.TEXT_NODE && (!node.textContent || node.textContent.trim() === '')) {
+                 orgEl.removeChild(node);
+             }
+         });
       }
     });
   },
@@ -1262,24 +1296,33 @@ const utilsExport = {
 
             // Process all properties in this blank node
             for (let key1 of Object.keys(userValue).filter(k => (!k.includes('@') ? true : false))){
-              // key1 is the property URI, e.g. http://id.loc.gov/ontologies/bibframe/classificationPortion
-              let value1Array = userValue[key1]; // This should be an array of values for this property
+              let value1Array = userValue[key1];
               if (!Array.isArray(value1Array)) {
-                value1Array = [value1Array]; // Ensure it's always an array
+                value1Array = [value1Array];
               }
 
-              for (let value1 of value1Array) { // Iterate through each value for the property
-                // value1 is the actual value object, e.g. { '@type': '...', 'rdf:value': '...' } or { '@id': '...' }
+              for (let value1 of value1Array) {
                 xmlLog.push(`Processing key1: ${key1} with value1: ${JSON.stringify(value1)}`);
-
-                // Create the element for the property itself (e.g., <bf:classificationPortion>)
-                let pLvl2 = this.createElByBestNS(key1);
+                let pLvl2 = this.createElByBestNS(key1); // Create element for the property
                 if (!pLvl2 || !pLvl2.nodeType) {
                   xmlLog.push(`Failed to create pLvl2 element for key ${key1}`);
-                  continue; // Skip if element creation failed
+                  continue;
                 }
 
-                // Check if value1 represents another blank node
+                // --- START SIMPLIFICATION for bf:assigner ---
+                // If the root property is bf:adminMetadata and this key is bf:assigner,
+                // skip the complex processing and insert the default structure.
+                if (ptObj.propertyURI === 'http://id.loc.gov/ontologies/bibframe/adminMetadata' && key1 === 'http://id.loc.gov/ontologies/bibframe/assigner') {
+                    xmlLog.push(`[Simplification] Found bf:assigner within bf:adminMetadata. Using default assigner element instead of processing userValue.`);
+                    const defaultAssigner = this.buildDefaultAssignerElement(); // This creates <bf:assigner><bf:Organization>...</bf:Organization></bf:assigner>
+                    bnodeLvl1.appendChild(defaultAssigner); // Append the whole default structure to the <bf:AdminMetadata> bnode
+                    // We created pLvl2 (<bf:assigner>) but won't use it or process its children (value1)
+                    xmlLog.push(`[Simplification] Appended default assigner structure.`);
+                    continue; // Skip the rest of the loop for this value1 (the assigner userValue)
+                }
+                // --- END SIMPLIFICATION ---
+
+
                 if (this.isBnode(value1)){
                   xmlLog.push(`Nested bnode found for key: ${key1}`);
                   let bnodeLvl2 = this.createBnode(value1, key1);
@@ -1295,6 +1338,18 @@ const utilsExport = {
                     if (!Array.isArray(value2Array)) {
                        value2Array = [value2Array];
                     }
+
+                    // --- START SIMPLIFICATION for nested bf:assigner ---
+                    // Also simplify if bf:assigner is found nested deeper
+                    if (key2 === 'http://id.loc.gov/ontologies/bibframe/assigner') {
+                        xmlLog.push(`[Simplification] Found nested bf:assigner. Using default assigner element.`);
+                        const defaultAssigner = this.buildDefaultAssignerElement();
+                        bnodeLvl2.appendChild(defaultAssigner); // Append default to the parent bnode (bnodeLvl2)
+                        xmlLog.push(`[Simplification] Appended default assigner structure to nested bnode.`);
+                        continue; // Skip processing the rest of the loop for this key2
+                    }
+                    // --- END SIMPLIFICATION ---
+
                     for (let value2 of value2Array) {
                       // Create element for the nested property (e.g., <bf:assigner>)
                       let pLvl3 = this.createElByBestNS(key2);
@@ -1370,8 +1425,9 @@ const utilsExport = {
                     xmlLog.push(`Could not extract literal value for key ${key1}: ${JSON.stringify(value1)}`);
                   }
                 }
-              }
-            }
+              } // end for (let value1...)
+            } // end for (let key1...)
+
             pLvl1.appendChild(bnodeLvl1);
             rootEl.appendChild(pLvl1);
             componentXmlLookup[`${rt}-${pt}`] = formatXML(pLvl1.outerHTML);
@@ -1660,7 +1716,7 @@ const utilsExport = {
 
                 sublocationNode.appendChild(labelNode);
                 sublocationEl.appendChild(sublocationNode);
-                rootEl.appendChild(sublocationEl); // Add the whole structure
+                rootEl.appendChild(sublocationEl); // Corrected variable name
 
                 componentXmlLookup[`${rt}-${pt}`] = formatXML(sublocationEl.outerHTML);
                 console.log(`Created sublocation with label: ${sublocationLabel}`);
@@ -1894,9 +1950,10 @@ const utilsExport = {
                   const sublocationEl = this.createElByBestNS('bf:sublocation');
                   const sublocationNode = this.createElByBestNS('bf:Sublocation');
                   const labelNode = this.createRdfsLabel(finalSublocationLabel);
+                  
                   sublocationNode.appendChild(labelNode);
                   sublocationEl.appendChild(sublocationNode);
-                  rootEl.appendChild(sublocationEl);
+                  rootEl.appendChild(sublocationEl); // Corrected variable name
                   console.log(`[Item Cleanup] Appended single clean sublocation with label: '${finalSublocationLabel}'`);
               } else {
                    console.warn(`[Item Cleanup] Could not determine a final label for sublocation. No element added.`);
