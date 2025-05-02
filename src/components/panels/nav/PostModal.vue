@@ -145,10 +145,15 @@
         }
 
         try {
-          const response = await this.profileStore.publishRecord(xmlString, profile, type) // Pass xmlString and type
-          this.postResults = response // Assign raw response directly
-          if (response.publish.status !== 'published') {
-            console.error('Error response:', response)
+          const response = await this.profileStore.publishRecord(xmlString, profile, type);
+          this.postResults = response; // Store the entire response
+
+          // Check the status from the publish property
+          if (response.publish && response.publish.status === 'published') {
+            // Handle success
+          } else {
+            // Handle error
+            console.error('Error response:', response);
           }
         } catch (error) {
           console.error('Error during post:', error)
@@ -171,19 +176,22 @@
       async handlePublish() {
         const profile = this.profileStore.activeProfile;
 
-        if (!profile?.eId) { // Ensure EID is available if needed elsewhere
+        if (!profile?.eId) {
           this.showError('EID is not available.');
           return;
-        }
+      }
 
-        const result = await this.profileStore.publishRecord(profile); // Removed 'eid'
+      const result = await this.profileStore.publishRecord(profile);
 
-        if (result.publish.status === 'published') {
-          this.showSuccess(result.name.instance_mms_id, result.name.work_mms_id);
-        } else {
-          this.showError(result.publish.message);
-        }
-      },
+      // Add null check
+      if (result && result.publish && result.publish.status === 'published') {
+        this.showSuccess(result.name.instance_mms_id, result.name.work_mms_id);
+      } else {
+        // Also add a null check here
+        const errorMessage = result && result.publish ? result.publish.message : 'Unknown error occurred';
+        this.showError(errorMessage);
+      }
+    },
 
       cleanUpErrorResponse: function(msg) {
         if (!msg) return '';
@@ -211,6 +219,31 @@
         if (this.showDropdown && !e.target.closest('.dropdown-wrapper') && !e.target.closest('.bar-menu')) {
           this.showDropdown = false;
         }
+      },
+
+      // Display success message with MMS IDs
+      showSuccess: function(instanceMmsId, workMmsId) {
+        this.postResults = {
+          publish: { 
+            status: 'published' 
+          },
+          name: {
+            instance_mms_id: instanceMmsId ? [instanceMmsId] : [],
+            work_mms_id: workMmsId ? [workMmsId] : []
+          }
+        };
+        this.posting = false;
+      },
+
+      // Display error message
+      showError: function(message) {
+        this.postResults = {
+          publish: {
+            status: 'error',
+            message: message || 'An unknown error occurred'
+          }
+        };
+        this.posting = false;
       },
     },
 

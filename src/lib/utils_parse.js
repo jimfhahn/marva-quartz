@@ -72,9 +72,10 @@ const utilsParse = {
   activeDom: null,
   hasItem: false,
 
-
-  namespace: utilsRDF.namespace,
-
+  // Define namespace property as a getter that uses utilsRDF.namespace
+  get namespace() {
+    return utilsRDF.namespace;
+  },
 
   /**
   * Tests if a URI string is likely an RDF Class
@@ -232,34 +233,90 @@ const utilsParse = {
   * @return {void}
   */
   parseXml: function(xml) {
-    console.log("Raw XML payload:", xml);
-    // If the payload isn't valid XML, skip further processing.
-    if (!xml.trim().startsWith('<')) {
-      console.warn("Payload is not XML. Skipping XML parsing.");
-      return xml; // or handle as needed
+    console.log("Raw XML payload:", xml); // Keep logging the raw payload
+
+    // Basic XML validation
+    if (!xml || typeof xml !== 'string') {
+      console.error("Invalid XML: Input is null, undefined, or not a string");
+      // Depending on expected behavior, you might throw an error or return early
+      // For now, let's throw an error to halt processing
+      throw new Error("Invalid XML: Input is empty or not a string");
     }
-    xml = ensureRoot(xml);
-    if (!xml.trim().startsWith('<')) {
-      console.error("The XML payload is still invalid:", xml);
+
+    // Check for common error indicators before parsing
+    if (xml.includes('<parsererror') || xml.includes('Not found')) {
+      console.error("XML appears to contain a parser error or 'Not found' message:", xml.substring(0, 200)); // Log snippet
+      throw new Error("XML parsing error: The requested record may not exist or the response is malformed.");
     }
+
+    // Trim and check if it starts with '<'
+    const trimmedXml = xml.trim();
+    if (!trimmedXml.startsWith('<')) {
+      console.error("Invalid XML: Does not start with '<'", trimmedXml.substring(0, 50));
+      throw new Error("Invalid XML: Malformed content, does not start with '<'.");
+    }
+
+    // The ensureRoot function seems to be missing, assuming it's defined elsewhere or removing if not needed.
+    // If ensureRoot modifies the XML, ensure it handles potential errors gracefully.
+    // xml = ensureRoot(xml); // Assuming ensureRoot exists and is necessary
+
     let parser = new DOMParser();
-    this.activeDom = parser.parseFromString(xml, 'application/xml');
-    this.testDom = parser.parseFromString(xml, 'application/xml');
-
-    let root = this.activeDom.getElementsByTagName('rdf:RDF')
-    if (root.length > 0){ root = root[0]}
-
-
-    this.hasInstance = 0
-    for (let rdfChild of root.children){
-      if (rdfChild.tagName == 'bf:Instance'){
-        this.hasInstance++
-      }
+    let parsedDoc;
+    try {
+      parsedDoc = parser.parseFromString(trimmedXml, 'application/xml');
+    } catch (parseError) {
+      console.error("DOMParser failed:", parseError, "Input XML:", trimmedXml.substring(0, 200));
+      throw new Error(`DOMParser failed: ${parseError.message}`);
     }
+
+    // Check for parser errors embedded in the parsed document
+    const parserError = parsedDoc.getElementsByTagName('parsererror');
+    if (parserError.length > 0) {
+      console.error("XML parsing error detected by DOMParser:", parserError[0].textContent);
+      throw new Error("XML parsing error: " + parserError[0].textContent);
+    }
+
+    this.activeDom = parsedDoc;
+    // this.testDom = parser.parseFromString(trimmedXml, 'application/xml'); // Redundant parsing? Remove if not needed.
+
+    // Validate the RDF root element AFTER successful parsing
+    let root = this.activeDom.getElementsByTagName('rdf:RDF');
+    if (root.length === 0) {
+      console.error("Missing <rdf:RDF> root element in parsed XML.");
+      // Decide how to handle this - throw error or allow processing?
+      // For robustness, maybe allow processing but log a significant warning.
+      // Or throw if <rdf:RDF> is absolutely required:
+      throw new Error("Invalid RDF/XML: Missing <rdf:RDF> root element.");
+    }
+    root = root[0]; // Now safe to access index 0
+
+    // Namespace validation could be added here if needed, checking root attributes
+    // const requiredNamespaces = ['xmlns:rdf', 'xmlns:bf', 'xmlns:bflc']; // Example
+    // requiredNamespaces.forEach(ns => {
+    //   if (!root.hasAttribute(ns)) {
+    //     console.warn(`Missing namespace declaration: ${ns}`);
+    //   }
+    // });
+
+
+    this.hasInstance = 0;
+    // Check children safely
+    if (root && root.children) {
+      for (let rdfChild of root.children) {
+        if (rdfChild.tagName == 'bf:Instance') {
+          this.hasInstance++;
+        }
+      }
+    } else {
+      console.warn("<rdf:RDF> element has no children to check for bf:Instance.");
+    }
+
 
     // test to see if there are any Items,
-    this.hasItem = this.activeDom.getElementsByTagName('bf:Item').length
+    this.hasItem = this.activeDom.getElementsByTagName('bf:Item').length;
 
+    // Return the parsed DOM or handle as needed
+    // return this.activeDom; // If the function should return the DOM
   },
 
   /**

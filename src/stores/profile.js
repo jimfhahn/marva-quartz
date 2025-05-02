@@ -3292,63 +3292,74 @@ export const useProfileStore = defineStore('profile', {
     /**
     * Publish record to backend
     *
-
-    * @return {obj} - response from posting action
+    * @param {string} xmlString - Optional XML string to publish, if not provided it will be generated
+    * @param {object} profile - The profile object containing record metadata
+    * @param {string} type - The type of content to publish: 'default', 'work', or 'instance'
+    * @return {Promise<object>} - Response from posting action
     */
-    publishRecord: async function(eid, profile){
-
-
-
-      let postingHub = false
-      if (this.activeProfile && this.activeProfile.id && this.activeProfile.id.indexOf(':Hub')>-1){
-        // ITS A HUB!
-        // do other things if its a hub
-        postingHub=true
-      }
-
-      let xml = await utilsExport.buildXML(this.activeProfile)
-
-
-      let pubResuts
-
-      if (postingHub){
-        pubResuts = await utilsNetwork.publish(xml.xlmStringBasic, this.activeProfile.eId, {id: 'Hub'})
-      }else{
-        pubResuts = await utilsNetwork.publish(xml.xlmStringBasic, this.activeProfile.eId, this.activeProfile)
-      }
-
-
-      pubResuts.resourceLinks=[]
-      // if it was accepted by the system send it to the marva backend to store as posted
-
-      if (pubResuts.status){
-        this.activeProfile.status = 'published'
-        await this.saveRecord()
-
-
-
-        const config = useConfigStore()
-
-        for (let rt in this.activeProfile.rt){
-          let type = rt.split(':').slice(-1)[0]
-          let url = config.convertToRegionUrl(this.activeProfile.rt[rt].URI)
-          let env = config.returnUrls.env
-
-          // populate the title
-          if (type=='Instance'){
-            let bibId =  this.activeProfile.rt[rt].URI.split("/")[this.activeProfile.rt[rt].URI.split('/').length - 1]
-            document.title = `Marva | ${bibId}`;
-          }
-
-          pubResuts.resourceLinks.push({
-            'type':type,
-            'url': url,
-            'env': env
-          })
+    publishRecord: async function(xmlString, profile, type = 'default') {
+      try {
+        console.log("DEBUG: publishRecord called with params:", {
+          xmlStringProvided: !!xmlString,
+          profileProvided: !!profile,
+          type: type
+        });
+        
+        // Get XML if not provided
+        let xml = xmlString;
+        if (!xml) {
+          console.log("DEBUG: No XML provided, generating from active profile");
+          const xmlObj = await utilsExport.buildXML(this.activeProfile);
+          xml = xmlObj.xmlStringFormatted;
+          console.log("DEBUG: Generated XML length:", xml ? xml.length : 0);
         }
+        
+        // Make sure XML is valid
+        if (!xml || xml === '<rdf:RDF></rdf:RDF>') {
+          console.error("DEBUG: Invalid XML - empty or null");
+          return {
+            status: false,
+            publish: { 
+              status: 'error', 
+              message: 'Failed to generate valid XML'
+            }
+          };
+        }
+    
+        // Determine if we need to filter content based on type
+        const config = useConfigStore();
+        let finalXml = xml;
+        
+        // Determine which publish URL to use based on the type parameter
+        let publishUrl;
+        if (type === 'work') {
+          publishUrl = config.returnUrls.workpublish;
+        } else if (type === 'instance') {
+          publishUrl = config.returnUrls.instancepublish;
+        } else {
+          // Default is both work and instance
+          publishUrl = config.returnUrls.publish;
+        }
+        
+        console.log("DEBUG: Using publish URL:", publishUrl);
+        
+        // Send publication request to backend
+        console.log("DEBUG: Sending publish request to backend");
+        const response = await utilsNetwork.publishRecord(finalXml, profile, publishUrl);
+        console.log("DEBUG: Backend response:", response);
+        
+        // Return properly structured response
+        return response;
+      } catch (error) {
+        console.error("DEBUG: Error during publish:", error);
+        return {
+          status: false,
+          publish: {
+            status: 'error',
+            message: error.message || "An unknown error occurred during publishing"
+          }
+        };
       }
-
-      return pubResuts
     },
 
 
@@ -3414,7 +3425,7 @@ export const useProfileStore = defineStore('profile', {
       }else if (numUpper == 1){
         code = code.split(':')[0] + ':' + justProperty.charAt(0) + justProperty.charAt(1) + justProperty.replace(/[a-z]/g, '')
       }else if (numUpper == 0){
-        code = code.split(':')[0] + ':' + justProperty.charAt(0) + justProperty.charAt(1) + justProperty.charAt(2)
+        code = code.split(':')[0] + justProperty.charAt(0) + justProperty.charAt(1) + justProperty.charAt(2)
       }
       // console.log("code=",code)
 
@@ -3460,9 +3471,6 @@ export const useProfileStore = defineStore('profile', {
       // let valueLocation = utilsProfile.returnValueFromPropertyPath(pt,propertyPath)
       // some hard coded hacks
 
-      if (fieldStructure.propertyURI === 'http://id.loc.gov/ontologies/bflc/nonSortNum'){
-        return false
-      }
       if (fieldStructure.propertyURI === 'http://id.loc.gov/ontologies/bibframe/mainTitle'){
         return true
       }
@@ -3488,7 +3496,7 @@ export const useProfileStore = defineStore('profile', {
     /**
     * returns if the request property has a value in it
     *
-    * @param {string} componentGuid - the guid of the component
+    * @param {string} componentGuid - the guid of the component (the parent of all fields)
     * @param {array} propertyPath - the property path of the property in question
     * @return {boolean} -
     */
@@ -3928,27 +3936,27 @@ export const useProfileStore = defineStore('profile', {
             for (let rtId in this.activeProfile.rt){
               if (rtId.indexOf(":Work") > -1){
                 workRtId = rtId
-                for (let ptId of this.activeProfile.rt[rtId].ptOrder){
-                  if (this.activeProfile.rt[rtId].pt[ptId].propertyURI == 'http://id.loc.gov/ontologies/bibframe/subject'){
+                for (let ptId of this.activeProfile.rt[workRtId].ptOrder){
+                  if (this.activeProfile.rt[workRtId].pt[ptId].propertyURI == 'http://id.loc.gov/ontologies/bibframe/subject'){
                     subjItems.push(ptId)
-                    if (this.activeProfile.rt[rtId].pt[ptId]["@guid"] == componentGuid){
+                    if (this.activeProfile.rt[workRtId].pt[ptId]["@guid"] == componentGuid){
                         target = ptId
                         targetType = "subject"
                     }
                   }
                   if (
-                        this.activeProfile.rt[rtId].pt[ptId].propertyURI == 'http://id.loc.gov/ontologies/bibframe/contribution' &&
-                        this.activeProfile.rt[rtId].pt[ptId].propertyLabel != "Creator of Work"
+                        this.activeProfile.rt[workRtId].pt[ptId].propertyURI == 'http://id.loc.gov/ontologies/bibframe/contribution' &&
+                        this.activeProfile.rt[workRtId].pt[ptId].propertyLabel != "Creator of Work"
                      ){
                     contribItems.push(ptId)
-                    if (this.activeProfile.rt[rtId].pt[ptId]["@guid"] == componentGuid){
+                    if (this.activeProfile.rt[workRtId].pt[ptId]["@guid"] == componentGuid){
                         target = ptId
                         targetType = "contribution"
                     }
                   }
-                  if (this.activeProfile.rt[rtId].pt[ptId].propertyURI == 'http://id.loc.gov/ontologies/bibframe/genreForm'){
+                  if (this.activeProfile.rt[workRtId].pt[ptId].propertyURI == 'http://id.loc.gov/ontologies/bibframe/genreForm'){
                     gfItems.push(ptId)
-                    if (this.activeProfile.rt[rtId].pt[ptId]["@guid"] == componentGuid){
+                    if (this.activeProfile.rt[workRtId].pt[ptId]["@guid"] == componentGuid){
                         target = ptId
                         targetType = "gf"
                     }
@@ -4211,7 +4219,13 @@ export const useProfileStore = defineStore('profile', {
                           }
                         }
 
-                        userValue[p.propertyURI].push(value)
+                        // if we're not working at the top level, just add the default values
+                        if (!isParentTop){
+                          userValue[p.propertyURI].push(value)
+                        //otherwise, make sure the propertyURI matches the baseURI
+                        } else if (isParentTop && p.propertyURI == baseURI){
+                          userValue[p.propertyURI].push(value)
+                        }
                       }
                     }else{
                       console.warn("Nested default template trying to insert values but there are multiple propertyTemplates so no clue which proerpty to look into for the default value: ", this.rtLookup[p.valueConstraint.valueTemplateRefs[0]])

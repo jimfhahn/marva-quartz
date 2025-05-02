@@ -883,6 +883,8 @@
       addInstance: function(secondary=false){
         let lccn = "" //prompt("Enter an LCCN for this Instance.")
         this.profileStore.createInstance(secondary, lccn)
+        // Emit event to trigger XML rebuild
+        this.$root.$emit('rebuild-xml');
       },
 
       addItem: function(){
@@ -912,12 +914,8 @@
         this.showItemInstanceSelection = false
         this.instances = []
         this.profileStore.createItem(this.targetInstance)
-      },
-      setInstance(data) {
-        this.targetInstance = this.instances[data];
-        this.showItemInstanceSelection = false;
-        this.instances = [];
-        this.profileStore.createItem(this.targetInstance);
+        // Emit event to trigger XML rebuild
+        this.$root.$emit('rebuild-xml');
       },
       async fetchContent(url) {
         const response = await fetch(url);

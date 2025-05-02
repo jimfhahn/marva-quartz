@@ -2720,7 +2720,9 @@ const utilsNetwork = {
     * @param {string} eId - the editor id
     * @return {void} -
     */
-
+    // TODO: The user reported an error "Type annotations can only be used in TypeScript files" pointing to the 'log' parameter on the next line.
+    // However, no type annotation was visible in the provided code. Assuming a type annotation like ': any' was present but not shown, it should be removed.
+    // If the error persists, check the project's build/lint configuration or the exact location reported by the tool.
     saveRecord: async function(xml, eId){
       const putMethod = {
         method: 'PUT', // Method itself
@@ -2917,18 +2919,77 @@ const utilsNetwork = {
       throw new Error('Profile or EID is not defined');
     }
     let uuid = translator.toUUID(translator.new());
-    const rawResponse = await fetch(publishUrl, {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ name: uuid, rdfxml: xmlString, eid: profile.eId, hub: profile.hub })
-    });
-    if (!rawResponse.ok) {
-      throw new Error(`Failed to publish: ${rawResponse.status} ${rawResponse.statusText}`);
+    
+    try {
+      const rawResponse = await fetch(publishUrl, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ name: uuid, rdfxml: xmlString, eid: profile.eId, hub: profile.hub })
+      });
+      
+      if (!rawResponse.ok) {
+        throw new Error(`Failed to publish: ${rawResponse.status} ${rawResponse.statusText}`);
+      }
+      
+      const content = await rawResponse.json();
+      console.log("Raw server response:", content);
+      
+      // If the server already returns data in the correct format, use it directly
+      if (content.name && 
+         ((content.name.instance_mms_id && content.name.instance_mms_id.length > 0) || 
+          (content.name.work_mms_id && content.name.work_mms_id.length > 0))) {
+        return {
+          status: true,
+          publish: {
+            status: 'published'
+          },
+          postLocation: content.postLocation || null,
+          name: content.name
+        };
+      }
+      
+      // Otherwise, try to extract MMS IDs from other fields
+      let instanceMmsIds = [];
+      let workMmsIds = [];
+      
+      if (content.mmsIds) {
+        // If server returns generic mmsIds array, assume they're instance IDs
+        instanceMmsIds = Array.isArray(content.mmsIds) ? content.mmsIds : [content.mmsIds];
+      } else if (content.ids) {
+        // If server returns generic ids array, assume they're instance IDs
+        instanceMmsIds = Array.isArray(content.ids) ? content.ids : [content.ids];
+      }
+      
+      // Format response to match what PostModal.vue expects
+      return {
+        status: true,
+        publish: {
+          status: 'published'
+        },
+        postLocation: content.postLocation || null,
+        name: {
+          instance_mms_id: instanceMmsIds,
+          work_mms_id: workMmsIds
+        }
+      };
+    } catch (error) {
+      console.error("Error publishing record:", error);
+      return {
+        status: false,
+        publish: {
+          status: 'error',
+          message: error.message
+        },
+        postLocation: null,
+        name: {
+          instance_mms_id: [],
+          work_mms_id: []
+        }
+      };
     }
-    return await rawResponse.json();
   },
 
     /**
@@ -3062,18 +3123,6 @@ const utilsNetwork = {
 
         // let results = [{"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TF148%20C66%202016", "term":"TF148 C66 2016", "frequency":"", "creator":"", "title":"Trains", "pubdate":"2016", "subject":"Railroad trains--Juvenile literature", "altsubject":"Railroad trains"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TF148%20.A46%202021", "term":"TF148 .A46 2021", "frequency":"", "creator":"", "title":"Listen up!", "pubdate":"2021", "subject":"Railroad trains--Juvenile literature", "altsubject":"Trains--Ouvrages pour la jeunesse"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TF148%20.A47%201983", "term":"TF148 .A47 1983", "frequency":"", "creator":"", "title":"Going on a train", "pubdate":"1983", "subject":"Railroads--Juvenile literature", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TF148%20.A5%201993", "term":"TF148 .A5 1993", "frequency":"", "creator":"", "title":"Trains at work", "pubdate":"1993", "subject":"Railroads--Juvenile literature", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TF148%20.B24%201999", "term":"TF148 .B24 1999", "frequency":"", "creator":"", "title":"The best book of trains", "pubdate":"1999", "subject":"Railroad trains--Juvenile literature", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TF148%20.B26%201998", "term":"TF148 .B26 1998", "frequency":"", "creator":"", "title":"Amazing trains", "pubdate":"1998", "subject":"Railroads--Juvenile literature", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TF148%20.B27%201986", "term":"TF148 .B27 1986", "frequency":"", "creator":"", "title":"Trains", "pubdate":"1986", "subject":"Railroads--Juvenile literature", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TF148%20.B3%201949", "term":"TF148 .B3 1949", "frequency":"", "creator":"", "title":"A book of trains", "pubdate":"1949", "subject":"Railroads--Juvenile literature", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TF148%20.B45%201984", "term":"TF148 .B45 1984", "frequency":"", "creator":"", "title":"Amazing trains of the world", "pubdate":"1984", "subject":"Railroads--Juvenile literature", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TF148%20.B4594%202018", "term":"TF148 .B4594 2018", "frequency":"", "creator":"", "title":"Trains", "pubdate":"2017", "subject":"Railroad trains--Juvenile literature", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TF148%20.B48%201990", "term":"TF148 .B48 1990", "frequency":"", "creator":"", "title":"The train book", "pubdate":"1990", "subject":"Railroads--Juvenile literature", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TF148%20.B49%201998", "term":"TF148 .B49 1998", "frequency":"", "creator":"", "title":"Big book of trains", "pubdate":"1998", "subject":"Railroad trains--Juvenile literature", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TF148%20.B49%202016", "term":"TF148 .B49 2016", "frequency":"", "creator":"", "title":"The big book of trains", "pubdate":"2016", "subject":"Locomotives--Juvenile literature", "altsubject":"Railroad trains--Juvenile literature"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TF148%20.B55", "term":"TF148 .B55", "frequency":"", "creator":"", "title":"Great trains of the world", "pubdate":"1953", "subject":"Railroads--Juvenile literature", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TF148%20.B69%201995", "term":"TF148 .B69 1995", "frequency":"", "creator":"", "title":"Trains", "pubdate":"1995", "subject":"Railroads--Juvenile literature", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TF148%20.B692%202017", "term":"TF148 .B692 2017", "frequency":"", "creator":"", "title":"Trains", "pubdate":"2017", "subject":"Railroad trains--Juvenile literature", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TF148%20.B693%202003", "term":"TF148 .B693 2003", "frequency":"", "creator":"", "title":"Railroading", "pubdate":"2003", "subject":"Railroads--Juvenile literature", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TF148%20.B696%201996", "term":"TF148 .B696 1996", "frequency":"", "creator":"", "title":"Freight trains", "pubdate":"1996", "subject":"Railroads--Juvenile literature", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TF148%20.B7", "term":"TF148 .B7", "frequency":"", "creator":"", "title":"Richard learns about railroading", "pubdate":"1969", "subject":"Railroads--Juvenile literature", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TF148%20.B717%202016", "term":"TF148 .B717 2016", "frequency":"", "creator":"", "title":"Rolling down the Avenue", "pubdate":"2016", "subject":"Street-railroads--Juvenile literature", "altsubject":""}]
         // results = [{"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TT820%20H316%202005", "term":"TT820 H316 2005", "frequency":"", "creator":"", "title":"Decorative knitting", "pubdate":"2005", "subject":"Knitting", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TT820%20H813145%202008", "term":"TT820 H813145 2008", "frequency":"", "creator":"", "title":"Knit aid", "pubdate":"2008", "subject":"Knitting", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TT820%20.A115%201991", "term":"TT820 .A115 1991", "frequency":"", "creator":"", "title":"42 favorite crochet motifs", "pubdate":"1992", "subject":"Crocheting--Patterns", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TT820%20.A1155%202023", "term":"TT820 .A1155 2023", "frequency":"", "creator":"", "title":"60 quick crochet projects for beginners", "pubdate":"2023", "subject":"Crocheting--Patterns", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TT820%20.A1156%202024", "term":"TT820 .A1156 2024", "frequency":"", "creator":"", "title":"60 quick granny squares", "pubdate":"2024", "subject":"Crocheting--Patterns", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TT820%20.A1158%202012", "term":"TT820 .A1158 2012", "frequency":"", "creator":"", "title":"101 crochet stitch patterns & edgings", "pubdate":"2012", "subject":"Crocheting", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TT820%20.A116%202002", "term":"TT820 .A116 2002", "frequency":"", "creator":"", "title":"101 double-ended hook stitches", "pubdate":"2002", "subject":"Crocheting--Patterns", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TT820%20.A117%201996", "term":"TT820 .A117 1996", "frequency":"", "creator":"", "title":"101 fun-to-crochet projects", "pubdate":"1996", "subject":"Crocheting--Patterns", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TT820%20.A119%201995", "term":"TT820 .A119 1995", "frequency":"", "creator":"", "title":"150 favorite crochet designs", "pubdate":"1995", "subject":"Crocheting--Patterns", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TT820%20.A11912%202017", "term":"TT820 .A11912 2017", "frequency":"", "creator":"", "title":"200 fun things to crochet", "pubdate":"2017", "subject":"Crocheting--Patterns", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TT820%20.A11913%202017", "term":"TT820 .A11913 2017", "frequency":"", "creator":"", "title":"200 fun things to knit", "pubdate":"2017", "subject":"Knitting--Patterns", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TT820%20.A1194%202015", "term":"TT820 .A1194 2015", "frequency":"", "creator":"", "title":"500 crochet stitches", "pubdate":"2015", "subject":"Crocheting--Technique", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TT820%20.A1196%202008", "term":"TT820 .A1196 2008", "frequency":"", "creator":"", "title":"A to Z of crochet", "pubdate":"2008", "subject":"Crocheting", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TT820%20.A11968%202009", "term":"TT820 .A11968 2009", "frequency":"", "creator":"", "title":"A to Z of knitting", "pubdate":"2009", "subject":"Knitting--Handbooks, manuals, etc.", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TT820%20.A1197%202020", "term":"TT820 .A1197 2020", "frequency":"", "creator":"", "title":"A-Z of knitting", "pubdate":"2020", "subject":"Knitting", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TT820%20.A19", "term":"TT820 .A19", "frequency":"", "creator":"", "title":"The complete book of knitting", "pubdate":"1971", "subject":"Knitting", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TT820%20.A33%202019", "term":"TT820 .A33 2019", "frequency":"", "creator":"", "title":"Fair Isle mittens", "pubdate":"2019", "subject":"Crocheting", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TT820%20.A42%202007", "term":"TT820 .A42 2007", "frequency":"", "creator":"", "title":"The natural knitter", "pubdate":"2007", "subject":"Knitting", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TT820%20.A48", "term":"TT820 .A48", "frequency":"", "creator":"", "title":"Le Tricot", "pubdate":"1977", "subject":"Knitting", "altsubject":""}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=TT820%20.A5149%202020", "term":"TT820 .A5149 2020", "frequency":"", "creator":"", "title":"Knitting & crocheting all-in-one", "pubdate":"2020", "subject":"Knitting--Patterns", "altsubject":""}]
-        // let results = [{"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=G3762.B495%201998%20.U5", "term":"G3762.B495 1998 .U5", "frequency":"", "creator":"", "title":"Blackstone River Valley National Heritage Corridor, Massachusetts/Rhode Island", "pubdate":"1998", "subject":"John H. Chafee Blackstone River Valley National Heritage Corridor (Mass. and R.I.)--Maps", "altsubject":"", "bibid":"5568980"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=G3762.B495%201999%20.U5", "term":"G3762.B495 1999 .U5", "frequency":"", "creator":"", "title":"Blackstone River Valley National Heritage Corridor, Massachusetts/Rhode Island", "pubdate":"1999", "subject":"John H. Chafee Blackstone River Valley National Heritage Corridor (Mass. and R.I.)--Maps", "altsubject":"", "bibid":"11797321"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=G3762.B495%202000%20.U5", "term":"G3762.B495 2000 .U5", "frequency":"", "creator":"", "title":"Blackstone River Valley National Heritage Corridor, Massachusetts, Rhode Island", "pubdate":"2000", "subject":"John H. Chafee Blackstone River Valley National Heritage Corridor (Mass. and R.I.)--Maps", "altsubject":"", "bibid":"19660525"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=G3762.B495%202003%20.U5", "term":"G3762.B495 2003 .U5", "frequency":"", "creator":"", "title":"Blackstone River Valley", "pubdate":"2003", "subject":"John H. Chafee Blackstone River Valley National Heritage Corridor (Mass. and R.I.)--Maps", "altsubject":"", "bibid":"19664821"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=G3762.B495%202004%20.U5", "term":"G3762.B495 2004 .U5", "frequency":"", "creator":"", "title":"Blackstone River Valley National Heritage Corridor, Massachusetts, Rhode Island", "pubdate":"2004", "subject":"John H. Chafee Blackstone River Valley National Heritage Corridor (Mass and R.I.)--Maps", "altsubject":"", "bibid":"19658722"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=G3762.B495%202006%20.U5", "term":"G3762.B495 2006 .U5", "frequency":"", "creator":"", "title":"Blackstone River Valley National Heritage Corridor, Massachusetts, Rhode Island", "pubdate":"2006", "subject":"John H. Chafee Blackstone River Valley National Heritage Corridor (Mass and R.I.)--Maps", "altsubject":"", "bibid":"19658918"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=G3762.B49P2%202004%20.A7", "term":"G3762.B49P2 2004 .A7", "frequency":"", "creator":"", "title":"Blackstone Valley, Massachusetts, street map", "pubdate":"2004", "subject":"Roads--Blackstone River Valley (Mass. and R.I.)--Maps", "altsubject":"", "bibid":"14274188"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=G3762.B4A5%201990%20.C3", "term":"G3762.B4A5 1990 .C3", "frequency":"", "creator":"", "title":"The Berkshires", "pubdate":"1990", "subject":"Berkshire Hills (Mass.)--Maps.", "altsubject":"", "bibid":"12770913"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=G3762.B4E63%201997%20.R8", "term":"G3762.B4E63 1997 .R8", "frequency":"", "creator":"", "title":"Western Massachusetts bicycle and road map, bed & breakfast guide", "pubdate":"1997", "subject":"Bicycle trails--Massachusetts--Berkshire Hills--Maps", "altsubject":"", "bibid":"5569084"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=G3762.B4E63%202004%20.R8", "term":"G3762.B4E63 2004 .R8", "frequency":"", "creator":"", "title":"Western Massachusetts road and bicycle map, bed & breakfast guide", "pubdate":"2004", "subject":"Bicycle trails--Massachusetts--Berkshire Hills--Maps", "altsubject":"", "bibid":"14637168"}, {"selected":"selected", "lookup":"", "term":"G3762.B4E635 1975 .G7", "frequency":"", "creator":"", "title":"The Berkshires", "pubdate":"1975", "subject":"Berkshire Hills (Mass.)--Maps.", "altsubject":"", "bibid":"5428687"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=G3762.B4E635%201978%20.G7", "term":"G3762.B4E635 1978 .G7", "frequency":"", "creator":"", "title":"Circle tours, the Berkshires", "pubdate":"1978", "subject":"Berkshire Hills, Mass.--Maps.", "altsubject":"", "bibid":"5445127"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=G3762.B4E635%201981%20.G7", "term":"G3762.B4E635 1981 .G7", "frequency":"", "creator":"", "title":"The Berkshires", "pubdate":"1981", "subject":"Berkshire Hills (Mass.)--Maps.", "altsubject":"", "bibid":"5463162"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=G3762.B4E635%202001%20.R4", "term":"G3762.B4E635 2001 .R4", "frequency":"", "creator":"", "title":"The best of Berkshires, Massachusetts, north County featuring Adams, North Adams, Pittsfield,...", "pubdate":"2000", "subject":"Berkshire Hills (Mass.)--Maps.", "altsubject":"", "bibid":"13816560"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=G3762.B4E635%202002%20.R4", "term":"G3762.B4E635 2002 .R4", "frequency":"", "creator":"", "title":"The best of Berkshires, Massachusetts, 2002", "pubdate":"2001", "subject":"Berkshire Hills (Mass.)--Maps.", "altsubject":"", "bibid":"13816576"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=G3762.B4E635%202004%20.R4", "term":"G3762.B4E635 2004 .R4", "frequency":"", "creator":"", "title":"The best of the Berkshires, Massachusetts, 2004", "pubdate":"2003", "subject":"Berkshire Hills (Mass.)--Maps.", "altsubject":"", "bibid":"13816614"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=G3762.B4E635%202005%20.R4", "term":"G3762.B4E635 2005 .R4", "frequency":"", "creator":"", "title":"The best of the Berkshires, Massachusetts, 2005", "pubdate":"2004", "subject":"Berkshire Hills (Mass.)--Maps.", "altsubject":"", "bibid":"13900397"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=G3762.B4E635%202006%20.R4", "term":"G3762.B4E635 2006 .R4", "frequency":"", "creator":"", "title":"The best of the Berkshires, Massachusetts, 2006", "pubdate":"2005", "subject":"Berkshire Hills (Mass.)--Maps.", "altsubject":"", "bibid":"14527448"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=G3762.B4E635%202007%20.R4", "term":"G3762.B4E635 2007 .R4", "frequency":"", "creator":"", "title":"The best of the Berkshires, Massachusetts, 2007", "pubdate":"2006", "subject":"Berkshire Hills (Mass.)--Maps.", "altsubject":"", "bibid":"15065556"}, {"lookup":"/lds/search.xqy?count=10&sort=score-desc&pg=1&precision=exact&qname=idx:lcclass&q=G3762.B4E635%202009%20.R4", "term":"G3762.B4E635 2009 .R4", "frequency":"", "creator":"", "title":"The best of the Berkshires, Massachusetts, 2009", "pubdate":"2008", "subject":"Berkshire Hills (Mass.)--Maps.", "altsubject":"", "bibid":"15684452"}]
-
-        let selectedIndex = -1
-        let c = 0
-        for (let r of results){
-          r['lookup'] = useConfigStore().returnUrls.shelfListing.slice(0, -1) + r['lookup']
-          if (r.selected){
-            selectedIndex = c
-          }
-          c++
-        }
-        // selectedIndex = selectedIndex - 1
         // if (selectedIndex > -1){
         //   results.splice(selectedIndex, 0, {
         //     term:'-----',
@@ -3092,10 +3141,8 @@ const utilsNetwork = {
 
     },
 
-    sendErrorReportLog: function(log,filename,profileAsJson){
-
-      let url = useConfigStore().returnUrls.util + 'errorlog/'
-
+    sendErrorReportLog: function(log, filename, profileAsJson) {
+      let url = useConfigStore().returnUrls.util + 'errorlog/';
 
       fetch(url, {
         method: 'POST',
@@ -3105,12 +3152,10 @@ const utilsNetwork = {
         },
         body: JSON.stringify({
           log: log,
-          filename:filename,
+          filename: filename,
           profile: profileAsJson
         })
       });
-
-
     },
 
 
@@ -3152,11 +3197,11 @@ const utilsNetwork = {
 
     },
 
-    logActiveTemplate() {
+    logActiveTemplate: function() {  // Changed to consistent style with other methods
         // Use optional chaining and a default value to avoid errors if the store is not initialized
         const templateType = useConfigStore()?.activeProfile?.templateType || 'monograph';
         console.log('Active template type:', templateType);
-    },
+    } // No comma after the last property
 
 }
 

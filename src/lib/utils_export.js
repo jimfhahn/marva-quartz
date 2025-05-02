@@ -1,11 +1,31 @@
-// Add the missing import statements at the top of the file
-import {useConfigStore} from "../stores/config";
-import {useProfileStore} from "../stores/profile";
-import {usePreferenceStore} from "../stores/preference";
-import utilsRDF from './utils_rdf';
-import utilsNetwork from './utils_network';
-import { parse as parseEDTF } from 'edtf';
+// import the required modules at the top of the file
+import { useConfigStore } from '@/stores/config';
+import { usePreferenceStore } from '@/stores/preference';
+import { useProfileStore } from '@/stores/profile';
+import utilsRDF from '@/lib/utils_rdf';
+import utilsNetwork from '@/lib/utils_network';
+import utilsParse from '@/lib/utils_parse';
 
+// Rest of the imports would be added here if needed
+
+// Add debugging function
+const DEBUG_ENABLED = true;
+
+/**
+ * Debugging helper function that logs messages conditionally based on DEBUG_ENABLED flag
+ * @param {string} message - The message to log
+ * @param {any} data - Optional data to log along with the message
+ */
+function debugLog(message, data = undefined) {
+  if (!DEBUG_ENABLED) return;
+  
+  const timestamp = new Date().toISOString();
+  if (data !== undefined) {
+    console.log(`[${timestamp}] DEBUG: ${message}`, data);
+  } else {
+    console.log(`[${timestamp}] DEBUG: ${message}`);
+  }
+}
 
 const escapeHTML = str => str.replace(/[&<>'"]/g,
   tag => ({
@@ -1623,7 +1643,7 @@ const utilsExport = {
                          }
                      }
                      // Check for doubly nested physicalLocation structure seen in logs
-                     else if (userValue[ptObj.propertyURI] && userValue[ptObj.propertyURI][0] && userValue[ptObj.propertyURI][0][rdfsLabelURI] && userValue[ptObj.propertyURI][0][rdfsLabelURI][0] && userValue[ptObj.propertyURI][0][rdfsLabelURI][0]['@id']) {
+                     else if (userValue[ptObj.propertyURI] && userValue[ptObj.propertyURI][0] && userValue[ptObj.propertyURI][0][rdfsLabelURI] && userValue[ptObj.propertyURI][0][rdfsLabelURI][0]['@id']) {
                          locationId = userValue[ptObj.propertyURI][0][rdfsLabelURI][0]['@id'];
                      }
                 }
@@ -1659,72 +1679,117 @@ const utilsExport = {
             }
             continue; // Skip standard processing
         } else if (ptObj.propertyURI === 'http://id.loc.gov/ontologies/bibframe/sublocation') {
-            console.log('--- Simplified sublocation handling ---');
-
-            // Extract sublocation value more robustly
-            let sublocationLabel = null;
-            let sublocationId = null; // Keep track of ID if found
-
-            if (typeof userValue === 'string') {
-                sublocationLabel = userValue;
-            } else if (userValue && typeof userValue === 'object') {
-                sublocationId = userValue['@id']; // Check for ID first
-
-                // Look for label in various structures
-                const rdfsLabelURI = 'http://www.w3.org/2000/01/rdf-schema#label';
-                if (userValue.rdfsLabel) { // Direct property
-                    sublocationLabel = userValue.rdfsLabel;
-                } else if (userValue[rdfsLabelURI] && userValue[rdfsLabelURI][0]) { // Nested label object
-                    if (userValue[rdfsLabelURI][0]['@value']) {
-                        sublocationLabel = userValue[rdfsLabelURI][0]['@value'];
-                    } else if (userValue[rdfsLabelURI][0]['@id']) {
-                        sublocationId = userValue[rdfsLabelURI][0]['@id']; // Get ID if label value is missing
-                    }
-                }
-                // Check for the structure <bf:sublocation><bf:Sublocation><rdfs:label>stor</rdfs:label>...
-                else if (userValue['bf:Sublocation'] && userValue['bf:Sublocation'][0] && userValue['bf:Sublocation'][0][rdfsLabelURI] && userValue['bf:Sublocation'][0][rdfsLabelURI][0] && userValue['bf:Sublocation'][0][rdfsLabelURI][0]['@value']) {
-                     sublocationLabel = userValue['bf:Sublocation'][0][rdfsLabelURI][0]['@value'];
-                }
-                 // Check for the structure <bf:sublocation><bf:Sublocation><rdfs:label rdf:resource="..."></rdfs:label>...
-                else if (userValue['bf:Sublocation'] && userValue['bf:Sublocation'][0] && userValue['bf:Sublocation'][0][rdfsLabelURI] && userValue['bf:Sublocation'][0][rdfsLabelURI][0] && userValue['bf:Sublocation'][0][rdfsLabelURI][0]['@id']) {
-                     sublocationId = userValue['bf:Sublocation'][0][rdfsLabelURI][0]['@id'];
-                }
-
-
-                // If we only found an ID, extract label from it
-                if (!sublocationLabel && sublocationId) {
-                    console.log(`[sublocation] Extracted ID: ${sublocationId}`);
-                    const idParts = sublocationId.split(':');
-                    sublocationLabel = idParts[idParts.length - 1]; // e.g., 'stor'
-                }
+          console.log("--- Simplified sublocation handling ---")
+          
+          try {
+            let sublocationId = targetHolding.sublocationText
+            if (sublocationId && typeof sublocationId === 'string' && sublocationId.trim() !== '') {
+              console.log("[sublocation] Extracted ID:", sublocationId)
+              
+              // Define newSublocation variable before using it
+              const newSublocation = this.createElByBestNS('bf:sublocation'); // <-- Changed to use proper method
+              
+              // Create proper sublocation structure
+              const sublocationNode = this.createElByBestNS('bf:Sublocation');
+              const labelNode = this.createRdfsLabel(sublocationId);
+              
+              // Build the structure correctly
+              sublocationNode.appendChild(labelNode);
+              newSublocation.appendChild(sublocationNode);
+              rootEl.appendChild(newSublocation);
+              
+              // Add to component XML lookup
+              componentXmlLookup[`${rt}-${pt}`] = formatXML(newSublocation.outerHTML);
+              console.log(`Created sublocation with value: ${sublocationId}`);
             }
+          } catch (e) {
+            console.error("Error in sublocation handling:", e)
+          }
+        } else if (ptObj.propertyURI === 'http://id.loc.gov/ontologies/bibframe/sublocation') {
+          console.log('--- Simplified sublocation handling ---');
+
+          // Extract sublocation value more robustly
+          let sublocationLabel = null;
+          let sublocationId = null; // Keep track of ID if found
+
+          if (typeof userValue === 'string') {
+              sublocationLabel = userValue;
+          } else if (userValue && typeof userValue === 'object') {
+              sublocationId = userValue['@id']; // Check for ID first
+
+              // Look for label in various structures
+              const rdfsLabelURI = 'http://www.w3.org/2000/01/rdf-schema#label';
+              if (userValue.rdfsLabel) { // Direct property
+                  sublocationLabel = userValue.rdfsLabel;
+              } else if (userValue[rdfsLabelURI] && userValue[rdfsLabelURI][0]) { // Nested label object
+                  if (userValue[rdfsLabelURI][0]['@value']) {
+                      sublocationLabel = userValue[rdfsLabelURI][0]['@value'];
+                  } else if (userValue[rdfsLabelURI][0]['@id']) {
+                      sublocationId = userValue[rdfsLabelURI][0]['@id']; // Get ID if label value is missing
+                  }
+              }
+              // Check for the structure <bf:sublocation><bf:Sublocation><rdfs:label>stor</rdfs:label>...
+              else if (userValue['bf:Sublocation'] && userValue['bf:Sublocation'][0] && userValue['bf:Sublocation'][0][rdfsLabelURI] && userValue['bf:Sublocation'][0][rdfsLabelURI][0]['@value']) {
+                   sublocationLabel = userValue['bf:Sublocation'][0][rdfsLabelURI][0]['@value'];
+              }
+               // Check for the structure <bf:sublocation><bf:Sublocation><rdfs:label rdf:resource="..."></rdfs:label>...
+              else if (userValue['bf:Sublocation'] && userValue['bf:Sublocation'][0] && userValue['bf:Sublocation'][0][rdfsLabelURI] && userValue['bf:Sublocation'][0][rdfsLabelURI][0]['@id']) {
+                   sublocationId = userValue['bf:Sublocation'][0][rdfsLabelURI][0]['@id'];
+              }
 
 
-            // If we found a label, create the element with the desired structure
-            if (sublocationLabel) {
-                // Remove any existing sublocation elements first
-                const existingSublocationElements = Array.from(rootEl.querySelectorAll('bf\\:sublocation')); // Correct selector
-                if (existingSublocationElements.length > 0) {
-                    console.log(`[sublocation] Removing ${existingSublocationElements.length} existing elements.`);
-                    existingSublocationElements.forEach(el => el.parentNode?.removeChild(el));
-                }
+              // If we only found an ID, extract label from it
+              if (!sublocationLabel && sublocationId) {
+                  console.log(`[sublocation] Extracted ID: ${sublocationId}`);
+                  const idParts = sublocationId.split(':');
+                  sublocationLabel = idParts[idParts.length - 1]; // e.g., 'stor'
+              }
+          }
 
-                // Create with exactly the structure you want:
-                const sublocationEl = this.createElByBestNS(ptObj.propertyURI); // bf:sublocation
-                const sublocationNode = this.createElByBestNS('bf:Sublocation'); // bf:Sublocation
-                const labelNode = this.createRdfsLabel(sublocationLabel); // rdfs:label
 
-                sublocationNode.appendChild(labelNode);
-                sublocationEl.appendChild(sublocationNode);
-                rootEl.appendChild(sublocationEl); // Corrected variable name
+          // If we found a label, create the element with the desired structure
+          if (sublocationLabel) {
+              // Remove any existing sublocation elements first
+              const existingSublocationElements = Array.from(rootEl.querySelectorAll('bf\\:sublocation')); // Correct selector
+              if (existingSublocationElements.length > 0) {
+                  console.log(`[sublocation] Removing ${existingSublocationElements.length} existing elements.`);
+                  existingSublocationElements.forEach(el => el.parentNode?.removeChild(el));
+              }
 
-                componentXmlLookup[`${rt}-${pt}`] = formatXML(sublocationEl.outerHTML);
-                console.log(`Created sublocation with label: ${sublocationLabel}`);
-            } else {
-                console.log('[sublocation] Could not determine sublocation label from userValue:', userValue);
+              // Create with exactly the structure you want:
+              const sublocationEl = this.createElByBestNS(ptObj.propertyURI); // bf:sublocation
+              const sublocationNode = this.createElByBestNS('bf:Sublocation'); // bf:Sublocation
+              const labelNode = this.createRdfsLabel(sublocationLabel); // rdfs:label
+
+              sublocationNode.appendChild(labelNode);
+              newSublocation.appendChild(sublocationNode);
+              rootEl.appendChild(newSublocation); // Changed from itemElement to rootEl
+
+              componentXmlLookup[`${rt}-${pt}`] = formatXML(sublocationEl.outerHTML);
+              console.log(`Created sublocation with label: ${sublocationLabel}`);
+          } else {
+              console.log('[sublocation] Could not determine sublocation label from userValue:', userValue);
+          }
+
+          continue; // Skip standard processing
+        } else if (ptObj.propertyURI === 'http://id.loc.gov/ontologies/bibframe/sublocation') {
+          console.log("--- Simplified sublocation handling ---")
+          
+          try {
+            let sublocationId = targetHolding.sublocationText
+            if (sublocationId && typeof sublocationId === 'string' && sublocationId.trim() !== '') {
+              console.log("[sublocation] Extracted ID:", sublocationId)
+              
+              // Define newSublocation variable before using it
+              let newSublocation = doc.createElement('sublocation')
+              
+              // Then use newSublocation for whatever operations follow
+              newSublocation.textContent = sublocationId
+              // Append to parent element, etc.
             }
-
-            continue; // Skip standard processing
+          } catch (e) {
+            console.error("Error in sublocation handling:", e)
+          }
         } else if (ptObj.type === 'literal-lang') {
           // ...existing code...
         }
@@ -1947,13 +2012,13 @@ const utilsExport = {
 
               // If a label was found, create the single correct structure
               if (finalSublocationLabel) {
-                  const sublocationEl = this.createElByBestNS('bf:sublocation');
+                  const newSublocation = this.createElByBestNS('bf:sublocation');
                   const sublocationNode = this.createElByBestNS('bf:Sublocation');
                   const labelNode = this.createRdfsLabel(finalSublocationLabel);
                   
                   sublocationNode.appendChild(labelNode);
-                  sublocationEl.appendChild(sublocationNode);
-                  rootEl.appendChild(sublocationEl); // Corrected variable name
+                  newSublocation.appendChild(sublocationNode);
+                  rootEl.appendChild(newSublocation); // Corrected variable name
                   console.log(`[Item Cleanup] Appended single clean sublocation with label: '${finalSublocationLabel}'`);
               } else {
                    console.warn(`[Item Cleanup] Could not determine a final label for sublocation. No element added.`);
@@ -2149,6 +2214,36 @@ const utilsExport = {
       rdf.appendChild(theHub);
     }
     
+    
+    // DIRECT WORK HANDLING: Ensure all standalone Works are added directly to the RDF root
+    console.log("DEBUG: Processing standalone Works for direct inclusion in RDF root");
+    for (let URI in tleLookup['Work']){
+      // Skip if this URI doesn't exist or isn't an actual Work
+      if (!tleLookup['Work'][URI]) {
+        console.log(`DEBUG: Work ${URI} doesn't exist in tleLookup['Work']`);
+        continue;
+      }
+  
+      try {
+        // Ensure we have a proper Work element
+        console.log(`DEBUG: Processing Work ${URI} for inclusion`);
+        const work = tleLookup['Work'][URI].cloneNode(true); // Clone to avoid modifying original
+    
+        if (!work || !work.nodeType) {
+          console.log(`DEBUG: Work ${URI} is not a valid node`);
+          continue;
+        }
+    
+        // Verify bf:Work is properly created
+        console.log(`DEBUG: Work ${URI} nodeName = ${work.nodeName}`);
+    
+        // Append directly to RDF root - this is the critical part
+        rdf.appendChild(work);
+        console.log(`DEBUG: Successfully added Work ${URI} directly to RDF root`);
+      } catch (error) {
+        console.error(`Error adding Work ${URI} to RDF root:`, error);
+      }
+    }
     // DIRECT ITEM HANDLING: Ensure all standalone Items are added directly to the RDF root
     console.log("DEBUG: Processing standalone Items for direct inclusion in RDF root");
     for (let URI in tleLookup['Item']){
@@ -2297,13 +2392,19 @@ const utilsExport = {
     rdfBasic = this.fixBarcodeStructures(rdfBasic);
     bf2MarcXmlElRdf = this.fixBarcodeStructures(bf2MarcXmlElRdf); // Corrected variable name
 
+    // Clean up XML strings (optional, but kept from previous state)
+    strXml = this.sanitizeXmlString(strXml)
+    strXmlFormatted = this.sanitizeXmlString(strXmlFormatted)
+    strBf2MarcXmlElBib = this.sanitizeXmlString(strBf2MarcXmlElBib)
+    strXmlBasic = this.sanitizeXmlString(strXmlBasic)
+
     // Return the XML in various formats
     return {
-      xmlDom: rdf,
-      xmlStringFormatted: this.sanitizeXmlString(strXmlFormatted),
-      xlmString: this.sanitizeXmlString(strXml),
-      bf2Marc: this.sanitizeXmlString(strBf2MarcXmlElBib),
-      xlmStringBasic: this.sanitizeXmlString(strXmlBasic),
+      xmlDom: rdf, // DOM now includes DatasetDescription
+      xmlStringFormatted: strXmlFormatted,
+      xlmString: strXml, // This should now be complete
+      bf2Marc: strBf2MarcXmlElBib,
+      xlmStringBasic: strXmlBasic,
       voidTitle: xmlVoidDataTitle,
       voidContributor: xmlVoidDataContributor,
       componentXmlLookup: componentXmlLookup

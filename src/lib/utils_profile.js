@@ -465,8 +465,23 @@ const utilsProfile = {
   */
   loadRecordFromBackend: async function(recordId){
     let xml = await utilsNetwork.loadSavedRecord(recordId)
+
+    // Check if the record was loaded successfully
+    if (xml === false || typeof xml !== 'string') {
+      console.error(`Error loading record with ID: ${recordId}. Record not found or network error.`);
+      // Handle the error appropriately - maybe show a user message or return null/throw error
+      // For now, let's return null to indicate failure
+      return null;
+    }
+
+    // Proceed only if xml is a valid string
     let meta = this.returnMetaFromSavedXML(xml)
 
+    // Check if meta extraction was successful (returnMetaFromSavedXML might also fail)
+    if (!meta || !meta.xml) {
+        console.error(`Error extracting metadata from saved XML for record ID: ${recordId}.`);
+        return null; // Or handle error appropriately
+    }
 
 
     utilsParse.parseXml(meta.xml)
@@ -631,53 +646,83 @@ const utilsProfile = {
   returnMetaFromSavedXML: function(xml){
 
       let parser = new DOMParser();
-      xml = parser.parseFromString(xml, "text/xml");
-      let voidData = xml.getElementsByTagName('void:DatasetDescription')[0]
+      let xmlDoc = parser.parseFromString(xml, "text/xml"); // Use xmlDoc consistently
+      let voidData = xmlDoc.getElementsByTagName('void:DatasetDescription')[0];
 
-      let rts = []
+      let meta = { // Initialize meta object
+          rts: [],
+          eid: null,
+          status: null,
+          profile: null,
+          procInfo: null,
+          user: null,
+          void: {}, // Initialize void object within meta
+          xml: null // Will hold the final XML string
+      };
 
+      if (!voidData) {
+          console.error("VOID DatasetDescription element not found in the provided XML.");
+          // Decide how to handle this - return null, throw error, or return partial meta?
+          // Returning partial meta for now, but might need adjustment.
+          meta.xml = (new XMLSerializer()).serializeToString(xmlDoc); // Serialize original if VOID is missing
+          return meta;
+      }
+
+      // --- Extract metadata BEFORE removing voidData ---
       for (let rt of voidData.getElementsByTagName('lclocal:rtsused')){
-          rts.push(rt.innerHTML)
+          meta.rts.push(rt.innerHTML);
       }
-
-      let eid = null
       for (let el of voidData.getElementsByTagName('lclocal:eid')){
-          eid = el.innerHTML
+          meta.eid = el.innerHTML;
       }
-
-      let status = null
       for (let el of voidData.getElementsByTagName('lclocal:status')){
-          status = el.innerHTML
+          meta.status = el.innerHTML;
       }
-
-      let profile = null
       for (let el of voidData.getElementsByTagName('lclocal:typeid')){
-          profile = el.innerHTML
+          meta.profile = el.innerHTML;
       }
-      let procInfo = null
       for (let el of voidData.getElementsByTagName('lclocal:procinfo')){
-          procInfo = el.innerHTML
+          meta.procInfo = el.innerHTML;
       }
-
-
-      let user = null
       for (let el of voidData.getElementsByTagName('lclocal:user')){
-          user = el.innerHTML
+          meta.user = el.innerHTML;
       }
 
-      voidData.remove()
-
-      xml = (new XMLSerializer()).serializeToString(xml)
-
-      return {
-          rts:rts,
-          xml:xml,
-          eid: eid,
-          status:status,
-          profile:profile,
-          procInfo:procInfo,
-          user:user
+      // --- Parse detailed VOID data BEFORE removing voidData ---
+      meta.void.uriSpace = voidData.getElementsByTagName('void:uriSpace')[0]?.textContent || '';
+      meta.void.classPartition = [];
+      for (let cp of voidData.getElementsByTagName('void:classPartition')){
+          const classElement = cp.getElementsByTagName('void:class')[0];
+          const triplesElement = cp.getElementsByTagName('void:triples')[0];
+          if (classElement && triplesElement) {
+              meta.void.classPartition.push({
+                  class: classElement.getAttribute('rdfs:resource'),
+                  triples: triplesElement.textContent
+              });
+          }
       }
+      meta.void.propertyPartition = [];
+      for (let pp of voidData.getElementsByTagName('void:propertyPartition')){
+          const propertyElement = pp.getElementsByTagName('void:property')[0];
+          const triplesElement = pp.getElementsByTagName('void:triples')[0];
+          if (propertyElement && triplesElement) {
+              meta.void.propertyPartition.push({
+                  property: propertyElement.getAttribute('rdfs:resource'),
+                  triples: triplesElement.textContent
+              });
+          }
+      }
+      // --- End of VOID parsing ---
+
+      // Now remove the voidData element
+      voidData.remove();
+
+      // Serialize the XML *after* removing voidData
+      meta.xml = (new XMLSerializer()).serializeToString(xmlDoc);
+
+      // REMOVED the redundant parsing section that caused the error
+
+      return meta;
   },
 
 

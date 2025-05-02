@@ -32,13 +32,11 @@ import { isReadonly } from 'vue';
     },
 
     computed: {
-      // other computed properties
-      // ...
-      // gives access to this.counterStore and this.userStore
       ...mapStores(useProfileStore,usePreferenceStore),
       // // gives read access to this.count and this.double
       ...mapState(useProfileStore, ['profilesLoaded','activeProfile', 'dataChanged','rtLookup', 'activeComponent', 'emptyComponents','returnComponentLibrary']),
-      ...mapState(usePreferenceStore, ['styleDefault', 'isEmptyComponent', 'layoutActive', 'layoutActiveFilter', 'createLayoutMode']),
+      // isEmptyComponent is now a getter, accessed via this.profileStore.isEmptyComponent()
+      ...mapState(usePreferenceStore, ['styleDefault', 'layoutActive', 'layoutActiveFilter', 'createLayoutMode']),
 
 
       ...mapWritableState(useProfileStore, ['activeComponent', 'emptyComponents']),
@@ -292,6 +290,7 @@ import { isReadonly } from 'vue';
           let emptyArray = new Array("@root")
           let dataLoaded = component.dataLoaded
 
+          // Use profileStore.isEmptyComponent getter
           if (this.profileStore.isEmptyComponent(JSON.parse(JSON.stringify(component)))){
             return false
           } else if (component.userModified){

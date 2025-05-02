@@ -1,12 +1,24 @@
 <script>
   import { useProfileStore } from '@/stores/profile'
-
   import { mapStores, mapState } from 'pinia'
 
   export default {
+    // Add props definition here
+    props: {
+      show: {
+        type: Boolean,
+        required: true,
+        default: false // Provide a default value
+      },
+      message: {
+        type: String,
+        required: true,
+        default: "Loading..." // Provide a default value
+      }
+    },
     data() {
       return {
-        
+
       }
     },
     computed: {
@@ -28,13 +40,13 @@
     // },
 
     methods: {
-      
+
 
     },
 
     mounted() {
-     
-    //  console.log(this.$t("--c-edit-main-splitpane-properties-background-color--desc"),'<-------')
+
+    //  console.log(this.$t("--c-edit-main-splitpane-properties-background-color--desc"),'<------')
 
     }
   }
@@ -45,13 +57,18 @@
 
 <template>
   <Teleport to="body">
+    <!-- Use the 'show' prop here instead of 'profilesLoaded' -->
     <Transition appear>
-      <div v-if="profilesLoaded==false" class="modal">
+      <!-- Conditionally render based on the 'show' prop -->
+      <div v-if="show" class="modal">
         <div class="modal-text">
-          <h1>{{ $t("message.generalLoadingModalLoadingMsg") }}</h1>
+          <!-- Use the 'message' prop here -->
+          <h1>{{ message }}</h1>
+          <!-- Or use the translation if the message prop is meant to be a key -->
+          <!-- <h1>{{ $t(message) }}</h1> -->
         </div>
       </div>
-    </Transition>    
+    </Transition>
   </Teleport>
 </template>
 
