@@ -1,6 +1,6 @@
 [
     {
-        "@id": "alma:library:Libra:subLocation:storcrstxt",
+        "@id": "storcrstxt",
         "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
         "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "storcrstxt" } ]
       },
@@ -10,113 +10,113 @@
         "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "stor" } ]
       },
     {
-        "@id": "alma:library:Libra:subLocation:sc1100c",
+        "@id": "sc1100c",
         "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
         "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "sc1100c" } ]
       },
     {
-        "@id": "alma:library:Libra:subLocation:scadams",
+        "@id": "scadams",
         "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
         "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "scadams" } ]
       },
     {
-        "@id": "alma:library:Libra:subLocation:athstor",
+        "@id": "athstor",
         "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
         "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "athstor" } ]
       },
     {
-        "@id": "alma:library:Libra:subLocation:athstorcir",
+        "@id": "athstorcir",
         "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
         "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "athstorcir" } ]
       },
     {
-        "@id": "alma:library:Libra:subLocation:scblank",
+        "@id": "scblank",
         "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
         "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "scblank" } ]
       },
     {
-        "@id": "alma:library:Libra:subLocation:scsmithst",
+        "@id": "scsmithst",
         "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
         "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "scsmithst" } ]
       },
     {
-        "@id": "alma:library:Libra:subLocation:newbrare",
+        "@id": "newbrare",
         "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
         "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "newbrare" } ]
       },
     {
-        "@id": "alma:library:Libra:subLocation:scfast",
+        "@id": "scfast",
         "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
         "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "scfast" } ]
       },
     {
-        "@id": "alma:library:Libra:subLocation:storfine",
+        "@id": "storfine",
         "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
         "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "storfine" } ]
       },
     {
-        "@id": "alma:library:Libra:subLocation:scfurnst",
+        "@id": "scfurnst",
         "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
         "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "scfurnst" } ]
       },
     {
-        "@id": "alma:library:Libra:subLocation:storlimit",
+        "@id": "storlimit",
         "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
         "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "storlimit" } ]
       },
 
     {
-        "@id": "alma:library:Libra:subLocation:scmst",
+        "@id": "scmst",
         "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
         "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "scmst" } ]
       },
     {
-        "@id": "alma:library:Libra:subLocation:storm",
+        "@id": "storm",
         "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
         "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "storm" } ]
       },
     {
-        "@id": "alma:library:Libra:subLocation:scstor",
+        "@id": "scstor",
         "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
         "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "scstor" } ]
       },
     {
-        "@id": "alma:library:Libra:subLocation:storrare",
+        "@id": "storrare",
         "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
         "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "storrare" } ]
       },
     {
-        "@id": "alma:library:Libra:subLocation:sckatzstor",
+        "@id": "sckatzstor",
         "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
         "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "sckatzstor" } ]
       },
     {
-        "@id": "alma:library:Libra:subLocation:screfestor",
+        "@id": "screfestor",
         "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
         "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "screfestor" } ]
       },
     {
-        "@id": "alma:library:Libra:subLocation:scrunning",
+        "@id": "scrunning",
         "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
         "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "scrunning" } ]
       },
     {
-        "@id": "alma:library:Libra:subLocation:storspec",
+        "@id": "storspec",
         "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
         "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "storspec" } ]
       },
     {
-        "@id": "alma:library:Libra:subLocation:stor3hr",
+        "@id": "stor3hr",
         "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
         "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "stor3hr" } ]
       },
     {
-        "@id": "alma:library:Libra:subLocation:storNoCirc",
+        "@id": "storNoCirc",
         "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
         "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "storNoCirc" } ]
       },
     {
-        "@id": "alma:library:Libra:subLocation:UNASSIGNED",
+        "@id": "UNASSIGNED",
         "@type": [ "http://www.loc.gov/mads/rdf/v1#Authority" ],
         "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [ { "@value": "UNASSIGNED" } ]
       }
