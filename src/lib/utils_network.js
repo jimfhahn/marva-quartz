@@ -2937,33 +2937,33 @@ const utilsNetwork = {
       const content = await rawResponse.json();
       console.log("Raw server response:", content);
       
-      // If the server already returns data in the correct format, use it directly
-      if (content.name && 
-         ((content.name.instance_mms_id && content.name.instance_mms_id.length > 0) || 
-          (content.name.work_mms_id && content.name.work_mms_id.length > 0))) {
-        return {
-          status: true,
-          publish: {
-            status: 'published'
-          },
-          postLocation: content.postLocation || null,
-          name: content.name
-        };
-      }
-      
-      // Otherwise, try to extract MMS IDs from other fields
+      // Initialize arrays for MMS IDs
       let instanceMmsIds = [];
       let workMmsIds = [];
       
-      if (content.mmsIds) {
-        // If server returns generic mmsIds array, assume they're instance IDs
-        instanceMmsIds = Array.isArray(content.mmsIds) ? content.mmsIds : [content.mmsIds];
-      } else if (content.ids) {
-        // If server returns generic ids array, assume they're instance IDs
-        instanceMmsIds = Array.isArray(content.ids) ? content.ids : [content.ids];
+      // Handle work_mms_id when directly in name object (work-only format)
+      if (content.name && content.name.work_mms_id) {
+        workMmsIds = Array.isArray(content.name.work_mms_id) ? 
+          content.name.work_mms_id : [content.name.work_mms_id];
       }
       
-      // Format response to match what PostModal.vue expects
+      // Handle instance_mms_id when directly in name object
+      if (content.name && content.name.instance_mms_id) {
+        instanceMmsIds = Array.isArray(content.name.instance_mms_id) ? 
+          content.name.instance_mms_id : [content.name.instance_mms_id];
+      }
+      
+      // Handle nested instance.mms_id (instance-only format)
+      if (content.name && content.name.instance && content.name.instance.mms_id) {
+        instanceMmsIds = [content.name.instance.mms_id];
+      }
+      
+      // Handle direct instance property (another possible format)
+      if (content.instance && content.instance.mms_id) {
+        instanceMmsIds = [content.instance.mms_id];
+      }
+      
+      // Format response consistently for all publish types
       return {
         status: true,
         publish: {

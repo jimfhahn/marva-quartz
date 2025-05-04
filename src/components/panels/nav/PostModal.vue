@@ -42,6 +42,41 @@
       selectedOptionLabel() {
         const option = this.postOptions.find(opt => opt.value === this.postType);
         return option ? option.label : 'Work + Instance';
+      },
+      normalizedInstanceIds() {
+        // First check the transformed format (arrays)
+        if (this.postResults.name?.instance_mms_id?.length) {
+          return this.postResults.name.instance_mms_id;
+        }
+        // Then check directly nested instance MMS ID (instance-only format)
+        else if (this.postResults.name?.instance?.mms_id) {
+          return [this.postResults.name.instance.mms_id];
+        }
+        // Check for mms_id in instance (alternate instance-only response)
+        else if (this.postResults.instance?.mms_id) {
+          return [this.postResults.instance.mms_id];
+        }
+        return [];
+      },
+      
+      normalizedWorkIds() {
+        // First check the transformed format (arrays)
+        if (this.postResults.name?.work_mms_id?.length) {
+          return this.postResults.name.work_mms_id;
+        }
+        // Then check directly nested work MMS ID (work-only format)
+        else if (this.postResults.name?.work?.mms_id) {
+          return [this.postResults.name.work.mms_id];
+        }
+        // Check for mms_id in work (alternate work-only response)
+        else if (this.postResults.work?.mms_id) {
+          return [this.postResults.work.mms_id];
+        }
+        return [];
+      },
+      
+      hasMMSIDs() {
+        return this.normalizedInstanceIds.length > 0 || this.normalizedWorkIds.length > 0;
       }
     },
 
@@ -66,18 +101,40 @@
         this.$refs.errorHolder.style.height = this.initalHeight + 'px';
         this.posting = true;
         this.showDropdown = false;
-        // Clear previous results
         this.postResults = {};
+        
         try {
-          // publishRecord now receives xmlString, profile and type
+          // Generate the XML
+          const xmlString = await this.generateXML(this.activeProfile);
+          
+          // Use the same approach for all publish types (work, instance, or both)
           const response = await this.profileStore.publishRecord(
-            await this.generateXML(this.activeProfile),
+            xmlString,
             this.activeProfile,
-            this.postType // Use the selected postType
+            this.postType
           );
-          this.postResults = response;
-          if (response.publish && response.publish.status !== 'published') {
-            console.error("Error response:", response);
+          
+          console.log("Normalized response from store:", response);
+          
+          // For instance-only updates, check if the response needs normalization
+          if (this.postType === 'instance' && 
+              response?.name?.instance?.mms_id && 
+              (!response?.name?.instance_mms_id || response?.name?.instance_mms_id.length === 0)) {
+            
+            // Format the response to match the work-only structure but with instance data
+            this.postResults = {
+              ...response,
+              name: {
+                ...response.name,
+                instance_mms_id: [response.name.instance.mms_id],
+                work_mms_id: []
+              }
+            };
+            
+            console.log("Normalized instance response:", this.postResults);
+          } else {
+            // For work or work+instance, use the response as-is
+            this.postResults = response;
           }
         } catch (error) {
           console.error("Error during post:", error);
@@ -302,17 +359,17 @@
       <div v-if="!posting && Object.keys(postResults).length !== 0">
         <div v-if="postResults.publish && postResults.publish.status === 'published'" style="margin: 0.5em 0; background-color: #90ee9052; padding: 0.5em; border-radius: 0.25em;">
           The record was accepted by the system.
-          <div v-if="postResults.name && (postResults.name.instance_mms_id?.length || postResults.name.work_mms_id?.length)">
+          <div v-if="hasMMSIDs">
             MMS IDs:
             <ul>
-              <li v-if="postResults.name.instance_mms_id?.length">Instance:
+              <li v-if="normalizedInstanceIds.length">Instance:
                 <ul>
-                  <li v-for="id in postResults.name.instance_mms_id" :key="id">{{ id }}</li>
+                  <li v-for="id in normalizedInstanceIds" :key="id">{{ id }}</li>
                 </ul>
               </li>
-              <li v-if="postResults.name.work_mms_id?.length">Work:
+              <li v-if="normalizedWorkIds.length">Work:
                 <ul>
-                  <li v-for="id in postResults.name.work_mms_id" :key="id">{{ id }}</li>
+                  <li v-for="id in normalizedWorkIds" :key="id">{{ id }}</li>
                 </ul>
               </li>
             </ul>
