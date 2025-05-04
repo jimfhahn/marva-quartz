@@ -371,6 +371,25 @@ const utilsExport = {
         bnode.setAttribute('rdf:parseType', userValue['@parseType']);
       }
       return bnode;
+    } else if (property === 'http://id.loc.gov/ontologies/bibframe/source' || 
+               property === 'bf:source') {
+      
+      // Create Source element directly (not nested)
+      let bnode = this.createElByBestNS('bf:Source');
+      
+      // Add code element if available in the userValue
+      if (userValue['code'] || userValue['bf:code']) {
+        let codeEl = this.createElByBestNS('bf:code');
+        codeEl.textContent = userValue['code'] || userValue['bf:code'];
+        bnode.appendChild(codeEl);
+      }
+      
+      // Handle @id if present
+      if (userValue['@id']) {
+        bnode.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:about', userValue['@id']);
+      }
+      
+      return bnode;
     } else if (userValue['@type'] && userValue['@type'].includes('id.loc.gov/vocabulary/mnotetype')) {
       // if it is this specific note vocabulary type then create a bf:Note with a RDF type in it
       let bnode = this.createElByBestNS('bf:Note');
@@ -1310,152 +1329,218 @@ const utilsExport = {
           // Process based on whether it's a blank node or literal
           if (this.isBnode(userValue)){
             xmlLog.push(`Root level bnode: ${ptObj.propertyURI}`);
-            let pLvl1 = this.createElByBestNS(ptObj.propertyURI);
-            let bnodeLvl1 = this.createBnode(userValue, ptObj.propertyURI);
-            xmlLog.push(`Created lvl 1 predicate: ${pLvl1.tagName} and bnode: ${bnodeLvl1.tagName}`);
 
-            // Process all properties in this blank node
-            for (let key1 of Object.keys(userValue).filter(k => (!k.includes('@') ? true : false))){
-              let value1Array = userValue[key1];
-              if (!Array.isArray(value1Array)) {
-                value1Array = [value1Array];
+            // *** NEW CONDITIONAL LOGIC FOR bf:source ***
+            if (ptObj.propertyURI === 'http://id.loc.gov/ontologies/bibframe/source' || ptObj.propertyURI === 'bf:source') {
+              xmlLog.push(`Special handling for bf:source property.`);
+              // 1. Create the outer predicate element <bf:source>
+              let pLvl1 = this.createElByBestNS(ptObj.propertyURI);
+              // 2. Create the inner <bf:Source> structure using the dedicated logic in createBnode
+              let sourceNode = this.createBnode(userValue, ptObj.propertyURI);
+              xmlLog.push(`Created bf:Source node: ${sourceNode.tagName}`);
+              // 3. Append the <bf:Source> node to the <bf:source> predicate
+              pLvl1.appendChild(sourceNode);
+              // 4. Append the <bf:source> predicate directly to the root element
+              rootEl.appendChild(pLvl1);
+              componentXmlLookup[`${rt}-${pt}`] = formatXML(pLvl1.outerHTML);
+              xmlLog.push(`Appended bf:source structure directly to root.`);
+
+              // Handle sibling nodes if necessary (assuming bf:source can be repeated)
+              if (userValueSiblings.length > 0){
+                xmlLog.push(`Handling ${userValueSiblings.length} sibling bf:source nodes`);
+                for (let siblingValue of userValueSiblings) {
+                  if (this.hasUserValue(siblingValue)) {
+                    let siblingPLvl1 = this.createElByBestNS(ptObj.propertyURI);
+                    let siblingSourceNode = this.createBnode(siblingValue, ptObj.propertyURI);
+                    siblingPLvl1.appendChild(siblingSourceNode);
+                    rootEl.appendChild(siblingPLvl1);
+                    // Optionally add to componentXmlLookup if needed for siblings
+                  }
+                }
               }
 
-              for (let value1 of value1Array) {
-                xmlLog.push(`Processing key1: ${key1} with value1: ${JSON.stringify(value1)}`);
-                let pLvl2 = this.createElByBestNS(key1); // Create element for the property
-                if (!pLvl2 || !pLvl2.nodeType) {
-                  xmlLog.push(`Failed to create pLvl2 element for key ${key1}`);
-                  continue;
+            } else {
+              // *** ORIGINAL BNODE LOGIC for properties OTHER THAN bf:source ***
+              xmlLog.push(`Standard bnode processing for: ${ptObj.propertyURI}`);
+              let pLvl1 = this.createElByBestNS(ptObj.propertyURI);
+              let bnodeLvl1 = this.createBnode(userValue, ptObj.propertyURI);
+              xmlLog.push(`Created lvl 1 predicate: ${pLvl1.tagName} and bnode: ${bnodeLvl1.tagName}`);
+
+              // Process all properties in this blank node
+              for (let key1 of Object.keys(userValue).filter(k => (!k.includes('@') ? true : false))){
+                let value1Array = userValue[key1];
+                if (!Array.isArray(value1Array)) {
+                  value1Array = [value1Array];
                 }
 
-                // --- START SIMPLIFICATION for bf:assigner ---
-                // If the root property is bf:adminMetadata and this key is bf:assigner,
-                // skip the complex processing and insert the default structure.
-                if (ptObj.propertyURI === 'http://id.loc.gov/ontologies/bibframe/adminMetadata' && key1 === 'http://id.loc.gov/ontologies/bibframe/assigner') {
-                    xmlLog.push(`[Simplification] Found bf:assigner within bf:adminMetadata. Using default assigner element instead of processing userValue.`);
-                    const defaultAssigner = this.buildDefaultAssignerElement(); // This creates <bf:assigner><bf:Organization>...</bf:Organization></bf:assigner>
-                    bnodeLvl1.appendChild(defaultAssigner); // Append the whole default structure to the <bf:AdminMetadata> bnode
-                    // We created pLvl2 (<bf:assigner>) but won't use it or process its children (value1)
-                    xmlLog.push(`[Simplification] Appended default assigner structure.`);
-                    continue; // Skip the rest of the loop for this value1 (the assigner userValue)
-                }
-                // --- END SIMPLIFICATION ---
-
-
-                if (this.isBnode(value1)){
-                  xmlLog.push(`Nested bnode found for key: ${key1}`);
-                  let bnodeLvl2 = this.createBnode(value1, key1);
-                  if (!bnodeLvl2 || !bnodeLvl2.nodeType) {
-                     xmlLog.push(`Failed to create bnodeLvl2 for key ${key1}`);
-                     continue;
+                for (let value1 of value1Array) {
+                  xmlLog.push(`Processing key1: ${key1} with value1: ${JSON.stringify(value1)}`);
+                  let pLvl2 = this.createElByBestNS(key1); // Create element for the property
+                  if (!pLvl2 || !pLvl2.nodeType) {
+                    xmlLog.push(`Failed to create pLvl2 element for key ${key1}`);
+                    continue;
                   }
-                  xmlLog.push(`Created nested bnode: ${bnodeLvl2.tagName}`);
 
-                  // Recursively process properties of the nested bnode
-                  for (let key2 of Object.keys(value1).filter(k => (!k.includes('@') ? true : false))){
-                    let value2Array = value1[key2];
-                    if (!Array.isArray(value2Array)) {
-                       value2Array = [value2Array];
+                  // --- START SIMPLIFICATION for bf:assigner ---
+                  // If the root property is bf:adminMetadata and this key is bf:assigner,
+                  // skip the complex processing and insert the default structure.
+                  if (ptObj.propertyURI === 'http://id.loc.gov/ontologies/bibframe/adminMetadata' && key1 === 'http://id.loc.gov/ontologies/bibframe/assigner') {
+                      xmlLog.push(`[Simplification] Found bf:assigner within bf:adminMetadata. Using default assigner element instead of processing userValue.`);
+                      const defaultAssigner = this.buildDefaultAssignerElement();
+                      bnodeLvl1.appendChild(defaultAssigner);
+                      // We created pLvl2 (<bf:assigner>) but won't use it or process its children (value1)
+                      xmlLog.push(`[Simplification] Appended default assigner structure.`);
+                      continue; // Skip the rest of the loop for this key1
+                  }
+                  // --- END SIMPLIFICATION ---
+
+
+                  if (this.isBnode(value1)){
+                    xmlLog.push(`Nested bnode found for key: ${key1}`);
+                    let bnodeLvl2 = this.createBnode(value1, key1);
+                    if (!bnodeLvl2 || !bnodeLvl2.nodeType) {
+                      xmlLog.push(`Failed to create nested bnode for key ${key1}`);
+                      continue;
                     }
+                    xmlLog.push(`Created nested bnode: ${bnodeLvl2.tagName}`);
 
-                    // --- START SIMPLIFICATION for nested bf:assigner ---
-                    // Also simplify if bf:assigner is found nested deeper
-                    if (key2 === 'http://id.loc.gov/ontologies/bibframe/assigner') {
-                        xmlLog.push(`[Simplification] Found nested bf:assigner. Using default assigner element.`);
-                        const defaultAssigner = this.buildDefaultAssignerElement();
-                        bnodeLvl2.appendChild(defaultAssigner); // Append default to the parent bnode (bnodeLvl2)
-                        xmlLog.push(`[Simplification] Appended default assigner structure to nested bnode.`);
-                        continue; // Skip processing the rest of the loop for this key2
-                    }
-                    // --- END SIMPLIFICATION ---
-
-                    for (let value2 of value2Array) {
-                      // Create element for the nested property (e.g., <bf:assigner>)
-                      let pLvl3 = this.createElByBestNS(key2);
-                      if (!pLvl3 || !pLvl3.nodeType) {
-                         xmlLog.push(`Failed to create pLvl3 element for key ${key2}`);
-                         continue;
+                    // Recursively process properties of the nested bnode
+                    for (let key2 of Object.keys(value1).filter(k => (!k.includes('@') ? true : false))){
+                      let value2Array = value1[key2];
+                      if (!Array.isArray(value2Array)) {
+                        value2Array = [value2Array];
                       }
+                      for (let value2 of value2Array) {
+                        xmlLog.push(`Processing key2: ${key2} with value2: ${JSON.stringify(value2)}`);
+                        let pLvl3 = this.createElByBestNS(key2);
+                        if (!pLvl3 || !pLvl3.nodeType) {
+                          xmlLog.push(`Failed to create pLvl3 element for key ${key2}`);
+                          continue;
+                        }
 
-                      if (this.isBnode(value2)) {
-                         // Handle deeper nesting if necessary (level 3 bnode)
-                         let bnodeLvl3 = this.createBnode(value2, key2);
-                         // ... process bnodeLvl3 properties ...
-                         pLvl3.appendChild(bnodeLvl3);
-                      } else if (value2['@id']) {
-                         // Handle URI resource reference
-                         pLvl3.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:resource', value2['@id']);
-                      } else {
-                         // Handle literal value
-                         let literalVal = value2;
-                         if (typeof value2 === 'object' && value2['@value']) {
-                            literalVal = value2['@value'];
-                         }
-                         if (typeof literalVal === 'string' || typeof literalVal === 'number') {
-                            pLvl3.textContent = literalVal;
-                         } else {
-                            xmlLog.push(`Unhandled literal type for key2 ${key2}: ${JSON.stringify(value2)}`);
+                        if (this.isBnode(value2)) {
+                          // Deeper nesting - handle similarly if needed, or stop recursion
+                          xmlLog.push(`Deeper bnode found for key: ${key2}`);
+                          let bnodeLvl3 = this.createBnode(value2, key2);
+                          if (bnodeLvl3 && bnodeLvl3.nodeType) {
+                            // Process key3 etc. if necessary
+                            pLvl3.appendChild(bnodeLvl3);
+                          } else {
+                            xmlLog.push(`Failed to create bnodeLvl3 for key ${key2}`);
+                          }
+                        } else if (value2['@id']) {
+                          pLvl3.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:resource', value2['@id']);
+                        } else {
+                          let literalEl3 = this.createLiteral(key2, value2);
+                          if (literalEl3) {
+                            bnodeLvl2.appendChild(literalEl3); // Append literal directly to bnodeLvl2
+                            continue; // Skip appending pLvl3 since literal is handled
+                          } else {
+                            xmlLog.push(`Could not create literal for key2: ${key2}`);
                             continue;
-                         }
-                      }
-                      bnodeLvl2.appendChild(pLvl3); // Append property to nested bnode
-                    }
-                  }
-                  pLvl2.appendChild(bnodeLvl2); // Append nested bnode to property element
-                  bnodeLvl1.appendChild(pLvl2); // Append property element to level 1 bnode
-
-                } else if (value1['@id']) {
-                  // Handle simple URI resource reference (e.g., <bf:role rdf:resource="..."/>)
-                  xmlLog.push(`Handling URI reference for key: ${key1}`);
-                  pLvl2.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:resource', value1['@id']);
-                  bnodeLvl1.appendChild(pLvl2); // Append property element to level 1 bnode
-
-                } else {
-                  // Handle literal value (could be simple string/number or object with @value/@language)
-                  xmlLog.push(`Handling literal for key: ${key1}`);
-                  let literalVal = value1;
-                  let lang = null;
-
-                  if (typeof value1 === 'object') {
-                    if (value1['@value']) {
-                      literalVal = value1['@value'];
-                      lang = value1['@language'];
-                    } else if (value1['rdf:value']) { // Handle cases like barcode where value is under rdf:value
-                      literalVal = value1['rdf:value'];
-                    } else {
-                      // Check if it's an object containing the literal directly (e.g., from language map)
-                      const literalKeys = Object.keys(value1).filter(k => !k.startsWith('@'));
-                      if (literalKeys.length === 1 && (typeof value1[literalKeys[0]] === 'string' || typeof value1[literalKeys[0]] === 'number')) {
-                        literalVal = value1[literalKeys[0]];
-                      } else {
-                         xmlLog.push(`Unhandled literal object structure for key ${key1}: ${JSON.stringify(value1)}`);
-                         continue; // Skip if we can't extract a literal value
+                          }
+                        }
+                        bnodeLvl2.appendChild(pLvl3); // Append pLvl3 to bnodeLvl2
                       }
                     }
-                  }
-
-                  if (typeof literalVal === 'string' || typeof literalVal === 'number') {
-                    pLvl2.textContent = literalVal;
-                    if (lang) {
-                      pLvl2.setAttribute('xml:lang', lang);
-                    }
-                    bnodeLvl1.appendChild(pLvl2); // Append property element to level 1 bnode
+                    pLvl2.appendChild(bnodeLvl2); // Append nested bnode to nested predicate
+                  } else if (value1['@id']) {
+                    xmlLog.push(`Resource found for key: ${key1}`);
+                    pLvl2.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:resource', value1['@id']);
                   } else {
-                    xmlLog.push(`Could not extract literal value for key ${key1}: ${JSON.stringify(value1)}`);
+                    // Handle literal values inside the bnode
+                    xmlLog.push(`Literal found for key: ${key1}`);
+                    let literalEl = this.createLiteral(key1, value1);
+                    if (literalEl) {
+                      // Check if literalEl is just a text node (from createElByBestNS fallback)
+                      if (literalEl.nodeType === Node.TEXT_NODE) {
+                        bnodeLvl1.appendChild(literalEl); // Append text node directly
+                      } else {
+                        // It's a proper element like <bf:code>value</bf:code>
+                        bnodeLvl1.appendChild(literalEl);
+                      }
+                      continue; // Skip appending pLvl2 since literal is handled directly
+                    } else {
+                      xmlLog.push(`Could not create literal for key1: ${key1}`);
+                      continue; // Skip appending pLvl2
+                    }
                   }
-                }
-              } // end for (let value1...)
-            } // end for (let key1...)
+                  // Append pLvl2 (predicate for the inner property) to bnodeLvl1
+                  // This happens only for nested bnodes or resources, not literals handled above
+                  bnodeLvl1.appendChild(pLvl2);
+                } // end for (let value1...)
+              } // end for (let key1...)
 
-            pLvl1.appendChild(bnodeLvl1);
-            rootEl.appendChild(pLvl1);
-            componentXmlLookup[`${rt}-${pt}`] = formatXML(pLvl1.outerHTML);
+              pLvl1.appendChild(bnodeLvl1);
+              rootEl.appendChild(pLvl1);
+              componentXmlLookup[`${rt}-${pt}`] = formatXML(pLvl1.outerHTML);
 
-            // Handle sibling nodes
-            if (userValueSiblings.length > 0){
-              // ...existing code for sibling nodes...
-            }
+              // Handle sibling nodes
+              if (userValueSiblings.length > 0){
+                 xmlLog.push(`Handling ${userValueSiblings.length} sibling bnodes`);
+                 for (let siblingValue of userValueSiblings) {
+                   if (this.hasUserValue(siblingValue)) {
+                     let siblingPLvl1 = this.createElByBestNS(ptObj.propertyURI);
+                     let siblingBnodeLvl1 = this.createBnode(siblingValue, ptObj.propertyURI);
+                     // Process inner keys for sibling bnode
+                     for (let key1 of Object.keys(siblingValue).filter(k => (!k.includes('@') ? true : false))) {
+                       // ... (repeat inner processing logic as above for siblingBnodeLvl1) ...
+                       let value1Array = siblingValue[key1];
+                       if (!Array.isArray(value1Array)) { value1Array = [value1Array]; }
+                       for (let value1 of value1Array) {
+                         let pLvl2 = this.createElByBestNS(key1);
+                         if (!pLvl2 || !pLvl2.nodeType) continue;
+                         if (ptObj.propertyURI === 'http://id.loc.gov/ontologies/bibframe/adminMetadata' && key1 === 'http://id.loc.gov/ontologies/bibframe/assigner') {
+                           const defaultAssigner = this.buildDefaultAssignerElement();
+                           siblingBnodeLvl1.appendChild(defaultAssigner);
+                           continue;
+                         }
+                         if (this.isBnode(value1)) {
+                           let bnodeLvl2 = this.createBnode(value1, key1);
+                           if (bnodeLvl2 && bnodeLvl2.nodeType) {
+                             // Process key2 etc.
+                             for (let key2 of Object.keys(value1).filter(k => (!k.includes('@') ? true : false))) {
+                               let value2Array = value1[key2];
+                               if (!Array.isArray(value2Array)) { value2Array = [value2Array]; }
+                               for (let value2 of value2Array) {
+                                 let pLvl3 = this.createElByBestNS(key2);
+                                 if (!pLvl3 || !pLvl3.nodeType) continue;
+                                 if (this.isBnode(value2)) {
+                                   let bnodeLvl3 = this.createBnode(value2, key2);
+                                   if (bnodeLvl3 && bnodeLvl3.nodeType) pLvl3.appendChild(bnodeLvl3);
+                                 } else if (value2['@id']) {
+                                   pLvl3.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:resource', value2['@id']);
+                                 } else {
+                                   let literalEl3 = this.createLiteral(key2, value2);
+                                   if (literalEl3) {
+                                     bnodeLvl2.appendChild(literalEl3);
+                                     continue;
+                                   } else continue;
+                                 }
+                                 bnodeLvl2.appendChild(pLvl3);
+                               }
+                             }
+                             pLvl2.appendChild(bnodeLvl2);
+                           }
+                         } else if (value1['@id']) {
+                           pLvl2.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:resource', value1['@id']);
+                         } else {
+                           let literalEl = this.createLiteral(key1, value1);
+                           if (literalEl) {
+                             siblingBnodeLvl1.appendChild(literalEl);
+                             continue;
+                           } else continue;
+                         }
+                         siblingBnodeLvl1.appendChild(pLvl2);
+                       }
+                     }
+                     siblingPLvl1.appendChild(siblingBnodeLvl1);
+                     rootEl.appendChild(siblingPLvl1);
+                     // Optionally add to componentXmlLookup if needed for siblings
+                   }
+                 }
+              }
+            } // *** END of the new ELSE block ***
           } else {
             // Not a blank node
             xmlLog.push(`Root level does not look like a bnode: ${ptObj.propertyURI}`);
@@ -2018,7 +2103,7 @@ const utilsExport = {
                   
                   sublocationNode.appendChild(labelNode);
                   newSublocation.appendChild(sublocationNode);
-                  rootEl.appendChild(newSublocation); // Corrected variable name
+                  itemElement.appendChild(newSublocation);
                   console.log(`[Item Cleanup] Appended single clean sublocation with label: '${finalSublocationLabel}'`);
               } else {
                    console.warn(`[Item Cleanup] Could not determine a final label for sublocation. No element added.`);
