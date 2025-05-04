@@ -1767,14 +1767,42 @@ const utilsExport = {
           console.log("--- Simplified sublocation handling ---")
           
           try {
-            let sublocationId = targetHolding.sublocationText
+            // Extract sublocation value directly from userValue
+            let sublocationId = null;
+            
+            // Handle different possible data structures
+            if (typeof userValue === 'string') {
+              sublocationId = userValue;
+            } else if (userValue && typeof userValue === 'object') {
+              // Try various properties where the sublocation text might be found
+              if (userValue['@value']) {
+                sublocationId = userValue['@value'];
+              } else if (userValue['bf:sublocation']) {
+                sublocationId = userValue['bf:sublocation'];
+              } else if (userValue['http://id.loc.gov/ontologies/bibframe/sublocation']) {
+                sublocationId = userValue['http://id.loc.gov/ontologies/bibframe/sublocation'];
+              } else if (userValue['rdfs:label']) {
+                sublocationId = userValue['rdfs:label'];
+              } else {
+                // Look deeper for nested structures
+                const rdfsLabelURI = 'http://www.w3.org/2000/01/rdf-schema#label';
+                if (userValue[rdfsLabelURI] && userValue[rdfsLabelURI][0]) {
+                  if (userValue[rdfsLabelURI][0]['@value']) {
+                    sublocationId = userValue[rdfsLabelURI][0]['@value'];
+                  } else if (userValue[rdfsLabelURI][0]['@id']) {
+                    const id = userValue[rdfsLabelURI][0]['@id'];
+                    // Extract identifier from the ID
+                    sublocationId = id.split(':').pop();
+                  }
+                }
+              }
+            }
+            
             if (sublocationId && typeof sublocationId === 'string' && sublocationId.trim() !== '') {
-              console.log("[sublocation] Extracted ID:", sublocationId)
-              
-              // Define newSublocation variable before using it
-              const newSublocation = this.createElByBestNS('bf:sublocation'); // <-- Changed to use proper method
+              console.log("[sublocation] Extracted ID:", sublocationId);
               
               // Create proper sublocation structure
+              const newSublocation = this.createElByBestNS('bf:sublocation');
               const sublocationNode = this.createElByBestNS('bf:Sublocation');
               const labelNode = this.createRdfsLabel(sublocationId);
               
@@ -1786,6 +1814,91 @@ const utilsExport = {
               // Add to component XML lookup
               componentXmlLookup[`${rt}-${pt}`] = formatXML(newSublocation.outerHTML);
               console.log(`Created sublocation with value: ${sublocationId}`);
+            }
+          } catch (e) {
+            console.error("Error in sublocation handling:", e);
+          }
+        } else if (ptObj.propertyURI === 'http://id.loc.gov/ontologies/bibframe/sublocation') {
+          console.log('--- Simplified sublocation handling ---');
+
+          // Extract sublocation value more robustly
+          let sublocationLabel = null;
+          let sublocationId = null; // Keep track of ID if found
+
+          if (typeof userValue === 'string') {
+              sublocationLabel = userValue;
+          } else if (userValue && typeof userValue === 'object') {
+              sublocationId = userValue['@id']; // Check for ID first
+
+              // Look for label in various structures
+              const rdfsLabelURI = 'http://www.w3.org/2000/01/rdf-schema#label';
+              if (userValue.rdfsLabel) { // Direct property
+                  sublocationLabel = userValue.rdfsLabel;
+              } else if (userValue[rdfsLabelURI] && userValue[rdfsLabelURI][0]) { // Nested label object
+                  if (userValue[rdfsLabelURI][0]['@value']) {
+                      sublocationLabel = userValue[rdfsLabelURI][0]['@value'];
+                  } else if (userValue[rdfsLabelURI][0]['@id']) {
+                      sublocationId = userValue[rdfsLabelURI][0]['@id']; // Get ID if label value is missing
+                  }
+              }
+              // Check for the structure <bf:sublocation><bf:Sublocation><rdfs:label>stor</rdfs:label>...
+              else if (userValue['bf:Sublocation'] && userValue['bf:Sublocation'][0] && userValue['bf:Sublocation'][0][rdfsLabelURI] && userValue['bf:Sublocation'][0][rdfsLabelURI][0]['@value']) {
+                   sublocationLabel = userValue['bf:Sublocation'][0][rdfsLabelURI][0]['@value'];
+              }
+               // Check for the structure <bf:sublocation><bf:Sublocation><rdfs:label rdf:resource="..."></rdfs:label>...
+              else if (userValue['bf:Sublocation'] && userValue['bf:Sublocation'][0] && userValue['bf:Sublocation'][0][rdfsLabelURI] && userValue['bf:Sublocation'][0][rdfsLabelURI][0]['@id']) {
+                   sublocationId = userValue['bf:Sublocation'][0][rdfsLabelURI][0]['@id'];
+              }
+
+
+              // If we only found an ID, extract label from it
+              if (!sublocationLabel && sublocationId) {
+                  console.log(`[sublocation] Extracted ID: ${sublocationId}`);
+                  const idParts = sublocationId.split(':');
+                  sublocationLabel = idParts[idParts.length - 1]; // e.g., 'stor'
+              }
+          }
+
+
+          // If we found a label, create the element with the desired structure
+          if (sublocationLabel) {
+              // Remove any existing sublocation elements first
+              const existingSublocationElements = Array.from(rootEl.querySelectorAll('bf\\:sublocation')); // Correct selector
+              if (existingSublocationElements.length > 0) {
+                  console.log(`[sublocation] Removing ${existingSublocationElements.length} existing elements.`);
+                  existingSublocationElements.forEach(el => el.parentNode?.removeChild(el));
+              }
+
+              // Create with exactly the structure you want:
+              const sublocationEl = this.createElByBestNS(ptObj.propertyURI); // bf:sublocation
+              const sublocationNode = this.createElByBestNS('bf:Sublocation'); // bf:Sublocation
+              const labelNode = this.createRdfsLabel(sublocationLabel); // rdfs:label
+
+              sublocationNode.appendChild(labelNode);
+              newSublocation.appendChild(sublocationNode);
+              rootEl.appendChild(newSublocation); // Changed from itemElement to rootEl
+
+              componentXmlLookup[`${rt}-${pt}`] = formatXML(sublocationEl.outerHTML);
+              console.log(`Created sublocation with label: ${sublocationLabel}`);
+          } else {
+              console.log('[sublocation] Could not determine sublocation label from userValue:', userValue);
+          }
+
+          continue; // Skip standard processing
+        } else if (ptObj.propertyURI === 'http://id.loc.gov/ontologies/bibframe/sublocation') {
+          console.log("--- Simplified sublocation handling ---")
+          
+          try {
+            let sublocationId = targetHolding.sublocationText
+            if (sublocationId && typeof sublocationId === 'string' && sublocationId.trim() !== '') {
+              console.log("[sublocation] Extracted ID:", sublocationId)
+              
+              // Define newSublocation variable before using it
+              let newSublocation = doc.createElement('sublocation')
+              
+              // Then use newSublocation for whatever operations follow
+              newSublocation.textContent = sublocationId
+              // Append to parent element, etc.
             }
           } catch (e) {
             console.error("Error in sublocation handling:", e)
@@ -1875,6 +1988,73 @@ const utilsExport = {
           } catch (e) {
             console.error("Error in sublocation handling:", e)
           }
+        } else if (ptObj.propertyURI === 'http://id.loc.gov/ontologies/bibframe/sublocation') {
+          console.log('--- Simplified sublocation handling ---');
+
+          // Extract sublocation value more robustly
+          let sublocationLabel = null;
+          let sublocationId = null; // Keep track of ID if found
+
+          if (typeof userValue === 'string') {
+              sublocationLabel = userValue;
+          } else if (userValue && typeof userValue === 'object') {
+              sublocationId = userValue['@id']; // Check for ID first
+
+              // Look for label in various structures
+              const rdfsLabelURI = 'http://www.w3.org/2000/01/rdf-schema#label';
+              if (userValue.rdfsLabel) { // Direct property
+                  sublocationLabel = userValue.rdfsLabel;
+              } else if (userValue[rdfsLabelURI] && userValue[rdfsLabelURI][0]) { // Nested label object
+                  if (userValue[rdfsLabelURI][0]['@value']) {
+                      sublocationLabel = userValue[rdfsLabelURI][0]['@value'];
+                  } else if (userValue[rdfsLabelURI][0]['@id']) {
+                      sublocationId = userValue[rdfsLabelURI][0]['@id']; // Get ID if label value is missing
+                  }
+              }
+              // Check for the structure <bf:sublocation><bf:Sublocation><rdfs:label>stor</rdfs:label>...
+              else if (userValue['bf:Sublocation'] && userValue['bf:Sublocation'][0] && userValue['bf:Sublocation'][0][rdfsLabelURI] && userValue['bf:Sublocation'][0][rdfsLabelURI][0]['@value']) {
+                   sublocationLabel = userValue['bf:Sublocation'][0][rdfsLabelURI][0]['@value'];
+              }
+               // Check for the structure <bf:sublocation><bf:Sublocation><rdfs:label rdf:resource="..."></rdfs:label>...
+              else if (userValue['bf:Sublocation'] && userValue['bf:Sublocation'][0] && userValue['bf:Sublocation'][0][rdfsLabelURI] && userValue['bf:Sublocation'][0][rdfsLabelURI][0]['@id']) {
+                   sublocationId = userValue['bf:Sublocation'][0][rdfsLabelURI][0]['@id'];
+              }
+
+
+              // If we only found an ID, extract label from it
+              if (!sublocationLabel && sublocationId) {
+                  console.log(`[sublocation] Extracted ID: ${sublocationId}`);
+                  const idParts = sublocationId.split(':');
+                  sublocationLabel = idParts[idParts.length - 1]; // e.g., 'stor'
+              }
+          }
+
+
+          // If we found a label, create the element with the desired structure
+          if (sublocationLabel) {
+              // Remove any existing sublocation elements first
+              const existingSublocationElements = Array.from(rootEl.querySelectorAll('bf\\:sublocation')); // Correct selector
+              if (existingSublocationElements.length > 0) {
+                  console.log(`[sublocation] Removing ${existingSublocationElements.length} existing elements.`);
+                  existingSublocationElements.forEach(el => el.parentNode?.removeChild(el));
+              }
+
+              // Create with exactly the structure you want:
+              const sublocationEl = this.createElByBestNS(ptObj.propertyURI); // bf:sublocation
+              const sublocationNode = this.createElByBestNS('bf:Sublocation'); // bf:Sublocation
+              const labelNode = this.createRdfsLabel(sublocationLabel); // rdfs:label
+
+              sublocationNode.appendChild(labelNode);
+              newSublocation.appendChild(sublocationNode);
+              rootEl.appendChild(newSublocation); // Changed from itemElement to rootEl
+
+              componentXmlLookup[`${rt}-${pt}`] = formatXML(sublocationEl.outerHTML);
+              console.log(`Created sublocation with label: ${sublocationLabel}`);
+          } else {
+              console.log('[sublocation] Could not determine sublocation label from userValue:', userValue);
+          }
+
+          continue; // Skip standard processing
         } else if (ptObj.type === 'literal-lang') {
           // ...existing code...
         }
@@ -2103,7 +2283,7 @@ const utilsExport = {
                   
                   sublocationNode.appendChild(labelNode);
                   newSublocation.appendChild(sublocationNode);
-                  itemElement.appendChild(newSublocation);
+                  rootEl.appendChild(newSublocation);
                   console.log(`[Item Cleanup] Appended single clean sublocation with label: '${finalSublocationLabel}'`);
               } else {
                    console.warn(`[Item Cleanup] Could not determine a final label for sublocation. No element added.`);
