@@ -430,6 +430,7 @@ const utilsNetwork = {
             if (urlTemplate[idx].includes('q=?')){
               urlTemplate[idx] = urlTemplate[idx].replace('q=?','q=')+'&searchtype=keyword'
             }
+
           }
 
         }
@@ -3201,8 +3202,45 @@ const utilsNetwork = {
         // Use optional chaining and a default value to avoid errors if the store is not initialized
         const templateType = useConfigStore()?.activeProfile?.templateType || 'monograph';
         console.log('Active template type:', templateType);
-    } // No comma after the last property
+    }, // No comma after the last property
 
+    /**
+   * Posts an instance to the server and returns the raw response with holding information
+   * @param {object} instanceData - The instance data to post
+   * @return {object} - The server response including holding information
+   */
+  postInstanceToServer: async function(instanceData) {
+    try {
+      const config = useConfigStore();
+      // Use the instancepublish URL which is defined in the config
+      const url = config.returnUrls.instancepublish;
+      
+      console.log("Posting instance to:", url);
+      
+      // Make the post request to the server
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(instanceData)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
+      }
+      
+      // Get the raw response that contains the holding information
+      const data = await response.json();
+      console.log("Raw server response:", data);
+      
+      // Return the raw response with holding information intact
+      return data;
+    } catch (error) {
+      console.error("Error posting instance to server:", error);
+      throw error;
+    }
+  },
 }
 
 export default utilsNetwork;

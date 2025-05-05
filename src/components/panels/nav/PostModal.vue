@@ -1,11 +1,15 @@
 <script>
   import { useProfileStore } from '@/stores/profile'
   import { useConfigStore } from '@/stores/config'
-
+  import utilsNetwork from '@/lib/utils_network'
+  import short from 'short-uuid' // Add this import
 
   import {  mapStores, mapState, mapWritableState } from 'pinia'
   import { VueFinalModal } from 'vue-final-modal'
   import utilsExport from '@/lib/utils_export'
+
+  // Create a translator instance to use for UUID generation
+  const translator = short();
 
   export default {
     components: {
@@ -30,10 +34,10 @@
 
         initalHeight: 400,
         initalLeft: (window.innerWidth / 2) - 450,
+        holdingInfo: null
       }
     },
     computed: {
-      // ...existing code...
       ...mapStores(useProfileStore, useConfigStore),
       ...mapWritableState(useProfileStore, ['showPostModal']),
       activeProfile() {
@@ -97,45 +101,62 @@
         this.showDropdown = false;
       },
 
-      post: async function() {
+      async post() {
         this.$refs.errorHolder.style.height = this.initalHeight + 'px';
         this.posting = true;
         this.showDropdown = false;
         this.postResults = {};
+        this.holdingInfo = null; // Reset holding info
         
         try {
           // Generate the XML
           const xmlString = await this.generateXML(this.activeProfile);
           
-          // Use the same approach for all publish types (work, instance, or both)
-          const response = await this.profileStore.publishRecord(
-            xmlString,
-            this.activeProfile,
-            this.postType
-          );
-          
-          console.log("Normalized response from store:", response);
-          
-          // For instance-only updates, check if the response needs normalization
-          if (this.postType === 'instance' && 
-              response?.name?.instance?.mms_id && 
-              (!response?.name?.instance_mms_id || response?.name?.instance_mms_id.length === 0)) {
+          // If posting instance only, use our special method to preserve holding info
+          if (this.postType === 'instance') {
+            // Create the instance data
+            const instanceData = {
+              name: this.activeProfile.uuid || translator.toUUID(translator.new()),
+              rdfxml: xmlString,
+              eid: this.activeProfile.eId,
+              type: 'instance'
+            };
             
-            // Format the response to match the work-only structure but with instance data
+            // Use the new utility method that preserves the raw response format
+            const rawResponse = await utilsNetwork.postInstanceToServer(instanceData);
+            
+            // Extract holding information if it exists in the expected format
+            if (rawResponse && rawResponse.name && rawResponse.name.instance && rawResponse.name.instance.holding) {
+              this.holdingInfo = {
+                mms_id: rawResponse.name.instance.mms_id || 'Not provided',
+                holding_id: rawResponse.name.instance.holding.holding_id || 'Not provided',
+                item_id: rawResponse.name.instance.holding.item_id || 'Not provided'
+              };
+              console.log('Extracted holding info:', this.holdingInfo);
+            }
+            
+            // Format response for consistency with other post types
             this.postResults = {
-              ...response,
+              status: true,
+              publish: {
+                status: 'published'
+              },
               name: {
-                ...response.name,
-                instance_mms_id: [response.name.instance.mms_id],
+                instance_mms_id: rawResponse.name && rawResponse.name.instance && rawResponse.name.instance.mms_id ? 
+                                 [rawResponse.name.instance.mms_id] : [],
                 work_mms_id: []
               }
             };
-            
-            console.log("Normalized instance response:", this.postResults);
           } else {
-            // For work or work+instance, use the response as-is
-            this.postResults = response;
+            // For work or work+instance, use the existing publishRecord method
+            this.postResults = await this.profileStore.publishRecord(
+              xmlString,
+              this.activeProfile,
+              this.postType
+            );
           }
+          
+          console.log("Post response:", this.postResults);
         } catch (error) {
           console.error("Error during post:", error);
           this.postResults = {
@@ -212,6 +233,8 @@
             // Handle error
             console.error('Error response:', response);
           }
+          
+          this.handleResponse(response);
         } catch (error) {
           console.error('Error during post:', error)
           this.postResults = {
@@ -302,6 +325,82 @@
         };
         this.posting = false;
       },
+      
+      // Update your existing handleResponse method
+      handleResponse(response) {
+        console.log('Processing server response in handleResponse:', response);
+        
+        // Extract holding information from the response
+        this.holdingInfo = null;
+        
+        // Case 1: Check for holding info in the format from the logs (raw server response)
+        if (response && 
+            response.name && 
+            response.name.instance && 
+            response.name.instance.holding) {
+          
+          this.holdingInfo = {
+            mms_id: response.name.instance.mms_id || 'Not provided',
+            holding_id: response.name.instance.holding.holding_id || 'Not provided',
+            item_id: response.name.instance.holding.item_id || 'Not provided'
+          };
+          
+          console.log('Extracted holding info from name.instance:', this.holdingInfo);
+        } 
+        // Case 2: Check for alternative response format
+        else if (response && response.instance && response.instance.holding) {
+          this.holdingInfo = {
+            mms_id: response.instance.mms_id || 'Not provided',
+            holding_id: response.instance.holding.holding_id || 'Not provided',
+            item_id: response.instance.holding.item_id || 'Not provided'
+          };
+          
+          console.log('Extracted holding info from direct instance property:', this.holdingInfo);
+        }
+        // Case 3: Check for holding info in normalized format 
+        else if (response && 
+                response.name && 
+                response.name.instance_mms_id && 
+                response.name.instance_mms_id.length > 0) {
+          
+          // Look for holding info in other parts of the response structure
+          const instanceId = response.name.instance_mms_id[0];
+          
+          // Try to find holding data in the original response structure
+          if (response.holding || 
+              (response.name.instance && response.name.instance.holding)) {
+            
+            const holdingData = response.holding || 
+                              (response.name.instance && response.name.instance.holding);
+            
+            this.holdingInfo = {
+              mms_id: instanceId,
+              holding_id: holdingData.holding_id || 'Not provided',
+              item_id: holdingData.item_id || 'Not provided'
+            };
+            
+            console.log('Extracted holding info from normalized response with instance_mms_id array:', this.holdingInfo);
+          }
+        } else {
+          console.log('No holding information found in the response');
+        }
+      },
+
+      async sendDataToServer() {
+        try {
+          const response = await utilsNetwork.postInstanceToServer(instanceData);
+          
+          // Show the modal with the response
+          this.showPostModal = true;
+          this.$nextTick(() => {
+            // Make sure to pass the complete response object
+            this.$refs.postModal.handleResponse(response);
+          });
+        } catch (error) {
+          console.error('Error posting data:', error);
+          // Handle error
+        }
+      }
     },
 
     mounted() {
@@ -391,6 +490,25 @@
       </div>
 
       <button v-if="!posting && Object.keys(postResults).length !== 0" @click="done">Close</button>
+      
+      <!-- Add this section to display holding information -->
+      <div v-if="holdingInfo" class="holding-info-container">
+        <h3>Created Holding Information</h3>
+        <div class="holding-details">
+          <div class="detail-row">
+            <span class="detail-label">MMS ID:</span>
+            <span class="detail-value">{{ holdingInfo.mms_id }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Holding ID:</span>
+            <span class="detail-value">{{ holdingInfo.holding_id }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Item ID:</span>
+            <span class="detail-value">{{ holdingInfo.item_id }}</span>
+          </div>
+        </div>
+      </div>
     </div>
   </VueFinalModal>
 </template>
@@ -543,5 +661,41 @@
     border-radius: 5px;
     padding: 0.5em 1em;
     cursor: pointer;
+  }
+  
+  /* Add these styles for the holding info section */
+  .holding-info-container {
+    margin-top: 20px;
+    padding: 15px;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    background-color: #f9f9f9;
+  }
+
+  h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #333;
+    font-size: 1.1rem;
+  }
+
+  .holding-details {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .detail-row {
+    display: flex;
+  }
+
+  .detail-label {
+    min-width: 100px;
+    font-weight: bold;
+    color: #555;
+  }
+
+  .detail-value {
+    color: #333;
   }
 </style>
