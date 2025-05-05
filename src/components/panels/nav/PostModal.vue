@@ -48,33 +48,33 @@
         return option ? option.label : 'Work + Instance';
       },
       normalizedInstanceIds() {
-        // First check the transformed format (arrays)
-        if (this.postResults.name?.instance_mms_id?.length) {
+        // New response format direct at root
+        if (this.postResults.instance?.mms_id) {
+          return [this.postResults.instance.mms_id];
+        }
+        // Legacy nested format
+        else if (this.postResults.name?.instance_mms_id?.length) {
           return this.postResults.name.instance_mms_id;
         }
-        // Then check directly nested instance MMS ID (instance-only format)
+        // Legacy nested object format
         else if (this.postResults.name?.instance?.mms_id) {
           return [this.postResults.name.instance.mms_id];
-        }
-        // Check for mms_id in instance (alternate instance-only response)
-        else if (this.postResults.instance?.mms_id) {
-          return [this.postResults.instance.mms_id];
         }
         return [];
       },
       
       normalizedWorkIds() {
-        // First check the transformed format (arrays)
-        if (this.postResults.name?.work_mms_id?.length) {
+        // New response format direct at root
+        if (this.postResults.work?.mms_id) {
+        return [this.postResults.work.mms_id];
+        } 
+        // Legacy nested format
+        else if (this.postResults.name?.work_mms_id?.length) {
           return this.postResults.name.work_mms_id;
         }
-        // Then check directly nested work MMS ID (work-only format)
+        // Legacy nested object format
         else if (this.postResults.name?.work?.mms_id) {
           return [this.postResults.name.work.mms_id];
-        }
-        // Check for mms_id in work (alternate work-only response)
-        else if (this.postResults.work?.mms_id) {
-          return [this.postResults.work.mms_id];
         }
         return [];
       },
@@ -112,51 +112,39 @@
           // Generate the XML
           const xmlString = await this.generateXML(this.activeProfile);
           
-          // If posting instance only, use our special method to preserve holding info
+          let response;
+          // Create request payload with the right data
+          const requestData = {
+            name: this.activeProfile.uuid || translator.toUUID(translator.new()),
+            rdfxml: xmlString,
+            eid: this.activeProfile.eId
+          };
+          
           if (this.postType === 'instance') {
-            // Create the instance data
-            const instanceData = {
-              name: this.activeProfile.uuid || translator.toUUID(translator.new()),
-              rdfxml: xmlString,
-              eid: this.activeProfile.eId,
-              type: 'instance'
-            };
-            
-            // Use the new utility method that preserves the raw response format
-            const rawResponse = await utilsNetwork.postInstanceToServer(instanceData);
-            
-            // Extract holding information if it exists in the expected format
-            if (rawResponse && rawResponse.name && rawResponse.name.instance && rawResponse.name.instance.holding) {
-              this.holdingInfo = {
-                mms_id: rawResponse.name.instance.mms_id || 'Not provided',
-                holding_id: rawResponse.name.instance.holding.holding_id || 'Not provided',
-                item_id: rawResponse.name.instance.holding.item_id || 'Not provided'
-              };
-              console.log('Extracted holding info:', this.holdingInfo);
-            }
-            
-            // Format response for consistency with other post types
-            this.postResults = {
-              status: true,
-              publish: {
-                status: 'published'
-              },
-              name: {
-                instance_mms_id: rawResponse.name && rawResponse.name.instance && rawResponse.name.instance.mms_id ? 
-                                 [rawResponse.name.instance.mms_id] : [],
-                work_mms_id: []
-              }
-            };
+            // Post to the instance-only endpoint
+            response = await utilsNetwork.postInstanceToServer(requestData);
           } else {
-            // For work or work+instance, use the existing publishRecord method
-            this.postResults = await this.profileStore.publishRecord(
-              xmlString,
-              this.activeProfile,
-              this.postType
-            );
+            // For work-only or work+instance, use the standard publish method
+            response = await this.profileStore.publishRecord(xmlString, this.activeProfile, this.postType);
           }
           
-          console.log("Post response:", this.postResults);
+          console.log("Post response:", response);
+          
+          // Handle holding information extraction
+          this.handleResponse(response);
+          
+          // Normalize the response for display
+          if (response.instance || response.work) {
+            // Format using the new response structure
+            this.postResults = {
+              publish: { status: 'published' },
+              ...response // Include the full response with instance and/or work objects
+            };
+          } else {
+            // Keep original response structure for legacy formats
+            this.postResults = response;
+          }
+          
         } catch (error) {
           console.error("Error during post:", error);
           this.postResults = {
@@ -323,65 +311,52 @@
             message: message || 'An unknown error occurred'
           }
         };
-        this.posting = false;
+        this.posting = false
       },
-      
-      // Update your existing handleResponse method
+
+      // Update handleResponse method to handle the new API response formats
       handleResponse(response) {
         console.log('Processing server response in handleResponse:', response);
         
-        // Extract holding information from the response
+        // Reset holding information
         this.holdingInfo = null;
         
-        // Case 1: Check for holding info in the format from the logs (raw server response)
-        if (response && 
-            response.name && 
-            response.name.instance && 
-            response.name.instance.holding) {
-          
-          this.holdingInfo = {
-            mms_id: response.name.instance.mms_id || 'Not provided',
-            holding_id: response.name.instance.holding.holding_id || 'Not provided',
-            item_id: response.name.instance.holding.item_id || 'Not provided'
-          };
-          
-          console.log('Extracted holding info from name.instance:', this.holdingInfo);
-        } 
-        // Case 2: Check for alternative response format
-        else if (response && response.instance && response.instance.holding) {
+        // Case 1: New response format - direct instance object with holding
+        if (response && response.instance && response.instance.holding) {
           this.holdingInfo = {
             mms_id: response.instance.mms_id || 'Not provided',
             holding_id: response.instance.holding.holding_id || 'Not provided',
             item_id: response.instance.holding.item_id || 'Not provided'
           };
-          
-          console.log('Extracted holding info from direct instance property:', this.holdingInfo);
+          console.log('Extracted holding info from new response format:', this.holdingInfo);
         }
-        // Case 3: Check for holding info in normalized format 
-        else if (response && 
-                response.name && 
-                response.name.instance_mms_id && 
-                response.name.instance_mms_id.length > 0) {
-          
-          // Look for holding info in other parts of the response structure
-          const instanceId = response.name.instance_mms_id[0];
-          
-          // Try to find holding data in the original response structure
-          if (response.holding || 
-              (response.name.instance && response.name.instance.holding)) {
-            
-            const holdingData = response.holding || 
-                              (response.name.instance && response.name.instance.holding);
-            
-            this.holdingInfo = {
-              mms_id: instanceId,
-              holding_id: holdingData.holding_id || 'Not provided',
-              item_id: holdingData.item_id || 'Not provided'
-            };
-            
-            console.log('Extracted holding info from normalized response with instance_mms_id array:', this.holdingInfo);
+        // Case 2: Legacy format - name.instance with holding
+        else if (response && response.name && response.name.instance && response.name.instance.holding) {
+          this.holdingInfo = {
+            mms_id: response.name.instance.mms_id || 'Not provided',
+            holding_id: response.name.instance.holding.holding_id || 'Not provided',
+            item_id: response.name.instance.holding.item_id || 'Not provided'
+          };
+          console.log('Extracted holding info from legacy name.instance format:', this.holdingInfo);
+        }
+        // Case 3: Legacy format with separate holding object
+        else if (response && response.holding) {
+          // Try to find the associated instance ID from any available source
+          let instanceId = null;
+          if (response.instance && response.instance.mms_id) {
+            instanceId = response.instance.mms_id;
+          } else if (response.name && response.name.instance_mms_id && response.name.instance_mms_id.length > 0) {
+            instanceId = response.name.instance_mms_id[0];
           }
-        } else {
+          
+          this.holdingInfo = {
+            mms_id: instanceId || 'Not provided',
+            holding_id: response.holding.holding_id || 'Not provided',
+            item_id: response.holding.item_id || 'Not provided'
+          };
+          console.log('Extracted holding info from separate holding object:', this.holdingInfo);
+        }
+        else {
           console.log('No holding information found in the response');
         }
       },
