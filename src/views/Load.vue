@@ -327,19 +327,18 @@
 
       loadAllRecords: async function(event){
         event.preventDefault()
-
+        
         this.displayDashboard = false
         this.displayAllRecords = true
-        this.isLoadingAllRecords=true
-
+        this.isLoadingAllRecords = true
+        
         let allRecordsRaw = await utilsNetwork.searchSavedRecords()
-
+        console.log("All records raw data:", allRecordsRaw);
+        
         this.allRecords = []
         for (let r of allRecordsRaw){
-
           let obj = {
             'Id': r.eid,
-
             'RTs': r.rstused,
             'Type': r.typeid,
             'Title': r.title,
@@ -347,18 +346,21 @@
             'Urls': r.externalid,
             'Time': r.time,
             'User': r.user,
-
-
-
           }
           this.allRecords.push(obj)
-
-
         }
-        // let lccnLookup = {}
-
-
-        this.isLoadingAllRecords=false
+        
+        // Sort by timestamp (newest first) if available
+        if (this.allRecords.length > 0 && this.allRecords[0].Time) {
+          this.allRecords.sort((a, b) => {
+            // Convert time strings to comparable values
+            const timeA = new Date(a.Time.replace(/:/g, '-')).getTime();
+            const timeB = new Date(b.Time.replace(/:/g, '-')).getTime();
+            return timeB - timeA; // Descending order (newest first)
+          });
+        }
+        
+        this.isLoadingAllRecords = false
       },
 
       returnTimeAgo: function(timestamp){
@@ -573,29 +575,16 @@
 
 
      async refreshSavedRecords(){
-
-
-
         let records = await utilsNetwork.searchSavedRecords(this.preferenceStore.returnUserNameForSaving)
-
-          let lccnLookup = {}
-
-          // in this view we want to remove any records that are repeats, so only show the latest LCCN being edited
-          this.continueRecords = []
-          for (let r of records){
-            if (r.lccn && r.lccn != '' && r.lccn !== null){
-              if (!lccnLookup[r.lccn]){
-                this.continueRecords.push(r)
-                lccnLookup[r.lccn]=true
-              }
-            }else{
-              // no LCCN just add it
-              this.continueRecords.push(r)
-            }
-
-          }
-
-
+        console.log("Processing records for display:", records);
+        
+        // Option 1: Remove all filtering - show ALL records
+        this.continueRecords = Array.isArray(records) ? records : Object.values(records);
+        
+        // Sort by timestamp to show newest records first
+        if (this.continueRecords.length > 0 && this.continueRecords[0].timestamp) {
+          this.continueRecords.sort((a, b) => b.timestamp - a.timestamp);
+        }
       },
 
 

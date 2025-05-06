@@ -3259,9 +3259,96 @@ export const useProfileStore = defineStore('profile', {
     * @return {boolean} - did it save
     */
     saveRecord: async function(){
-      let xml = await utilsExport.buildXML(this.activeProfile)
-      utilsNetwork.saveRecord(xml.xlmStringBasic, this.activeProfile.eId)
-      this.activeProfileSaved = true
+      console.log("Attempting to save record:", this.activeProfile.eId);
+      let userInitial = usePreferenceStore().catInitals;
+      let catCode = usePreferenceStore().catCode;
+      let userInProfile = `${userInitial} (${catCode})`;
+      console.log("Current user data for saving:", { userInProfile, catInitals: userInitial, catCode });
+      
+      // Extract the title from Work resource template - CRITICAL FOR HISTORY DISPLAY
+      this.activeProfile.title = '';
+      this.activeProfile.contributor = '';
+      
+      for (const rt in this.activeProfile.rt) {
+        if (rt.includes(':Work')) {
+          // First, let's dump the title structure for debugging
+          for (const pt in this.activeProfile.rt[rt].pt) {
+            const property = this.activeProfile.rt[rt].pt[pt];
+            if (property.propertyURI === 'http://id.loc.gov/ontologies/bibframe/title') {
+              console.log("DEBUG: Found title property structure:", JSON.stringify(property.userValue, null, 2));
+              
+              // Try various paths to extract the title
+              if (property.userValue && property.userValue['http://id.loc.gov/ontologies/bibframe/title']) {
+                const titleArray = property.userValue['http://id.loc.gov/ontologies/bibframe/title'];
+                if (titleArray && titleArray.length > 0) {
+                  const titleObj = titleArray[0];
+                  
+                  // Try path 1: title/mainTitle/mainTitle
+                  if (titleObj['http://id.loc.gov/ontologies/bibframe/mainTitle'] && 
+                      titleObj['http://id.loc.gov/ontologies/bibframe/mainTitle'][0] &&
+                      titleObj['http://id.loc.gov/ontologies/bibframe/mainTitle'][0]['http://id.loc.gov/ontologies/bibframe/mainTitle']) {
+                    this.activeProfile.title = titleObj['http://id.loc.gov/ontologies/bibframe/mainTitle'][0]['http://id.loc.gov/ontologies/bibframe/mainTitle'];
+                    console.log("DEBUG: Found title via path 1:", this.activeProfile.title);
+                  }
+                  // Try path 2: direct mainTitle property
+                  else if (titleObj['http://id.loc.gov/ontologies/bibframe/mainTitle']) {
+                    if (typeof titleObj['http://id.loc.gov/ontologies/bibframe/mainTitle'] === 'string') {
+                      this.activeProfile.title = titleObj['http://id.loc.gov/ontologies/bibframe/mainTitle'];
+                    } else if (Array.isArray(titleObj['http://id.loc.gov/ontologies/bibframe/mainTitle'])) {
+                      // If it's an array, try to find the non-language tagged entry
+                      const mainTitles = titleObj['http://id.loc.gov/ontologies/bibframe/mainTitle'];
+                      for (const title of mainTitles) {
+                        if (typeof title === 'string') {
+                          this.activeProfile.title = title;
+                          break;
+                        } else if (title['http://id.loc.gov/ontologies/bibframe/mainTitle']) {
+                          this.activeProfile.title = title['http://id.loc.gov/ontologies/bibframe/mainTitle'];
+                          break;
+                        }
+                      }
+                    }
+                    console.log("DEBUG: Found title via path 2:", this.activeProfile.title);
+                  }
+                }
+              }
+            }
+          }
+          
+          // Also check for the first contributor
+          for (const pt in this.activeProfile.rt[rt].pt) {
+            const property = this.activeProfile.rt[rt].pt[pt];
+            if (property.propertyURI === 'http://id.loc.gov/ontologies/bibframe/contribution') {
+              try {
+                if (property.userValue && 
+                    property.userValue['http://id.loc.gov/ontologies/bibframe/contribution'] &&
+                    property.userValue['http://id.loc.gov/ontologies/bibframe/contribution'][0] &&
+                    property.userValue['http://id.loc.gov/ontologies/bibframe/contribution'][0]['http://id.loc.gov/ontologies/bibframe/agent'] &&
+                    property.userValue['http://id.loc.gov/ontologies/bibframe/contribution'][0]['http://id.loc.gov/ontologies/bibframe/agent'][0] &&
+                    property.userValue['http://id.loc.gov/ontologies/bibframe/contribution'][0]['http://id.loc.gov/ontologies/bibframe/agent'][0]['http://www.w3.org/2000/01/rdf-schema#label'] &&
+                    property.userValue['http://id.loc.gov/ontologies/bibframe/contribution'][0]['http://id.loc.gov/ontologies/bibframe/agent'][0]['http://www.w3.org/2000/01/rdf-schema#label'][0] &&
+                    property.userValue['http://id.loc.gov/ontologies/bibframe/contribution'][0]['http://id.loc.gov/ontologies/bibframe/agent'][0]['http://www.w3.org/2000/01/rdf-schema#label'][0]['http://www.w3.org/2000/01/rdf-schema#label']) {
+                  
+                  this.activeProfile.contributor = property.userValue['http://id.loc.gov/ontologies/bibframe/contribution'][0]['http://id.loc.gov/ontologies/bibframe/agent'][0]['http://www.w3.org/2000/01/rdf-schema#label'][0]['http://www.w3.org/2000/01/rdf-schema#label'];
+                }
+              } catch (e) {
+                console.error("Error extracting contributor:", e);
+              }
+            }
+          }
+        }
+      }
+      
+      console.log("Extracted for DatasetDescription:", { 
+        title: this.activeProfile.title, 
+        contributor: this.activeProfile.contributor 
+      });
+    
+      let xml = await utilsExport.buildXML(this.activeProfile);
+      return utilsNetwork.saveRecord(xml.xlmStringBasic, this.activeProfile.eId)
+        .then(() => {
+          this.activeProfileSaved = true;
+          return true;
+        });
     },
 
     /**
@@ -3423,7 +3510,7 @@ export const useProfileStore = defineStore('profile', {
       if (numUpper == 2){
         code = code.split(':')[0] + ':' + justProperty.charAt(0) + justProperty.replace(/[a-z]/g, '')
       }else if (numUpper == 1){
-        code = code.split(':')[0] + ':' + justProperty.charAt(0) + justProperty.charAt(1) + justProperty.replace(/[a-z]/g, '')
+        code = code.split(':')[0] + justProperty.charAt(0) + justProperty.charAt(1) + justProperty.replace(/[a-z]/g, '')
       }else if (numUpper == 0){
         code = code.split(':')[0] + justProperty.charAt(0) + justProperty.charAt(1) + justProperty.charAt(2)
       }
@@ -5702,6 +5789,7 @@ export const useProfileStore = defineStore('profile', {
       }
 
       // pubResuts = {'postLocation': 'https://id.loc.gov/authorities/names/n83122656', status: 'published'}
+      console.log('pubResuts')
       console.log('pubResuts')
       console.log(pubResuts)
       return {

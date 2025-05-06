@@ -4,6 +4,7 @@ import { getCurrentInstance } from 'vue'
 import diacrticsVoyagerMacroExpress from "@/lib/diacritics/diacritic_pack_voyager_macro_express.json"
 import diacrticsVoyagerNative from "@/lib/diacritics/diacritic_pack_voyager_native.json"
 import utilsProfile from '../lib/utils_profile'
+import utilsParse from '../lib/utils_parse'
 
 export const usePreferenceStore = defineStore('preference', {
   state: () => ({
@@ -524,7 +525,7 @@ export const usePreferenceStore = defineStore('preference', {
     '--c-edit-main-splitpane-edit-scroll-bar-track-color' : {
       value:'#fafafa',
       desc: 'The color of the scroll bar track (background).',
-      descShort: 'Scrollbard Track Color',
+      descShort: 'Scrollbar Track Color',
       type: 'color',
       group: 'Edit Panel',
       range: null
@@ -532,7 +533,7 @@ export const usePreferenceStore = defineStore('preference', {
     '--c-edit-main-splitpane-edit-scroll-bar-thumb-color' : {
       value:'#c7c7c7',
       desc: 'The color of the scroll bar thumb (the part you grab).',
-      descShort: 'Scrollbard Thumb Color',
+      descShort: 'Scrollbar Thumb Color',
       type: 'color',
       group: 'Edit Panel',
       range: null
@@ -638,21 +639,47 @@ export const usePreferenceStore = defineStore('preference', {
         group: 'Literal Field',
         range: [true,false]
     },
+    '--b-edit-main-literal-non-latin-first' : {
+      desc: 'With paired literals values (transliteration) always show the non-Latin value first (otherwise the Latin value will be first)',
+      descShort: 'Paired literals, show non-Latin First.',
+      value: false,
+      type: 'boolean',
+      unit: null,
+      group: 'Literal Field',
+      range: [true,false]
+    },
+
+    '--b-edit-main-literal-display-paired-literal-line' : {
+      desc: 'Display a line between the two paired literals. Indicates that the two values are related.',
+      descShort: 'Display a line between the two paired literals.',
+      value: true,
+      type: 'boolean',
+      unit: null,
+      group: 'Literal Field',
+      range: [true,false]
+    },
+    '--c-edit-main-literal-paired-literal-line-color' : {
+      desc: 'Line color of the paired literal line',
+      descShort: 'Paired literal line color',
+      value: "#4b4b4b",
+      type: 'color',
+      group: 'Literal Field',
+      range: null
+    },
 
 
-
-
-    // Lookup Field
-    '--n-edit-main-lookup-background-color' : {
-      desc: 'The background color of the entity badge',
-      descShort: 'Lookup value background color',
-      value: 1,
-      step: 0.1,
-      type: 'number',
-      unit: 'em',
-      group: 'Lookup Field',
-      range: [1,2]
-  },
+  // Lookup Field
+  // Not sure what this is supposed to be
+  // '--n-edit-main-lookup-background-color' : {
+  //   desc: 'The background color of the entity badge',
+  //   descShort: 'Lookup value background color',
+  //   value: 1,
+  //   step: 0.1,
+  //   type: 'number',
+  //   unit: 'em',
+  //   group: 'Lookup Field',
+  //   range: [1,2]
+  // },
   '--c-edit-main-lookup-background-color' : {
     desc: 'The background color of the entity badge',
     descShort: 'Lookup value background color',
@@ -1008,6 +1035,15 @@ export const usePreferenceStore = defineStore('preference', {
         range: [5, 100],
         step: 5,
       },
+      '--b-edit-complex-include-usage' : {
+        desc: 'Include the usage numbers for subject headings. This might increase search time.',
+        descShort: 'Include Usage',
+        value: false,
+        type: 'boolean',
+        unit: null,
+        group: 'Complex Lookup',
+        range: [true,false]
+      },
 
       //general
       '--c-general-icon-instance-color' : {
@@ -1055,7 +1091,15 @@ export const usePreferenceStore = defineStore('preference', {
           group: 'General',
           range: [true,false]
       },
-
+      '--b-general-auto-save' : {
+        desc: 'When On the record will be saved to the backend on every change.',
+        descShort: 'Auto Save Mode',
+        value: false,
+        type: 'boolean',
+        unit: null,
+        group: 'General',
+        range: [true,false]
+    },
 
 
       // diacritics
@@ -1252,6 +1296,13 @@ export const usePreferenceStore = defineStore('preference', {
         group: 'layouts',
       },
 
+      '--l-custom-order' : {
+        desc: '',
+        descShort: '',
+        value: {},
+        type: 'object',
+        group: 'preferenes',
+      },
 
 
     }
@@ -1462,6 +1513,15 @@ export const usePreferenceStore = defineStore('preference', {
 
       this.styleDefault[propertyName].value = value
       this.savePreferences()
+
+      // we can do any actions on specific preference changes here
+      if (propertyName == '--b-edit-main-literal-non-latin-first'){
+        useProfileStore().reorderAllNonLatinLiterals()
+        utilsParse.buildPairedLiteralsIndicators(useProfileStore().activeProfile)
+        useProfileStore ().dataChanged()
+      }
+
+
       return true
     },
 
@@ -1533,7 +1593,7 @@ export const usePreferenceStore = defineStore('preference', {
       this.diacriticUse = this.returnValue('--c-diacritics-enabled-macros')
       this.diacriticUse = [...new Set(this.diacriticUse)];
 
-      console.log(this.diacriticUse)
+      // console.log(this.diacriticUse)
       for (let d in this.diacriticPacks.macroExpress){
 
         let macros = this.diacriticPacks.macroExpress[d]
@@ -1544,12 +1604,21 @@ export const usePreferenceStore = defineStore('preference', {
           }
         }
       }
-      console.log(this.diacriticUseValues)
+      // console.log(this.diacriticUseValues)
     },
 
     // turn copy mode on/off
     toggleCopyMode: function(){
         this.copyMode = !this.copyMode
+    },
+
+    saveOrder: function(newOrder){
+      this.setValue('--l-custom-order', newOrder)
+    },
+
+    loadOrder: function(){
+      let currentOrder = this.returnValue('--l-custom-order')
+      return currentOrder
     },
 
     deleteLayout: function(target){
@@ -1660,6 +1729,30 @@ export const usePreferenceStore = defineStore('preference', {
     },
 
 
+    isNarTester(){
+
+      let canTest = ["kevinford","pfrank","eram","ctur","trod","jowill","ntra","ddavis","nalf","fd07","cyea","fc80","smcc","tsod","fo","hhuh","yshi","cc33","amors","cd01","mnaz","cgir","pkho","cf31","stellier","test",'matt']
+
+      // Convert initials and code to lowercase if they exist
+      const initials = this.catInitals ? this.catInitals.toLowerCase() : '';
+      const code = this.catCode ? this.catCode.toLowerCase() : '';
+
+      // Convert all test strings to lowercase
+      const canTestLower = canTest.map(item => item.toLowerCase());
+
+      // Check if initials or code match any of the test strings
+      return canTestLower.some(testStr =>
+        (initials && initials.includes(testStr)) ||
+        (code && code.includes(testStr))
+      );
+
+
+    },
+
+
+
+
+
     /**
     * Take a url and rewrites it to match the url pattern of the current enviornment
     * @param {string} url - the url to modfidfy
@@ -1680,5 +1773,4 @@ export const usePreferenceStore = defineStore('preference', {
 
 
 })
-
 

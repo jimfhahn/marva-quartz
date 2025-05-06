@@ -2778,7 +2778,7 @@ const utilsNetwork = {
        }
      },
 
-     searchSavedRecords: async function(user,search){
+     searchSavedRecords: async function(user, search) {
 
       let utilUrl = useConfigStore().returnUrls.util
       let utilPath = useConfigStore().returnUrls.env
@@ -2803,6 +2803,7 @@ const utilsNetwork = {
             return b.timestamp - a.timestamp ;
         });
 
+        console.log("Records data received:", r);  // Shows what's actually returned
         return rSorted
 
       }
