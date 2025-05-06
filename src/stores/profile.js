@@ -3433,6 +3433,21 @@ export const useProfileStore = defineStore('profile', {
         // Send publication request to backend
         console.log("DEBUG: Sending publish request to backend");
         const response = await utilsNetwork.publishRecord(finalXml, profile, publishUrl);
+        
+        console.log("Raw server response:", response);
+        
+        // Ensure work_mms_id is populated from the nested structure if available
+        if (response.name && response.name.work && response.name.work.mms_id) {
+          // Create or update work_mms_id array with the ID from name.work.mms_id
+          if (!response.name.work_mms_id) {
+            response.name.work_mms_id = [response.name.work.mms_id];
+          } else if (Array.isArray(response.name.work_mms_id) && response.name.work_mms_id.length === 0) {
+            response.name.work_mms_id.push(response.name.work.mms_id);
+          }
+          
+          console.log("Updated work_mms_id with value from name.work.mms_id:", response.name.work_mms_id);
+        }
+        
         console.log("DEBUG: Backend response:", response);
         
         // Return properly structured response

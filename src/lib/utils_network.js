@@ -2942,31 +2942,30 @@ const utilsNetwork = {
       // Initialize arrays for MMS IDs
       let instanceMmsIds = [];
       let workMmsIds = [];
+      let holdingInfo = null;
       
-      // Handle work_mms_id when directly in name object (work-only format)
-      if (content.name && content.name.work_mms_id) {
-        workMmsIds = Array.isArray(content.name.work_mms_id) ? 
-          content.name.work_mms_id : [content.name.work_mms_id];
+      // Handle nested work.mms_id format
+      if (content.name && content.name.work && content.name.work.mms_id) {
+        workMmsIds = Array.isArray(content.name.work.mms_id) ?
+          content.name.work.mms_id : [content.name.work.mms_id];
       }
       
-      // Handle instance_mms_id when directly in name object
-      if (content.name && content.name.instance_mms_id) {
-        instanceMmsIds = Array.isArray(content.name.instance_mms_id) ? 
-          content.name.instance_mms_id : [content.name.instance_mms_id];
-      }
-      
-      // Handle nested instance.mms_id (instance-only format)
+      // Handle nested instance.mms_id format
       if (content.name && content.name.instance && content.name.instance.mms_id) {
-        instanceMmsIds = [content.name.instance.mms_id];
-      }
-      
-      // Handle direct instance property (another possible format)
-      if (content.instance && content.instance.mms_id) {
-        instanceMmsIds = [content.instance.mms_id];
+        instanceMmsIds = Array.isArray(content.name.instance.mms_id) ?
+          content.name.instance.mms_id : [content.name.instance.mms_id];
+          
+        // Extract holding information if present
+        if (content.name.instance.holding) {
+          holdingInfo = {
+            holding_id: content.name.instance.holding.holding_id,
+            item_id: content.name.instance.holding.item_id
+          };
+        }
       }
       
       // Format response consistently for all publish types
-      return {
+      const response = {
         status: true,
         publish: {
           status: 'published'
@@ -2977,6 +2976,16 @@ const utilsNetwork = {
           work_mms_id: workMmsIds
         }
       };
+      
+      // Add holding information to the response if available
+      if (holdingInfo) {
+        response.name.instance = {
+          mms_id: instanceMmsIds.length > 0 ? instanceMmsIds[0] : null,
+          holding: holdingInfo
+        };
+      }
+      
+      return response;
     } catch (error) {
       console.error("Error publishing record:", error);
       return {

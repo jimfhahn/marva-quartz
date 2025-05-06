@@ -48,33 +48,25 @@
         return option ? option.label : 'Work + Instance';
       },
       normalizedInstanceIds() {
-        // New response format direct at root
-        if (this.postResults.instance?.mms_id) {
-          return [this.postResults.instance.mms_id];
+        // Simplified to only handle nested format under name.instance
+        if (this.postResults.name?.instance?.mms_id) {
+          return [this.postResults.name.instance.mms_id];
         }
-        // Legacy nested format
+        // Backward compatibility for instance_mms_id array
         else if (this.postResults.name?.instance_mms_id?.length) {
           return this.postResults.name.instance_mms_id;
-        }
-        // Legacy nested object format
-        else if (this.postResults.name?.instance?.mms_id) {
-          return [this.postResults.name.instance.mms_id];
         }
         return [];
       },
       
       normalizedWorkIds() {
-        // New response format direct at root
-        if (this.postResults.work?.mms_id) {
-        return [this.postResults.work.mms_id];
-        } 
-        // Legacy nested format
+        // Simplified to only handle nested format under name.work
+        if (this.postResults.name?.work?.mms_id) {
+          return [this.postResults.name.work.mms_id];
+        }
+        // Backward compatibility for work_mms_id array
         else if (this.postResults.name?.work_mms_id?.length) {
           return this.postResults.name.work_mms_id;
-        }
-        // Legacy nested object format
-        else if (this.postResults.name?.work?.mms_id) {
-          return [this.postResults.name.work.mms_id];
         }
         return [];
       },
@@ -128,21 +120,26 @@
             response = await this.profileStore.publishRecord(xmlString, this.activeProfile, this.postType);
           }
           
-          console.log("Post response:", response);
+          // Log the raw server response to diagnose structure issues
+          console.log("Raw server response:", response);
           
           // Handle holding information extraction
           this.handleResponse(response);
           
-          // Normalize the response for display
-          if (response.instance || response.work) {
-            // Format using the new response structure
-            this.postResults = {
-              publish: { status: 'published' },
-              ...response // Include the full response with instance and/or work objects
-            };
+          // IMPORTANT: Store the ORIGINAL response structure without modification
+          // This will preserve the nested work and instance data for normalizedWorkIds
+          this.postResults = response;
+          
+          // Log the data that will be used for displaying IDs
+          console.log("Work ID debug - response structure:", JSON.stringify(this.postResults, null, 2));
+          if (this.postResults.work) {
+            console.log("Work data directly in response:", this.postResults.work);
+          } else if (this.postResults.name?.work) {
+            console.log("Work data in name.work:", this.postResults.name.work);
+          } else if (this.postResults.name?.work_mms_id) {
+            console.log("Work MMS ID in legacy format:", this.postResults.name.work_mms_id);
           } else {
-            // Keep original response structure for legacy formats
-            this.postResults = response;
+            console.log("No work information found - full response:", this.postResults);
           }
           
         } catch (error) {
@@ -321,43 +318,36 @@
         // Reset holding information
         this.holdingInfo = null;
         
-        // Case 1: New response format - direct instance object with holding
-        if (response && response.instance && response.instance.holding) {
-          this.holdingInfo = {
-            mms_id: response.instance.mms_id || 'Not provided',
-            holding_id: response.instance.holding.holding_id || 'Not provided',
-            item_id: response.instance.holding.item_id || 'Not provided'
-          };
-          console.log('Extracted holding info from new response format:', this.holdingInfo);
+        if (!response) {
+          console.log('Response is empty or invalid');
+          return;
         }
-        // Case 2: Legacy format - name.instance with holding
-        else if (response && response.name && response.name.instance && response.name.instance.holding) {
+
+        // First check for name.work.mms_id and ensure it's copied to work_mms_id
+        if (response.name?.work?.mms_id) {
+          if (!response.name.work_mms_id) {
+            response.name.work_mms_id = [response.name.work.mms_id];
+          } else if (Array.isArray(response.name.work_mms_id) && response.name.work_mms_id.length === 0) {
+            response.name.work_mms_id.push(response.name.work.mms_id);
+          }
+          console.log("Added work mms_id to work_mms_id array:", response.name.work_mms_id);
+        }
+        
+        // Check for holding information in nested format
+        if (response.name?.instance?.holding) {
           this.holdingInfo = {
             mms_id: response.name.instance.mms_id || 'Not provided',
             holding_id: response.name.instance.holding.holding_id || 'Not provided',
-            item_id: response.name.instance.holding.item_id || 'Not provided'
+            item_id: response.name.instance.holding.item_id || 'Not available'
           };
-          console.log('Extracted holding info from legacy name.instance format:', this.holdingInfo);
+          console.log('Extracted holding info from name.instance.holding:', this.holdingInfo);
         }
-        // Case 3: Legacy format with separate holding object
-        else if (response && response.holding) {
-          // Try to find the associated instance ID from any available source
-          let instanceId = null;
-          if (response.instance && response.instance.mms_id) {
-            instanceId = response.instance.mms_id;
-          } else if (response.name && response.name.instance_mms_id && response.name.instance_mms_id.length > 0) {
-            instanceId = response.name.instance_mms_id[0];
-          }
-          
-          this.holdingInfo = {
-            mms_id: instanceId || 'Not provided',
-            holding_id: response.holding.holding_id || 'Not provided',
-            item_id: response.holding.item_id || 'Not provided'
-          };
-          console.log('Extracted holding info from separate holding object:', this.holdingInfo);
+        // Instance exists but no holding information
+        else if (response.name?.instance) {
+          console.log('Instance found but no holding information');
         }
         else {
-          console.log('No holding information found in the response');
+          console.log('No instance information found in the response');
         }
       },
 
@@ -471,15 +461,15 @@
         <h3>Created Holding Information</h3>
         <div class="holding-details">
           <div class="detail-row">
-            <span class="detail-label">MMS ID:</span>
+            <span class="detail-label">Instance:</span>
             <span class="detail-value">{{ holdingInfo.mms_id }}</span>
           </div>
           <div class="detail-row">
-            <span class="detail-label">Holding ID:</span>
+            <span class="detail-label">Holding:</span>
             <span class="detail-value">{{ holdingInfo.holding_id }}</span>
           </div>
           <div class="detail-row">
-            <span class="detail-label">Item ID:</span>
+            <span class="detail-label">Item:</span>
             <span class="detail-value">{{ holdingInfo.item_id }}</span>
           </div>
         </div>
