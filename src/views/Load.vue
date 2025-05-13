@@ -232,6 +232,7 @@
 
   import { DataTable } from "@jobinsjp/vue3-datatable"
   import "@jobinsjp/vue3-datatable/dist/style.css"
+  import axios from 'axios'
 
 
   if (TimeAgo.getDefaultLocale() != 'en'){TimeAgo.addDefaultLocale(en)}
@@ -263,7 +264,8 @@
         isLoadingAllRecords:false,
 
         allRecords: [],
-        urlEntered: false
+        urlEntered: false,
+        searchType: null // NEW: track type of search
 
       }
     },
@@ -388,61 +390,145 @@
 
       },
 
-      loadSearch: function(){
-        this.lccnLoadSelected = null
-        this.urlEntered = this.urlToLoad.trim() !== '';
-
-        if (this.urlToLoad.startsWith("http://") || this.urlToLoad.startsWith("https://")){
-          this.urlToLoadIsHttp = true
-          return false
-        }else{
-          this.urlToLoadIsHttp = false
-
-        }
-        // lccns are not short
-        if (this.urlToLoad.length < 8){ return false}
-
-        window.clearTimeout(this.lccnToSearchTimeout)
-          this.searchByLccnResults = 'Searching...'
-          this.lccnToSearchTimeout = window.setTimeout(async ()=>{
-
-          this.searchByLccnResults = await utilsNetwork.searchInstanceByLCCN(this.urlToLoad)
-
-          // If there's only one result, load it so the user doesn't have to do any clicking
-          if (this.searchByLccnResults.length == 1) {
-            this.lccnLoadSelected = this.searchByLccnResults[0]
-          }
-
-        },500)
-
-
+      // NEW: Helper to detect identifier type
+      detectSearchType(input) {
+        const trimmed = input.trim();
+        // MMSID: 8-19 digits, all numeric, and starts with 99
+        if (/^99\d{6,17}$/.test(trimmed)) return 'mmsid';
+        // POD: UUID format (36 chars with hyphens)
+        if (/^[0-9a-fA-F-]{36}$/.test(trimmed)) return 'pod';
+        // LCCN: fallback, allow digits, letters, hyphens, dots, spaces
+        if (/^[0-9A-Za-z-. ]+$/.test(trimmed)) return 'lccn';
+        return null;
       },
 
-      loadUrl: async function(useInstanceProfile,multiTestFlag){
-        if (this.lccnLoadSelected){
+      // UPDATED: loadSearch to support new endpoints
+      loadSearch: function() {
+        this.lccnLoadSelected = null
+        this.urlEntered = this.urlToLoad.trim() !== ''
+        if (this.urlToLoad.startsWith("http://") || this.urlToLoad.startsWith("https://")) {
+          this.urlToLoadIsHttp = true
+          return false
+        } else {
+          this.urlToLoadIsHttp = false
+        }
+        if (this.urlToLoad.length < 8) { return false }
 
+        window.clearTimeout(this.lccnToSearchTimeout)
+        this.searchByLccnResults = 'Searching...'
+        this.searchType = this.detectSearchType(this.urlToLoad)
+        console.log("Detected search type:", this.searchType, "for input:", this.urlToLoad)
+
+        this.lccnToSearchTimeout = window.setTimeout(async () => {
+          if (this.searchType === 'mmsid') {
+            // Penn Alma MMSID search
+            const url = `https://quartz.bibframe.app/alma/?version=1.2&operation=searchRetrieve&recordSchema=lc_bf_instance&query=alma.mms_id="${this.urlToLoad}"`
+            console.log("MMSID search URL:", url)
+            try {
+              const resp = await axios.get(url)
+              console.log("MMSID search response:", resp)
+              const xml = resp.data
+              // Check for <numberOfRecords> > 0
+              const numMatch = xml.match(/<numberOfRecords>(\d+)<\/numberOfRecords>/)
+              const numRecords = numMatch ? parseInt(numMatch[1], 10) : 0
+              if (numRecords > 0 && xml.includes('<bf:Instance')) {
+                // Extract the rdf:about attribute from <bf:Instance>
+                const aboutMatch = xml.match(/<bf:Instance[^>]+rdf:about="([^"]+)"/)
+                const instanceAbout = aboutMatch ? aboutMatch[1] : '(no instance URL)'
+                this.searchByLccnResults = [{
+                  label: `MMSID: ${this.urlToLoad} (${instanceAbout})`,
+                  bfdbURL: url,
+                  bfdbPackageURL: url,
+                  idURL: url,
+                  instanceAbout // you can use this elsewhere if needed
+                }]
+                this.lccnLoadSelected = this.searchByLccnResults[0]
+                console.log("MMSID searchByLccnResults:", this.searchByLccnResults)
+              } else {
+                this.searchByLccnResults = []
+                console.log("No records found in MMSID response.")
+              }
+            } catch (e) {
+              console.error("Error fetching MMSID:", e)
+              this.searchByLccnResults = []
+            }
+          } else if (this.searchType === 'pod') {
+            // POD search
+            const url = `https://quartz.bibframe.app/pod/${this.urlToLoad}.xml`
+            console.log("POD search URL:", url)
+            try {
+              const resp = await axios.get(url)
+              console.log("POD search response:", resp)
+              this.searchByLccnResults = [{
+                label: `POD: ${this.urlToLoad}`,
+                bfdbURL: url,
+                bfdbPackageURL: url,
+                idURL: url
+              }]
+              this.lccnLoadSelected = this.searchByLccnResults[0]
+              console.log("POD searchByLccnResults:", this.searchByLccnResults)
+            } catch (e) {
+              console.error("Error fetching POD:", e)
+              this.searchByLccnResults = []
+            }
+          } else {
+            // Default: LCCN
+            console.log("Searching by LCCN:", this.urlToLoad)
+            this.searchByLccnResults = await utilsNetwork.searchInstanceByLCCN(this.urlToLoad)
+            console.log("LCCN searchByLccnResults:", this.searchByLccnResults)
+            if (this.searchByLccnResults.length == 1) {
+              this.lccnLoadSelected = this.searchByLccnResults[0]
+            }
+          }
+        }, 500)
+      },
+
+      loadUrl: async function(useInstanceProfile, multiTestFlag) {
+        if (this.lccnLoadSelected) {
           this.urlToLoad = this.lccnLoadSelected.bfdbPackageURL
-
+          console.log("loadUrl: using bfdbPackageURL:", this.urlToLoad)
         }
 
-
-
-        if (this.urlToLoad.trim() !== ''){
-
+        if (this.urlToLoad.trim() !== '') {
+          console.log("Fetching XML from:", this.urlToLoad)
           let xml = await utilsNetwork.fetchBfdbXML(this.urlToLoad)
-          if (!xml){
+          console.log("Fetched XML:", xml ? xml.substring(0, 200) : "No XML returned")
+          if (!xml) {
             alert("There was an error retrieving that URL. Are you sure it is correct: " + this.urlToLoad)
             return false
           }
-          // if (xml.indexOf('<rdf:RDF'))
 
-
-          // check for XML problems here ?
-
-          utilsParse.parseXml(xml)
-
-
-
+          let xmlToParse = xml
+          
+          // MMSID processing temporarily disabled
+          /*
+          if (this.searchType === 'mmsid') {
+            // Only extract RDF for MMSID
+            let rdfMatch = xml.match(/<rdf:RDF[\s\S]*?<\/rdf:RDF>/)
+            if (rdfMatch) {
+              let rdfBlock = rdfMatch[0]
+              // Patch in missing namespaces if needed
+              if (!rdfBlock.includes('xmlns:bf=')) {
+                rdfBlock = rdfBlock.replace(
+                  '<rdf:RDF',
+                  `<rdf:RDF
+                    xmlns:bf="http://id.loc.gov/ontologies/bibframe/"
+                    xmlns:bflc="http://id.loc.gov/ontologies/bflc/"
+                    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+                    xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+                    xmlns:sinopia="http://sinopia.io/vocabulary/"`
+                )
+              }
+              xmlToParse = rdfBlock
+            } else {
+              xmlToParse = xml
+              console.warn("Could not find <rdf:RDF> block, passing full XML to parser.")
+            }
+          }
+          */
+          
+          // For LCCN and POD, just use the full XML
+          utilsParse.parseXml(xmlToParse)
         }
 
         // find the right profile to use from the instance profile name used

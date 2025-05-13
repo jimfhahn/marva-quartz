@@ -294,30 +294,31 @@ const utilsNetwork = {
       if (json){
         options = {headers: {'Content-Type': 'application/json', 'Accept': 'application/json'}, mode: "cors", signal: signal}
       }
-      // console.log("url:",url)
-      // console.log('options:',options)
       try{
+        console.log("[fetchSimpleLookup] Fetching URL:", url, "Options:", options)
         let response = await fetch(url,options);
+        console.log("[fetchSimpleLookup] Response status:", response.status)
         let data = null
         if (response.status == 404){
+          console.warn("[fetchSimpleLookup] 404 Not Found for URL:", url)
           return false
         }
 
-        if (url.includes('.rdf') || url.includes('.xml')){
-          data = await response.text()
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('xml') || contentType.includes('rdf')) {
+          data = await response.text();
+          console.log("[fetchSimpleLookup] XML/RDF response text (first 200 chars):", data ? data.substring(0,200) : "EMPTY");
         } else {
-          // Check if response is empty before parsing
           const responseText = await response.text();
           if (!responseText || responseText.trim() === '') {
-            console.warn("Empty response received from URL:", url);
+            console.warn("[fetchSimpleLookup] Empty response received from URL:", url);
             return false;
           }
-          
           try {
             data = JSON.parse(responseText);
           } catch (parseError) {
-            console.error("JSON parse error for URL:", url, "Error:", parseError.message);
-            console.debug("Response text:", responseText);
+            console.error("[fetchSimpleLookup] JSON parse error for URL:", url, "Error:", parseError.message);
+            console.debug("[fetchSimpleLookup] Response text:", responseText);
             return false;
           }
         }
@@ -327,7 +328,7 @@ const utilsNetwork = {
           // don't do anything
           // console.error("There was an error retriving the record from ", url, ". Likely from the search being aborted because the user was typing.");
         } else {
-          console.error("Network error for URL:", url, "Error:", err);
+          console.error("[fetchSimpleLookup] Network error for URL:", url, "Error:", err);
         }
         return false;
       }
@@ -1384,25 +1385,27 @@ const utilsNetwork = {
     },
 
     fetchBfdbXML: async function(url){
-
-        // bdfb quirk /works/ only serve xml at .rdf
-        if (url.includes('/works/')){
-          url = url.replace(/\.jsonld/,'.rdf')
+      if (url.includes('/works/')){
+        url = url.replace(/\.jsonld/,'.rdf')
+      }
+      url = url.replace(/\.jsonld/,'.xml')
+      if (!url.includes('?')){
+        url = url + '?nocache='+Date.now()
+      }
+      console.log("[fetchBfdbXML] Fetching:", url)
+      let r
+      try{
+        r = await this.fetchSimpleLookup(url)
+        if (r === false || r === null || r === undefined || r === '') {
+          console.warn("[fetchBfdbXML] No data returned from fetchSimpleLookup for URL:", url)
+          return null
         }
-
-        url = url.replace(/\.jsonld/,'.xml')
-
-        if (!url.includes('?')){
-          url = url + '?nocache='+Date.now()
-        }
-
-        let r
-        try{
-          r = await this.fetchSimpleLookup(url)
-        }catch (error) {
-          r = 'ERROR: Error fetching record.'
-        }
+        console.log("[fetchBfdbXML] Data returned (first 200 chars):", typeof r === 'string' ? r.substring(0,200) : r)
         return r
+      }catch (error) {
+        console.error("[fetchBfdbXML] Error fetching record:", error)
+        return null
+      }
     },
 
 
@@ -3023,7 +3026,7 @@ const utilsNetwork = {
 
       // ID needs the lccn to have a space between letters and the numbers
       // If there isn't one, make the adjustment
-      const re = /^[a-z]{2}/g          // not sure if it's only every 2 characters
+      const re = /^[a-z]{2}/g
       const found = lccn.match(re)
       if (found != null){
         lccn = lccn.slice(0,2) + " " + lccn.slice(2)
@@ -3053,9 +3056,10 @@ const utilsNetwork = {
 
         }
 
+        // Add this log to inspect the LCCN results
+        console.log("[searchInstanceByLCCN] Returning:", returnVal)
 
         return returnVal
-
 
       }catch{
         return ["Error searching LCCN"]
