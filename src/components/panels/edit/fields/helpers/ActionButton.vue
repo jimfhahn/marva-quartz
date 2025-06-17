@@ -107,12 +107,6 @@
             </template>
         </template>
 
-        <template v-if="showBuildNacoStub()">
-              <button  class="" :id="`action-button-command-${fieldGuid}-d`" @click="buildNacoStub()" :style="buttonStyle">
-                Create NAR Stub
-              </button>
-        </template>
-
         <template v-if="isContribField()">
               <button  class="" :id="`action-button-command-${fieldGuid}-d`" @click="addToSubjects()" :style="buttonStyle">
                 Add to Subjects
@@ -424,21 +418,6 @@
         // ?
       },
 
-      buildNacoStub(){
-        console.log(this.guid)
-
-        this.profileStore.activeNARStubComponent = {
-          type: this.type,
-          guid: this.guid,
-          fieldGuid: this.fieldGuid,
-          structure: this.structure,
-          type: this.type,
-          propertyPath:this.propertyPath
-        }
-        this.profileStore.showNacoStubCreateModal = true
-      },
-
-
       isContribField(){
         let pt = this.profileStore.returnStructureByComponentGuid(this.guid)
         if (pt && pt.propertyURI && pt.propertyURI == "http://id.loc.gov/ontologies/bibframe/contribution"){
@@ -447,20 +426,6 @@
 
         return false
       },
-
-      showBuildNacoStub(){
-
-        if (this.isStaging() == false){ return false} // REMOVE BEFORE PROD USAGE
-
-        if (!this.propertyPath) return false;
-        if (this.propertyPath && this.propertyPath.length==0) return false;
-
-        return this.isContribField()
-      },
-
-
-
-
 
       shortCutPressed: function(){
 

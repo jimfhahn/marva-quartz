@@ -99,7 +99,7 @@
 
       ...mapState(usePreferenceStore, ['diacriticUseValues', 'diacriticUse','diacriticPacks', 'lastComplexLookupString']),
 
-      ...mapWritableState(useProfileStore, ['lastComplexLookupString','showNacoStubCreateModal']),
+      ...mapWritableState(useProfileStore, ['lastComplexLookupString']),
 
 
 
@@ -750,21 +750,6 @@
         }
       },
 
-      loadNacoStubModal(){
-
-        this.$emit('hideComplexModal')
-
-        this.$nextTick(() => {
-
-          this.showNacoStubCreateModal = true
-
-        })
-
-
-        // this.displayCo/
-
-      },
-
       rewriteURI: function(uri){
 
         if (!uri){
@@ -1058,9 +1043,6 @@
             </template>
             <input class="lookup-input" v-model="searchValueLocal" ref="inputLookup" @keydown="inputKeydown($event)" @keyup="inputKeyup($event)" type="text" :style="`${this.preferenceStore.styleModalBackgroundColor()}; ${this.preferenceStore.styleModalTextColor()}`" />
             <button @click="forceSearch()">Search</button>
-
-            <!-- REMOVE v-if BEFORE PROD USAGE -->
-            <button @click="loadNacoStubModal" style="float: right;" v-if="isStaging() == true">Create Provisional NAR</button>
 
             <hr style="margin-top: 5px;">
             <div>
