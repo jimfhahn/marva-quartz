@@ -5889,7 +5889,7 @@
                 "valueConstraint": {
                   "valueTemplateRefs": [],
                   "useValuesFrom": [
-                    "https://preprod-8288.id.loc.gov/vocabulary/pmomedtype"
+                    "https://id.loc.gov/vocabulary/pmomedtype"
                   ],
                   "defaults": [],
                   "valueDataType": {
@@ -9670,8 +9670,8 @@
                 "valueConstraint": {
                   "valueTemplateRefs": [],
                   "useValuesFrom": [
-                    "https://preprod-8088.id.loc.gov/resources/works/",
-                    "https://preprod-8088.id.loc.gov/resources/hubs/"
+                    "https://id.loc.gov/resources/works/",
+                    "https://id.loc.gov/resources/hubs/"
                   ],
                   "defaults": [],
                   "valueDataType": {
@@ -12585,7 +12585,7 @@
                 "valueConstraint": {
                   "valueTemplateRefs": [],
                   "useValuesFrom": [
-                    "https://preprod-8288.id.loc.gov/vocabulary/pmomedtype"
+                    "https://id.loc.gov/vocabulary/pmomedtype"
                   ],
                   "defaults": [],
                   "valueDataType": {
@@ -13704,7 +13704,7 @@
                 "valueConstraint": {
                   "valueTemplateRefs": [],
                   "useValuesFrom": [
-                    "https://preprod-8288.id.loc.gov/vocabulary/pmomedtype"
+                    "https://id.loc.gov/vocabulary/pmomedtype"
                   ],
                   "defaults": [],
                   "valueDataType": {
@@ -14775,7 +14775,7 @@
                 "valueConstraint": {
                   "valueTemplateRefs": [],
                   "useValuesFrom": [
-                    "https://preprod-8288.id.loc.gov/vocabulary/pmomedtype"
+                    "https://id.loc.gov/vocabulary/pmomedtype"
                   ],
                   "defaults": [],
                   "valueDataType": {
@@ -15823,7 +15823,7 @@
                 "valueConstraint": {
                   "valueTemplateRefs": [],
                   "useValuesFrom": [
-                    "https://preprod-8288.id.loc.gov/vocabulary/pmomedtype"
+                    "https://id.loc.gov/vocabulary/pmomedtype"
                   ],
                   "defaults": [],
                   "valueDataType": {
@@ -18310,7 +18310,7 @@
                 "valueConstraint": {
                   "valueTemplateRefs": [],
                   "useValuesFrom": [
-                    "http://preprod.id.loc.gov/authorities/names"
+                    "http://id.loc.gov/authorities/names"
                   ],
                   "valueDataType": {},
                   "defaults": []
@@ -18333,7 +18333,7 @@
                 "valueConstraint": {
                   "valueTemplateRefs": [],
                   "useValuesFrom": [
-                    "http://preprod.id.loc.gov/authorities/names"
+                    "http://id.loc.gov/authorities/names"
                   ],
                   "defaults": [],
                   "valueDataType": {}
@@ -18356,7 +18356,7 @@
                 "valueConstraint": {
                   "valueTemplateRefs": [],
                   "useValuesFrom": [
-                    "http://preprod.id.loc.gov/authorities/names"
+                    "http://id.loc.gov/authorities/names"
                   ],
                   "defaults": [],
                   "valueDataType": {}
@@ -18379,7 +18379,7 @@
                 "valueConstraint": {
                   "valueTemplateRefs": [],
                   "useValuesFrom": [
-                    "http://preprod.id.loc.gov/authorities/names"
+                    "http://id.loc.gov/authorities/names"
                   ],
                   "defaults": [],
                   "valueDataType": {}
@@ -18402,7 +18402,7 @@
                 "valueConstraint": {
                   "valueTemplateRefs": [],
                   "useValuesFrom": [
-                    "http://preprod.id.loc.gov/authorities/names"
+                    "http://id.loc.gov/authorities/names"
                   ],
                   "defaults": [],
                   "valueDataType": {}
@@ -19549,7 +19549,7 @@
                 "valueConstraint": {
                   "valueTemplateRefs": [],
                   "useValuesFrom": [
-                    "http://preprod.id.loc.gov/authorities/names"
+                    "http://id.loc.gov/authorities/names"
                   ],
                   "valueDataType": {
                     "dataTypeURI": "http://www.loc.gov/mads/rdf/v1#Authority"
@@ -22221,7 +22221,7 @@
                   "valueTemplateRefs": [],
                   "useValuesFrom": [
                     "http://id.loc.gov/authorities/subjects",
-                    "http://preprod.id.loc.gov/authorities/names"
+                    "http://id.loc.gov/authorities/names"
                   ],
                   "valueDataType": {
                     "dataTypeURI": ""
@@ -22271,7 +22271,7 @@
                 "valueConstraint": {
                   "valueTemplateRefs": [],
                   "useValuesFrom": [
-                    "http://preprod.id.loc.gov/authorities/names",
+                    "http://id.loc.gov/authorities/names",
                     "http://id.loc.gov/authorities/subjects"
                   ],
                   "defaults": [],
@@ -22295,7 +22295,7 @@
                 "valueConstraint": {
                   "valueTemplateRefs": [],
                   "useValuesFrom": [
-                    "http://preprod.id.loc.gov/authorities/names",
+                    "http://id.loc.gov/authorities/names",
                     "http://id.loc.gov/authorities/subjects"
                   ],
                   "valueDataType": {
@@ -22377,8 +22377,8 @@
                 "valueConstraint": {
                   "valueTemplateRefs": [],
                   "useValuesFrom": [
-                    "https://preprod-8080.id.loc.gov/resources/works/",
-                    "https://preprod-8080.id.loc.gov/resources/hubs/"
+                    "https://id.loc.gov/resources/works/",
+                    "https://id.loc.gov/resources/hubs/"
                   ],
                   "defaults": [],
                   "valueDataType": {}
@@ -22679,7 +22679,7 @@
                 "valueConstraint": {
                   "valueTemplateRefs": [],
                   "useValuesFrom": [
-                    "https://preprod-8080.id.loc.gov/vocabulary/pmocomponent"
+                    "https://id.loc.gov/vocabulary/pmocomponent"
                   ],
                   "defaults": [],
                   "valueDataType": {
@@ -26449,7 +26449,7 @@
                 "valueConstraint": {
                   "valueTemplateRefs": [],
                   "useValuesFrom": [
-                    "https://preprod-8080.id.loc.gov/resources/hubs"
+                    "https://id.loc.gov/resources/hubs"
                   ],
                   "defaults": [],
                   "valueDataType": {

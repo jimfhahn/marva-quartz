@@ -5293,7 +5293,7 @@
                                 "resourceTemplates": [],
                                 "valueConstraint": {
                                     "valueTemplateRefs": [],
-                                    "useValuesFrom": ["https://preprod-8288.id.loc.gov/vocabulary/pmomedtype"],
+                                    "useValuesFrom": ["https://id.loc.gov/vocabulary/pmomedtype"],
                                     "defaults": [],
                                     "valueDataType": {"dataTypeURI": "http://performedmusicontology.org/ontology/MediumType"}
                                 },
@@ -8687,8 +8687,8 @@
                                 "valueConstraint": {
                                     "valueTemplateRefs": [],
                                     "useValuesFrom": [
-                                        "https://preprod-8088.id.loc.gov/resources/works/",
-                                        "https://preprod-8088.id.loc.gov/resources/hubs/"
+                                        "https://id.loc.gov/resources/works/",
+                                        "https://id.loc.gov/resources/hubs/"
                                     ],
                                     "defaults": [],
                                     "valueDataType": {"dataTypeURI": ""}
@@ -11319,7 +11319,7 @@
                                 "resourceTemplates": [],
                                 "valueConstraint": {
                                     "valueTemplateRefs": [],
-                                    "useValuesFrom": ["https://preprod-8288.id.loc.gov/vocabulary/pmomedtype"],
+                                    "useValuesFrom": ["https://id.loc.gov/vocabulary/pmomedtype"],
                                     "defaults": [],
                                     "valueDataType": {"dataTypeURI": "http://performedmusicontology.org/ontology/MediumType"}
                                 },
@@ -12318,7 +12318,7 @@
                                 "resourceTemplates": [],
                                 "valueConstraint": {
                                     "valueTemplateRefs": [],
-                                    "useValuesFrom": ["https://preprod-8288.id.loc.gov/vocabulary/pmomedtype"],
+                                    "useValuesFrom": ["https://id.loc.gov/vocabulary/pmomedtype"],
                                     "defaults": [],
                                     "valueDataType": {"dataTypeURI": "http://performedmusicontology.org/ontology/MediumType"}
                                 },
@@ -13283,7 +13283,7 @@
                                 "resourceTemplates": [],
                                 "valueConstraint": {
                                     "valueTemplateRefs": [],
-                                    "useValuesFrom": ["https://preprod-8288.id.loc.gov/vocabulary/pmomedtype"],
+                                    "useValuesFrom": ["https://id.loc.gov/vocabulary/pmomedtype"],
                                     "defaults": [],
                                     "valueDataType": {"dataTypeURI": "http://performedmusicontology.org/ontology/MediumType"}
                                 },
@@ -14119,6 +14119,20 @@
                             {
                                 "mandatory": "false",
                                 "repeatable": "true",
+                                "type": "lookup",
+                                "resourceTemplates": [],
+                                "valueConstraint": {
+                                    "valueTemplateRefs": [],
+                                    "useValuesFrom": ["https://id.loc.gov/resources/hubs"],
+                                    "defaults": [],
+                                    "valueDataType": {"dataTypeURI": "http://id.loc.gov/ontologies/bibframe/Hub"}
+                                },
+                                "propertyURI": "http://id.loc.gov/ontologies/bibframe/expressionOf",
+                                "propertyLabel": "Expression of [search for a Hub]"
+                            },
+                            {
+                                "mandatory": "false",
+                                "repeatable": "true",
                                 "type": "resource",
                                 "resourceTemplates": [],
                                 "valueConstraint": {
@@ -14221,7 +14235,7 @@
                                 "resourceTemplates": [],
                                 "valueConstraint": {
                                     "valueTemplateRefs": [],
-                                    "useValuesFrom": ["https://preprod-8288.id.loc.gov/vocabulary/pmomedtype"],
+                                    "useValuesFrom": ["https://id.loc.gov/vocabulary/pmomedtype"],
                                     "defaults": [],
                                     "valueDataType": {"dataTypeURI": "http://performedmusicontology.org/ontology/MediumType"}
                                 },
@@ -16518,7 +16532,7 @@
                                 "resourceTemplates": [],
                                 "valueConstraint": {
                                     "valueTemplateRefs": [],
-                                    "useValuesFrom": ["http://preprod.id.loc.gov/authorities/names"],
+                                    "useValuesFrom": ["http://id.loc.gov/authorities/names"],
                                     "valueDataType": "",
                                     "defaults": []
                                 },
@@ -16539,7 +16553,7 @@
                                 "resourceTemplates": [],
                                 "valueConstraint": {
                                     "valueTemplateRefs": [],
-                                    "useValuesFrom": ["http://preprod.id.loc.gov/authorities/names"],
+                                    "useValuesFrom": ["http://id.loc.gov/authorities/names"],
                                     "defaults": [],
                                     "valueDataType": ""
                                 },
@@ -16560,7 +16574,7 @@
                                 "resourceTemplates": [],
                                 "valueConstraint": {
                                     "valueTemplateRefs": [],
-                                    "useValuesFrom": ["http://preprod.id.loc.gov/authorities/names"],
+                                    "useValuesFrom": ["http://id.loc.gov/authorities/names"],
                                     "defaults": [],
                                     "valueDataType": ""
                                 },
@@ -16581,7 +16595,7 @@
                                 "resourceTemplates": [],
                                 "valueConstraint": {
                                     "valueTemplateRefs": [],
-                                    "useValuesFrom": ["http://preprod.id.loc.gov/authorities/names"],
+                                    "useValuesFrom": ["http://id.loc.gov/authorities/names"],
                                     "defaults": [],
                                     "valueDataType": ""
                                 },
@@ -16602,7 +16616,7 @@
                                 "resourceTemplates": [],
                                 "valueConstraint": {
                                     "valueTemplateRefs": [],
-                                    "useValuesFrom": ["http://preprod.id.loc.gov/authorities/names"],
+                                    "useValuesFrom": ["http://id.loc.gov/authorities/names"],
                                     "defaults": [],
                                     "valueDataType": ""
                                 },
@@ -17667,7 +17681,7 @@
                                 "resourceTemplates": [],
                                 "valueConstraint": {
                                     "valueTemplateRefs": [],
-                                    "useValuesFrom": ["http://preprod.id.loc.gov/authorities/names"],
+                                    "useValuesFrom": ["http://id.loc.gov/authorities/names"],
                                     "valueDataType": {"dataTypeURI": "http://www.loc.gov/mads/rdf/v1#Authority"},
                                     "defaults": []
                                 },
@@ -20154,7 +20168,7 @@
                                     "valueTemplateRefs": [],
                                     "useValuesFrom": [
                                         "http://id.loc.gov/authorities/subjects",
-                                        "http://preprod.id.loc.gov/authorities/names"
+                                        "http://id.loc.gov/authorities/names"
                                     ],
                                     "valueDataType": {"dataTypeURI": ""},
                                     "repeatable": "true",
@@ -20200,7 +20214,7 @@
                                 "valueConstraint": {
                                     "valueTemplateRefs": [],
                                     "useValuesFrom": [
-                                        "http://preprod.id.loc.gov/authorities/names",
+                                        "http://id.loc.gov/authorities/names",
                                         "http://id.loc.gov/authorities/subjects"
                                     ],
                                     "defaults": [],
@@ -20224,7 +20238,7 @@
                                 "valueConstraint": {
                                     "valueTemplateRefs": [],
                                     "useValuesFrom": [
-                                        "http://preprod.id.loc.gov/authorities/names",
+                                        "http://id.loc.gov/authorities/names",
                                         "http://id.loc.gov/authorities/subjects"
                                     ],
                                     "valueDataType": {"dataTypeURI": ""},
@@ -20296,8 +20310,8 @@
                                 "valueConstraint": {
                                     "valueTemplateRefs": [],
                                     "useValuesFrom": [
-                                        "https://preprod-8080.id.loc.gov/resources/works/",
-                                        "https://preprod-8080.id.loc.gov/resources/hubs/"
+                                        "https://id.loc.gov/resources/works/",
+                                        "https://id.loc.gov/resources/hubs/"
                                     ],
                                     "defaults": [],
                                     "valueDataType": ""
@@ -20579,7 +20593,7 @@
                                 "resourceTemplates": [],
                                 "valueConstraint": {
                                     "valueTemplateRefs": [],
-                                    "useValuesFrom": ["https://preprod-8080.id.loc.gov/vocabulary/pmocomponent"],
+                                    "useValuesFrom": ["https://id.loc.gov/vocabulary/pmocomponent"],
                                     "defaults": [],
                                     "valueDataType": {"dataTypeURI": "http://performedmusicontology.org/ontology/MediumComponentQualifier"}
                                 },
@@ -24223,7 +24237,7 @@
                                 "resourceTemplates": [],
                                 "valueConstraint": {
                                     "valueTemplateRefs": [],
-                                    "useValuesFrom": ["https://preprod-8080.id.loc.gov/resources/hubs"],
+                                    "useValuesFrom": ["https://id.loc.gov/resources/hubs"],
                                     "defaults": [],
                                     "valueDataType": {"dataTypeURI": "http://id.loc.gov/ontologies/bibframe/Series"}
                                 },

@@ -700,7 +700,7 @@ export const useProfileStore = defineStore('profile', {
                               "valueConstraint": {
                                   "defaults": [],
                                   "useValuesFrom": [
-                                      "https://preprod-8230.id.loc.gov/resources/works"
+                                      "https://id.loc.gov/resources/works"
                                   ],
                                   "valueDataType": {
                                       "dataTypeURI": ""
@@ -723,7 +723,7 @@ export const useProfileStore = defineStore('profile', {
                               "valueConstraint": {
                                   "defaults": [],
                                   "useValuesFrom": [
-                                      "https://preprod-8295.id.loc.gov/resources/works"
+                                      "https://id.loc.gov/resources/works"
                                   ],
                                   "valueDataType": {
                                       "dataTypeURI": ""
@@ -746,7 +746,7 @@ export const useProfileStore = defineStore('profile', {
                               "valueConstraint": {
                                   "defaults": [],
                                   "useValuesFrom": [
-                                      "https://preprod-8230.id.loc.gov/resources/instances"
+                                      "https://id.loc.gov/resources/instances"
                                   ],
                                   "valueDataType": {
                                       "dataTypeURI": ""
@@ -760,7 +760,7 @@ export const useProfileStore = defineStore('profile', {
               // add wikidata into any NAF lookup pt
               if (rt.id.includes(':Agent')){
                   for (let pt of rt.propertyTemplates){
-                      if (pt.valueConstraint.useValuesFrom.indexOf('http://preprod.id.loc.gov/authorities/names')>-1){
+                      if (pt.valueConstraint.useValuesFrom.indexOf('http://id.loc.gov/authorities/names')>-1){
                           if (pt.valueConstraint.useValuesFrom.indexOf('https://www.wikidata.org/w/api.php')==-1){
                               pt.valueConstraint.useValuesFrom.push('https://www.wikidata.org/w/api.php')
                           }
@@ -5534,19 +5534,6 @@ export const useProfileStore = defineStore('profile', {
         console.log(error)
         alert("There was an error creating your Hub. Please report this issue.")
       }
-
-      // // to simulate a post
-      // alert("Fake Hub Requesting")
-      // pubResuts = {
-      //     "name": "bc331009-aa60-48b3-ba17-865fc7389f23",
-      //     "publish": {
-      //         "status": "published"
-      //     },
-      //     "postLocation": "http://preprod-8299.id.loc.gov/resources/hubs/bf110051-532b-c50c-5d5c-baa4ea6d2044"
-      // }
-
-
-
 
       return pubResuts
 

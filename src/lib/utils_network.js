@@ -442,14 +442,13 @@ const utilsNetwork = {
 
             // kind of hack, change to the public endpoint if we are in dev or public mode
             if (returnUrls.dev || returnUrls.publicEndpoints){
-              url = url.replace('http://preprod.id.','https://id.')
+              url = url.replace('http://id.','https://id.')
               url = url.replace('https://preprod-8230.id.loc.gov','https://id.loc.gov')
               url = url.replace('https://test-8080.id.lctl.gov','https://id.loc.gov')
-              url = url.replace('https://preprod-8080.id.loc.gov','https://id.loc.gov')
-              url = url.replace('https://preprod-8080.id.loc.gov','https://id.loc.gov')
-              url = url.replace('https://preprod-8288.id.loc.gov','https://id.loc.gov')
+              url = url.replace('https://id.loc.gov','https://id.loc.gov')
+              url = url.replace('https://id.loc.gov','https://id.loc.gov')
             } else { // if it's not dev or public make sure we're using 8080
-              url = url.replace('https://id.loc.gov', 'https://preprod-8080.id.loc.gov')
+              url = url.replace('https://preprod-8288.id.loc.gov','https://id.loc.gov')
             }
 
 
@@ -626,8 +625,8 @@ const utilsNetwork = {
           //if we are in production use preprod
           // if (returnUrls.env == 'production' && jsonuri.includes("authorities/names")){
             if (returnUrls.env == 'production'){
-            jsonuri = jsonuri.replace('http://id.', 'https://preprod-8080.id.')
-            jsonuri = jsonuri.replace('https://id.', 'https://preprod-8080.id.')
+            jsonuri = jsonuri.replace('http://id.', 'https://id.')
+            jsonuri = jsonuri.replace('https://id.', 'https://id.')
           }
 
           // rewrite the url to the config if we are using staging
@@ -648,22 +647,16 @@ const utilsNetwork = {
           // unless we are in a dev or public mode
 
           if (returnUrls.dev || returnUrls.publicEndpoints){
-            jsonuri = jsonuri.replace('http://preprod.id.','https://id.')
+            jsonuri = jsonuri.replace('http://id.','https://id.')
             jsonuri = jsonuri.replace('https://preprod-8230.id.loc.gov','https://id.loc.gov')
             jsonuri = jsonuri.replace('https://test-8080.id.lctl.gov','https://id.loc.gov')
-            jsonuri = jsonuri.replace('https://preprod-8080.id.loc.gov','https://id.loc.gov')
+            jsonuri = jsonuri.replace('https://id.loc.gov','https://id.loc.gov')
             jsonuri = jsonuri.replace('https://preprod-8288.id.loc.gov','https://id.loc.gov')
           }
 
-
-
           if (jsonuri.includes('gpo_') && jsonuri.includes('preprod') ){
-            jsonuri = jsonuri.replace('8080','8295')
-            jsonuri = jsonuri.replace('8230','8295')
-            jsonuri = jsonuri.replace('https://id.','https://preprod-8295.id.')
+            jsonuri = jsonuri.replace('https://id.','https://id.')
           }
-
-
           jsonuri = jsonuri.replace('http://','https://')
 
           
@@ -746,25 +739,20 @@ const utilsNetwork = {
                   counter++
 
                   let url = i['@id']
-
-                  if (url.includes('gpo_')  ){
-                    url = url.replace('https://id.','https://preprod-8295.id.')
-                    url = url.replace('http://id.','http://preprod-8295.id.')
-                  }
-
+                  
                   if (url.includes('/instances/') || url.includes('/works/') || url.includes('/hubs/')){
                     if (returnUrls.env === 'production'){
-                      url = url.replace('https://id.','https://preprod-8080.id.')
-                      url = url.replace('http://id.','http://preprod-8080.id.')
+                      url = url.replace('https://id.','https://id.')
+                      url = url.replace('http://id.','http://id.')
                     }
                   }
 
                   if (returnUrls.dev || returnUrls.publicEndpoints){
-                    url = url.replace('http://preprod.id.','https://id.')
+                    url = url.replace('http://id.','https://id.')
                     url = url.replace('https://preprod-8230.id.loc.gov','https://id.loc.gov')
                     url = url.replace('https://test-8080.id.lctl.gov','https://id.loc.gov')
-                    url = url.replace('https://preprod-8080.id.loc.gov','https://id.loc.gov')
-                    url = url.replace('http://preprod-8080.id.loc.gov','https://id.loc.gov')
+                    url = url.replace('https://id.loc.gov','https://id.loc.gov')
+                    url = url.replace('http://id.loc.gov','https://id.loc.gov')
                     url = url.replace('https://preprod-8288.id.loc.gov','https://id.loc.gov')
                   }
 
@@ -856,7 +844,7 @@ const utilsNetwork = {
     * @return {array} - An array of {@link contextResult} results
     */
     extractContextData: function(data){
-      data.uri = data.uri.replace("https://preprod-8080.", "http://id.loc.gov/")
+      data.uri = data.uri.replace("https://", "http://id.loc.gov/")
 
           var results = {
             contextValue: true,
@@ -1616,27 +1604,27 @@ const utilsNetwork = {
 
         // we'll define all this for each one but not nessisarly use all of them
 
-        let namesUrl = useConfigStore().lookupConfig['http://preprod.id.loc.gov/authorities/names'].modes[0]['NAF All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")
-        let namesUrlSubdivision = useConfigStore().lookupConfig['http://preprod.id.loc.gov/authorities/names'].modes[0]['NAF All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")+'&memberOf=http://id.loc.gov/authorities/subjects/collection_Subdivisions'
+        let namesUrl = useConfigStore().lookupConfig['http://id.loc.gov/authorities/names'].modes[0]['NAF All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")
+        let namesUrlSubdivision = useConfigStore().lookupConfig['http://id.loc.gov/authorities/names'].modes[0]['NAF All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")+'&memberOf=http://id.loc.gov/authorities/subjects/collection_Subdivisions'
 
         let subjectUrlSimple = useConfigStore().lookupConfig['http://id.loc.gov/authorities/subjects'].modes[0]['LCSH All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")+'&rdftype=SimpleType'
         let subjectUrlSimpleSubdivison = useConfigStore().lookupConfig['http://id.loc.gov/authorities/subjects'].modes[0]['LCSH All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")+'&rdftype=SimpleType&memberOf=http://id.loc.gov/authorities/subjects/collection_Subdivisions'
         let subjectUrlTemporal = useConfigStore().lookupConfig['http://id.loc.gov/authorities/subjects'].modes[0]['LCSH All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")+'&memberOf=http://id.loc.gov/authorities/subjects/collection_TemporalSubdivisions'
         let subjectUrlGenre = useConfigStore().lookupConfig['http://id.loc.gov/authorities/subjects'].modes[0]['LCSH All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")+'&rdftype=GenreForm'
 
-        let worksUrlAnchored = useConfigStore().lookupConfig['https://preprod-8080.id.loc.gov/resources/works'].modes[0]['Works - Left Anchored'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")
-        let hubsUrlAnchored = useConfigStore().lookupConfig['https://preprod-8080.id.loc.gov/resources/works'].modes[0]['Hubs - Left Anchored'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")
+        let worksUrlAnchored = useConfigStore().lookupConfig['https://id.loc.gov/resources/works'].modes[0]['Works - Left Anchored'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")
+        let hubsUrlAnchored = useConfigStore().lookupConfig['https://id.loc.gov/resources/works'].modes[0]['Hubs - Left Anchored'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")
 
         let subjectUrlHierarchicalGeographic = useConfigStore().lookupConfig['HierarchicalGeographic'].modes[0]['All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")
         let subjectUrlHierarchicalGeographicLCSH = useConfigStore().lookupConfig['http://id.loc.gov/authorities/subjects'].modes[0]['LCSH All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")+ '&rdftype=HierarchicalGeographic'
 
         let subjectUrlGeographicLCSH = useConfigStore().lookupConfig['http://id.loc.gov/authorities/subjects'].modes[0]['LCSH All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")+'&rdftype=Geographic&memberOf=http://id.loc.gov/authorities/subjects/collection_Subdivisions'
-        let subjectUrlGeographicLCNAF = useConfigStore().lookupConfig['http://preprod.id.loc.gov/authorities/names'].modes[0]['NAF All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")+'&rdftype=Geographic&memberOf=http://id.loc.gov/authorities/subjects/collection_Subdivisions'
+        let subjectUrlGeographicLCNAF = useConfigStore().lookupConfig['http://id.loc.gov/authorities/names'].modes[0]['NAF All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")+'&rdftype=Geographic&memberOf=http://id.loc.gov/authorities/subjects/collection_Subdivisions'
 
         let subjectChildren = useConfigStore().lookupConfig['http://id.loc.gov/authorities/childrensSubjects'].modes[0]['LCSHAC All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")
         let childrenSubjectSubdivision = useConfigStore().lookupConfig['http://id.loc.gov/authorities/childrensSubjects'].modes[0]['LCSHAC All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=4').replace("<OFFSET>", "1")+'&memberOf=http://id.loc.gov/authorities/subjects/collection_Subdivisions'
 
-        const exactUri = 'https://preprod-8080.id.loc.gov/authorities/<SCHEME>/label/' + searchVal
+        const exactUri = 'https://id.loc.gov/authorities/<SCHEME>/label/' + searchVal
         let exactName = exactUri.replace('<SCHEME>', 'names')
         let exactSubject = exactUri.replace('<SCHEME>', 'subjects')
 
@@ -1838,19 +1826,6 @@ const utilsNetwork = {
             }
             if (foundHeading){ break }
           }
-
-
-          // // if not see if we matched a LCNAF for the first part
-          // if (resultsNames.length>0){
-          //   for (let r of resultsNames){
-          //     if (heading.label.toLowerCase().trim() == r.label.toLowerCase().trim()){
-          //       result.resultType = 'PRECOORD-LCNAF'
-          //       result.hit = r
-          //     }
-          //   }
-          //   if (result.resultType=='COMPLEX'){ break }
-          // }
-
 
           // remove any sub divisions from the main one
           let subdivisionUris = resultsPayloadSubjectsSimpleSubdivision.map(  (r) => { return r.uri } )
@@ -2393,8 +2368,8 @@ const utilsNetwork = {
 
 
       this.subjectSearchActive = true
-      let namesUrl = useConfigStore().lookupConfig['http://preprod.id.loc.gov/authorities/names'].modes[0]['NAF All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count='+numResultsNames).replace("<OFFSET>", "1")+'&memberOf=http://id.loc.gov/authorities/names/collection_NamesAuthorizedHeadings'
-      let namesUrlSubdivision = useConfigStore().lookupConfig['http://preprod.id.loc.gov/authorities/names'].modes[0]['NAF All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")+'&memberOf=http://id.loc.gov/authorities/subjects/collection_Subdivisions'
+      let namesUrl = useConfigStore().lookupConfig['http://id.loc.gov/authorities/names'].modes[0]['NAF All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count='+numResultsNames).replace("<OFFSET>", "1")+'&memberOf=http://id.loc.gov/authorities/names/collection_NamesAuthorizedHeadings'
+      let namesUrlSubdivision = useConfigStore().lookupConfig['http://id.loc.gov/authorities/names'].modes[0]['NAF All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")+'&memberOf=http://id.loc.gov/authorities/subjects/collection_Subdivisions'
 
       let subjectUrlComplex = useConfigStore().lookupConfig['http://id.loc.gov/authorities/subjects'].modes[0]['LCSH All'].url.replace('<QUERY>',complexVal).replace('&count=25','&count='+numResultsComplex).replace("<OFFSET>", "1")+'&rdftype=ComplexType'+'&memberOf=http://id.loc.gov/authorities/subjects/collection_LCSHAuthorizedHeadings'
       let subjectUrlSimple = useConfigStore().lookupConfig['http://id.loc.gov/authorities/subjects'].modes[0]['LCSH All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count='+numResultsSimple).replace("<OFFSET>", "1")+'&rdftype=SimpleType'+'&memberOf=http://id.loc.gov/authorities/subjects/collection_LCSHAuthorizedHeadings'
@@ -2402,11 +2377,11 @@ const utilsNetwork = {
       let subjectUrlTemporal = useConfigStore().lookupConfig['http://id.loc.gov/authorities/subjects'].modes[0]['LCSH All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")+'&memberOf=http://id.loc.gov/authorities/subjects/collection_TemporalSubdivisions'
       let subjectUrlGenre = useConfigStore().lookupConfig['http://id.loc.gov/authorities/subjects'].modes[0]['LCSH All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace("<OFFSET>", "1")+'&rdftype=GenreForm'
 
-      let worksUrlKeyword = useConfigStore().lookupConfig['https://preprod-8080.id.loc.gov/resources/works'].modes[0]['Works - Keyword'].url.replace('<QUERY>',searchVal).replace('&count=25','&count='+numResultsSimple).replace("<OFFSET>", "1")
-      let worksUrlAnchored = useConfigStore().lookupConfig['https://preprod-8080.id.loc.gov/resources/works'].modes[0]['Works - Left Anchored'].url.replace('<QUERY>',searchVal).replace('&count=25','&count='+numResultsSimple).replace("<OFFSET>", "1")
+      let worksUrlKeyword = useConfigStore().lookupConfig['https://id.loc.gov/resources/works'].modes[0]['Works - Keyword'].url.replace('<QUERY>',searchVal).replace('&count=25','&count='+numResultsSimple).replace("<OFFSET>", "1")
+      let worksUrlAnchored = useConfigStore().lookupConfig['https://id.loc.gov/resources/works'].modes[0]['Works - Left Anchored'].url.replace('<QUERY>',searchVal).replace('&count=25','&count='+numResultsSimple).replace("<OFFSET>", "1")
 
-      let hubsUrlKeyword = useConfigStore().lookupConfig['https://preprod-8080.id.loc.gov/resources/works'].modes[0]['Hubs - Keyword'].url.replace('<QUERY>',searchVal).replace('&count=25','&count='+numResultsSimple).replace("<OFFSET>", "1")
-      let hubsUrlAnchored = useConfigStore().lookupConfig['https://preprod-8080.id.loc.gov/resources/works'].modes[0]['Hubs - Left Anchored'].url.replace('<QUERY>',searchVal).replace('&count=25','&count='+numResultsSimple).replace("<OFFSET>", "1")
+      let hubsUrlKeyword = useConfigStore().lookupConfig['https://id.loc.gov/resources/works'].modes[0]['Hubs - Keyword'].url.replace('<QUERY>',searchVal).replace('&count=25','&count='+numResultsSimple).replace("<OFFSET>", "1")
+      let hubsUrlAnchored = useConfigStore().lookupConfig['https://id.loc.gov/resources/works'].modes[0]['Hubs - Left Anchored'].url.replace('<QUERY>',searchVal).replace('&count=25','&count='+numResultsSimple).replace("<OFFSET>", "1")
 
       let childrenSubject = useConfigStore().lookupConfig['http://id.loc.gov/authorities/childrensSubjects'].modes[0]['LCSHAC All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count='+numResultsCyac).replace("<OFFSET>", "1")+'&-memberOf=http://id.loc.gov/authorities/subjects/collection_Subdivisions'
       let childrenSubjectComplex = useConfigStore().lookupConfig['http://id.loc.gov/authorities/childrensSubjects'].modes[0]['LCSHAC All'].url.replace('<QUERY>',searchVal).replace('&count=25','&count='+numResultsCyac).replace("<OFFSET>", "1")+'&rdftype=ComplexType'
@@ -2416,7 +2391,7 @@ const utilsNetwork = {
 
       let subjectUrlHierarchicalGeographic = useConfigStore().lookupConfig['HierarchicalGeographic'].modes[0]['All'].url.replace('<QUERY>',searchValHierarchicalGeographic).replace('&count=25','&count='+numResultsComplex).replace("<OFFSET>", "1")
 
-      const exactUri = 'https://preprod-8080.id.loc.gov/authorities/<SCHEME>/label/' + searchVal
+      const exactUri = 'https://id.loc.gov/authorities/<SCHEME>/label/' + searchVal
       let exactName = exactUri.replace('<SCHEME>', 'names')
       let exactSubject = exactUri.replace('<SCHEME>', 'subjects')
       //children's subjects is supported by known-label lookup?
