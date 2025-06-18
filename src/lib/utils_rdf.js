@@ -44,7 +44,7 @@ const utilsRDF = {
     'owl': 'http://www.w3.org/2002/07/owl#',
 		'void':'http://rdfs.org/ns/void#',
     'lcc': 'http://id.loc.gov/ontologies/lcc#',
-    'skos': 'http://www.w3.org/2004/02/skos/core#"',
+    'skos': 'http://www.w3.org/2004/02/skos/core#',
     'cc': 'http://creativecommons.org/ns#',
     'foaf': 'http://xmlns.com/foaf/0.1/',
     'vartitletype': 'http://id.loc.gov/vocabulary/vartitletype/',
@@ -90,9 +90,16 @@ const utilsRDF = {
       if (propertyURI == pt.propertyURI){
           if (pt.valueConstraint &&
               pt.valueConstraint.valueDataType &&
-              pt.valueConstraint.valueDataType.dataTypeURI &&
-              pt.valueConstraint.valueDataType.dataTypeURI.trim() != ''){
-              return pt.valueConstraint.valueDataType.dataTypeURI.trim()
+              pt.valueConstraint.valueDataType.dataTypeURI){
+              // First check if dataTypeURI exists and what type it is
+              if (typeof pt.valueConstraint.valueDataType.dataTypeURI !== 'string') {
+                  console.warn("Non-string dataTypeURI found:", pt.valueConstraint.valueDataType.dataTypeURI, "in property:", pt.propertyURI);
+                  // Convert to string if possible
+                  const uriStr = String(pt.valueConstraint.valueDataType.dataTypeURI);
+                  return uriStr;
+              } else if (pt.valueConstraint.valueDataType.dataTypeURI.trim() != '') {
+                  return pt.valueConstraint.valueDataType.dataTypeURI.trim();
+              }
           }
       }
 
@@ -107,9 +114,16 @@ const utilsRDF = {
                       if (p.propertyURI == propertyURI){
                           if (p.valueConstraint &&
                               p.valueConstraint.valueDataType &&
-                              p.valueConstraint.valueDataType.dataTypeURI &&
-                              p.valueConstraint.valueDataType.dataTypeURI.trim() != ''){
-                              possibleTypes.push(p.valueConstraint.valueDataType.dataTypeURI.trim())
+                              p.valueConstraint.valueDataType.dataTypeURI){
+                              // First check if dataTypeURI exists and what type it is
+                              if (typeof p.valueConstraint.valueDataType.dataTypeURI !== 'string') {
+                                  console.warn("Non-string dataTypeURI found:", p.valueConstraint.valueDataType.dataTypeURI, "in property:", p.propertyURI);
+                                  // Convert to string if possible and add to possibleTypes
+                                  const uriStr = String(p.valueConstraint.valueDataType.dataTypeURI);
+                                  possibleTypes.push(uriStr);
+                              } else if (p.valueConstraint.valueDataType.dataTypeURI.trim() != ''){
+                                  possibleTypes.push(p.valueConstraint.valueDataType.dataTypeURI.trim())
+                              }
                           }
                       }
                   }
@@ -241,6 +255,12 @@ const utilsRDF = {
     if (propertyURI==='http://www.loc.gov/mads/rdf/v1#authoritativeLabel'){
       return 'http://www.w3.org/2000/01/rdf-schema#Literal'
     }
+    
+    // Add support for bibframe Hub relationships
+    if (propertyURI === "http://id.loc.gov/ontologies/bibframe/relatedTo" || 
+        propertyURI === "http://id.loc.gov/ontologies/bibframe/expressionOf") {
+      return "http://id.loc.gov/ontologies/bibframe/Hub";
+    }
 
     if (propertyURI==='http://www.w3.org/1999/02/22-rdf-syntax-ns#value'){
       return 'http://www.w3.org/2000/01/rdf-schema#Literal'
@@ -258,7 +278,28 @@ const utilsRDF = {
     // at this point we have a well cached lookup of the whole onotlogy in localstorage
     // ask for this one, if it idoesnt have it, it will relookup (or if it is expired)
     let propXml = await this.fetchOntology(propertyURI)
-    let prop = XMLParser.parseFromString(propXml, "text/xml");
+    
+    // If fetchOntology failed, return false early
+    if (!propXml) {
+      console.warn('Could not fetch ontology for property:', propertyURI);
+      return false;
+    }
+    
+    let prop;
+    try {
+      prop = XMLParser.parseFromString(propXml, "text/xml");
+      
+      // Check for parser errors in the resulting document
+      const parserError = prop.getElementsByTagName("parsererror");
+      if (parserError.length > 0) {
+        console.warn('XML parser error for property:', propertyURI, parserError[0].textContent);
+        return false;
+      }
+    } catch (error) {
+      console.warn('Failed to parse XML for property:', propertyURI, error);
+      return false;
+    }
+    
     let range = prop.getElementsByTagName("rdfs:range")
 
     let objProp = prop.getElementsByTagName("owl:ObjectProperty")
@@ -410,14 +451,31 @@ const utilsRDF = {
 
     try{
       r = await utilsNetwork.fetchSimpleLookup(url)
-    }catch{
+      
+      // Check if response contains HTML error content
+      if (r && typeof r === 'string' && r.includes('<parsererror')) {
+        console.warn('XML parsing error detected in response for:', url);
+        // Extract the actual error message if possible
+        const errorMatch = r.match(/<parsererror[^>]*>(.*?)<\/parsererror>/s);
+        if (errorMatch) {
+          console.warn('Parser error details:', errorMatch[1]);
+        }
+        return false;
+      }
+      
+      // Validate that we got actual XML, not HTML
+      if (r && typeof r === 'string' && r.trim().startsWith('<!DOCTYPE html')) {
+        console.warn('Received HTML instead of XML for:', url);
+        return false;
+      }
+      
+    }catch(error){
+      console.warn('Failed to fetch ontology:', url, error);
       return false
     }
 
-
-
     // if we got here set that localstorage for next time
-    if (window.localStorage){
+    if (window.localStorage && r){
       let toset = {response: r, ts: currentTS}
       window.localStorage.setItem('ontology_'+url, JSON.stringify(toset))
     }
@@ -495,6 +553,21 @@ const utilsRDF = {
     
     // Create XML elements using the existing utility
     const serializer = new XMLSerializer();
+    
+    // Special handling for Hub entities
+    if (entity.type === 'Hub' || entity.typeFull === 'http://id.loc.gov/ontologies/bibframe/Hub') {
+      const hubEl = utilsExport.createElByBestNS('bf:Hub');
+      hubEl.setAttributeNS(this.namespace.rdf, 'rdf:about', entity.uri);
+      
+      const typeEl = utilsExport.createElByBestNS('rdf:type');
+      typeEl.setAttributeNS(this.namespace.rdf, 'rdf:resource', 'http://id.loc.gov/ontologies/bibframe/Hub');
+      hubEl.appendChild(typeEl);
+      
+      const labelEl = utilsExport.createRdfsLabel(entity.title || entity.label || '');
+      hubEl.appendChild(labelEl);
+      
+      return returnElement ? hubEl : serializer.serializeToString(hubEl);
+    }
     
     // Special handling for Wikidata entities with MADS RDF types
     if (entity.uri && entity.uri.includes('wikidata.org') && entity.useMADSRDF && entity.type) {

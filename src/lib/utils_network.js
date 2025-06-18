@@ -683,6 +683,12 @@ const utilsNetwork = {
     extractContextDataWorksHubs: async function(data){
       let returnUrls = useConfigStore().returnUrls
 
+      console.log("extractContextDataWorksHubs called with data:", {
+        uri: data.uri,
+        isHub: data.uri.includes('/hubs/'),
+        dataKeys: data ? Object.keys(data) : 'no data',
+        hasGraph: data && data['@graph'] ? data['@graph'].length : 'no @graph'
+      });
 
       var results = { contextValue: true, source: [], type: null, typeFull: null, aap:null, variant : [], uri: data.uri, title: null, contributor:[], date:null, genreForm: null, nodeMap:{}, marcKey: null};
 
@@ -694,38 +700,77 @@ const utilsNetwork = {
         results.typeFull='http://id.loc.gov/ontologies/bibframe/Hub'
       }
 
-
-
-
-      // let nodeLookup = {}
-
-      // for (let key in data){
-
-      // }
-
+      // Handle both @graph and direct array formats
+      let dataArray = data;
+      if (data['@graph']) {
+        dataArray = data['@graph'];
+      }
 
       let instances = []
 
       // grab the title
-      for (let val of data){
+      for (let val of dataArray){
 
         if (val['@id']){
           if (val['@id'] == data.uri){
+            console.log("ExtractContextDataWorksHubs - Processing main Hub entity:", {
+              id: val['@id'],
+              keys: Object.keys(val),
+              hasMarcKey: !!val['http://id.loc.gov/ontologies/bflc/marcKey'],
+              hasLabel: !!val['http://www.w3.org/2000/01/rdf-schema#label'],
+              hasAAP: !!val['http://id.loc.gov/ontologies/bflc/aap'],
+              fullMarcKeyData: val['http://id.loc.gov/ontologies/bflc/marcKey'],
+              fullLabelData: val['http://www.w3.org/2000/01/rdf-schema#label']
+            });
+            
             // this is the main graph
-
             for (let k in val){
               //add the marcKey to the nodeMap, so nothing needs to happen downstream //here
               if (k == 'http://id.loc.gov/ontologies/bflc/marcKey'){
-                results.nodeMap["marcKey"] = [val[k][0]['@value']]
-                results.marcKey = [val[k][0]['@value']]
+                try {
+                  if (val[k] && Array.isArray(val[k]) && val[k][0]) {
+                    if (typeof val[k][0] === 'string') {
+                      results.nodeMap["marcKey"] = [val[k][0]]
+                      results.marcKey = [val[k][0]]
+                    } else if (val[k][0]['@value']) {
+                      results.nodeMap["marcKey"] = [val[k][0]['@value']]
+                      results.marcKey = [val[k][0]['@value']]
+                    }
+                    console.log("ExtractContextDataWorksHubs - Successfully extracted marcKey:", results.marcKey, "from data:", val[k]);
+                  }
+                } catch (err) {
+                  console.warn("Error extracting marcKey:", err, val[k]);
+                }
               }
               //find the title
               if (k == 'http://www.w3.org/2000/01/rdf-schema#label'){
-                results.title = val[k][0]['@value']
+                try {
+                  if (val[k] && Array.isArray(val[k]) && val[k][0]) {
+                    if (typeof val[k][0] === 'string') {
+                      results.title = val[k][0]
+                    } else if (val[k][0]['@value']) {
+                      results.title = val[k][0]['@value']
+                    }
+                    console.log("ExtractContextDataWorksHubs - Successfully extracted title:", results.title, "from data:", val[k]);
+                  }
+                } catch (err) {
+                  console.warn("Error extracting title:", err, val[k]);
+                }
               }
 
               if (k == 'http://id.loc.gov/ontologies/bflc/aap'){
-                results.aap = val[k][0]['@value']
+                try {
+                  if (val[k] && Array.isArray(val[k]) && val[k][0]) {
+                    if (typeof val[k][0] === 'string') {
+                      results.aap = val[k][0]
+                    } else if (val[k][0]['@value']) {
+                      results.aap = val[k][0]['@value']
+                    }
+                    console.log("Successfully extracted aap:", results.aap);
+                  }
+                } catch (err) {
+                  console.warn("Error extracting aap:", err, val[k]);
+                }
               }
 
 
@@ -833,7 +878,16 @@ const utilsNetwork = {
         results.nodeMap['Instances'] = instances
       }
 
-
+      // Enhanced logging for Hub context extraction results
+      console.log("ExtractContextDataWorksHubs - Final results:", {
+        uri: results.uri,
+        title: results.title,
+        marcKey: results.marcKey,
+        nodeMapMarcKey: results.nodeMap.marcKey,
+        nodeMapKeys: Object.keys(results.nodeMap),
+        hasValidMarcKey: !!(results.marcKey && results.marcKey.length > 0),
+        hasValidTitle: !!results.title
+      });
 
       return results
     },

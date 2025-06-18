@@ -447,7 +447,7 @@
   }
 
   .subject-editor-container-left .modal-context-data-li{
-    /*font-size: 1em;*/
+    font-size: 1em;
   }
 
   .subject-editor-container-left-lowres{
@@ -1752,13 +1752,16 @@ methods: {
       }
     }
 
-    //save the marcKey
-    if (Array.isArray(this.contextData.marcKey)){
-      // first grab the non-latin auth labels
-      this.contextData.nonLatinMarcKey = JSON.parse(JSON.stringify(this.contextData.marcKey.filter((v)=>{ return (v['@language']) })))
+        if (Array.isArray(this.contextData.marcKey)){
+      // first grab the non-latin auth labels - use explicit undefined check for browser compatibility
+      this.contextData.nonLatinMarcKey = JSON.parse(JSON.stringify(this.contextData.marcKey.filter((v)=>{ 
+        return (v && v['@language'] !== undefined && v['@language'] !== null && v['@language'] !== '') 
+      })))
       this.pickLookup[this.pickPostion].nonLatinMarcKey = this.contextData.nonLatinMarcKey
-      // return the first label with no language tag
-      this.contextData.marcKey = this.contextData.marcKey.filter((v)=>{ return (!v['@language']) })[0]
+      // return the first label with no language tag - use explicit undefined check for browser compatibility
+      this.contextData.marcKey = this.contextData.marcKey.filter((v)=>{ 
+        return (v && (v['@language'] === undefined || v['@language'] === null || v['@language'] === '')) 
+      })[0]
       if (this.contextData.marcKey && this.contextData.marcKey['@value']){
         this.contextData.marcKey = this.contextData.marcKey['@value']
         this.pickLookup[this.pickPostion].marcKey = this.contextData.marcKey

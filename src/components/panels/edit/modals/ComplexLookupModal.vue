@@ -93,7 +93,7 @@
       // // // gives read access to this.count and this.double
       // ...mapState(usePreferenceStore, ['showPrefModal','showPrefModalGroup','styleDefault', 'showPrefModalGroup', 'fontFamilies']),
 
-      // array of the pssobile groups from the stlyes
+      // array of the pssible groups from the stlyes
 
       ...mapState(useConfigStore, ['lookupConfig']),
 
@@ -582,17 +582,31 @@
         let toLoad = null
         if (this.authorityLookupLocal == null && this.$refs.selectOptions != null ){
           const selectedIndex = this.$refs.selectOptions.selectedIndex;
-          console.log("Selected index:", selectedIndex);
+          console.log("SelectChange - Selected index:", selectedIndex);
           
           // First check if it's a complex search result
           toLoad = this.activeComplexSearch[selectedIndex];
+          
+          // Enhanced Hub selection debugging
+          if (toLoad) {
+            console.log("SelectChange - Complex search result selected:", {
+              label: toLoad.label,
+              uri: toLoad.uri,
+              type: toLoad.type,
+              isHub: toLoad.uri && toLoad.uri.includes('/hubs/'),
+              marcKey: toLoad.marcKey,
+              extraMarcKeys: toLoad.extra ? toLoad.extra.marcKeys : null,
+              hasNodeMap: !!toLoad.nodeMap,
+              nodeMapMarcKey: toLoad.nodeMap ? toLoad.nodeMap.marcKey : null
+            });
+          }
           
           // If not found in complex results, check simple lookup
           if (!toLoad && this.activeSimpleLookup.length > 0){
             const selectedOption = this.activeSimpleLookup[selectedIndex];
             
             if (selectedOption) {
-              console.log("Selected option:", selectedOption);
+              console.log("SelectChange - Simple lookup selected:", selectedOption);
               const isLiteral = selectedOption.literal === true || selectedOption.uri === "";
               let literalText = '';
               if (isLiteral) {
@@ -606,7 +620,7 @@
               } else {
                 literalText = Array.isArray(selectedOption.label) ? selectedOption.label[0] : selectedOption.label;
               }
-              console.log("Is literal:", isLiteral, "Full text:", literalText);
+              console.log("SelectChange - Is literal:", isLiteral, "Full text:", literalText);
               toLoad = {
                 label: literalText,
                 uri: selectedOption.uri,
@@ -618,6 +632,7 @@
           }
         } else {
           // Handle preselection for authorityLookupLocal
+          console.log("SelectChange - Processing authorityLookupLocal:", this.authorityLookupLocal);
           for (const idx in this.activeComplexSearch){
             let label = this.activeComplexSearch[idx].label
             if (label == this.authorityLookupLocal){
@@ -772,10 +787,17 @@
 
       emitComplexValue: function() {
         try {
+          console.log("ComplexLookupModal emitComplexValue called");
+          console.log("Active context data:", this.activeContext);
+          console.log("Active context marcKey:", this.activeContext?.marcKey);
+          console.log("Active context nodeMap:", this.activeContext?.nodeMap);
+          
           // For literal values, create a structure specifically for literals that matches expected format
           if (this.activeContext && this.activeContext.literal === true) {
             // Get the best literal value
             let literalValue = this.searchValueLocal || this.activeContext.fullLiteralValue || this.activeContext.title;
+            
+            console.log("Emitting literal value:", literalValue);
             
             // Create an object that matches exactly what LookupComplex expects
             const literalObject = {
@@ -812,6 +834,59 @@
           
           // For non-literals, use the regular approach with deep copy
           const contextCopy = JSON.parse(JSON.stringify(this.activeContext));
+          
+          // Debug logging for Hub marcKey troubleshooting
+          console.log("Emitting complex value for:", {
+            type: contextCopy.type,
+            uri: contextCopy.uri,
+            label: contextCopy.title,
+            marcKey: contextCopy.marcKey,
+            extra: contextCopy.extra,
+            isHub: contextCopy.uri && contextCopy.uri.includes('/hubs/'),
+            hasExtraMarcKey: contextCopy.extra && contextCopy.extra.marcKeys
+          });
+          
+          // Special handling for Hub relationships
+          if (contextCopy.uri && contextCopy.uri.includes('/hubs/')) {
+            console.log("Processing Hub selection:", {
+              marcKey: contextCopy.marcKey,
+              extraMarcKeys: contextCopy.extra ? contextCopy.extra.marcKeys : null,
+              nodeMapMarcKey: contextCopy.nodeMap ? contextCopy.nodeMap.marcKey : null
+            });
+            
+            // Ensure marcKey is properly extracted for Hubs from multiple sources
+            if (!contextCopy.marcKey && contextCopy.extra && contextCopy.extra.marcKeys && contextCopy.extra.marcKeys.length > 0) {
+              contextCopy.marcKey = contextCopy.extra.marcKeys;
+              console.log("Set marcKey from extra.marcKeys:", contextCopy.marcKey);
+            } else if (!contextCopy.marcKey && contextCopy.nodeMap && contextCopy.nodeMap.marcKey) {
+              contextCopy.marcKey = contextCopy.nodeMap.marcKey;
+              console.log("Set marcKey from nodeMap.marcKey:", contextCopy.marcKey);
+            }
+            
+            // Ensure nodeMap structure for Hub
+            if (!contextCopy.nodeMap) contextCopy.nodeMap = {};
+            contextCopy.nodeMap.bfType = "http://id.loc.gov/ontologies/bibframe/Hub";
+            contextCopy.nodeMap.hubLabel = [contextCopy.title];
+            if (contextCopy.marcKey) {
+              contextCopy.nodeMap.hubMarcKey = contextCopy.marcKey;
+            }
+            
+            // Fallback: generate basic marcKey if still missing
+            if (!contextCopy.marcKey || (Array.isArray(contextCopy.marcKey) && contextCopy.marcKey.length === 0)) {
+              const label = Array.isArray(contextCopy.title) ? contextCopy.title[0] : contextCopy.title;
+              if (label) {
+                contextCopy.marcKey = [`1001 $a${label}`];
+                contextCopy.nodeMap.hubMarcKey = contextCopy.marcKey;
+                console.log("Generated fallback marcKey for Hub:", contextCopy.marcKey);
+              }
+            }
+            
+            console.log("Enhanced Hub context:", {
+              marcKey: contextCopy.marcKey,
+              nodeMap: contextCopy.nodeMap,
+              uri: contextCopy.uri
+            });
+          }
           
           // Log what's being emitted for debugging
           console.log("ALL VALUES IN EMITTED CONTEXT:", 
@@ -1255,6 +1330,7 @@
 }
 
 .complex-lookup-modal-content{
+  /* Empty for future use */
 }
 
 @media all and (max-width: 1024px) {
@@ -1268,6 +1344,7 @@
 
 <style scoped>
   .complex-lookup-modal-display-buttons{
+    display: flex;
     align-items: center;
     justify-content: center;
   }
@@ -1295,7 +1372,7 @@
     margin-bottom: 0;
   }
   .modal-context-data-li{
-
+    /* Empty for future use */
   }
 
   h3{

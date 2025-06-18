@@ -165,13 +165,22 @@ export const useProfileStore = defineStore('profile', {
     */
     returnStructureByGUID: (state) => {
       return (guid) => {
+        // Add null/undefined checks to prevent errors
+        if (!guid || !state.activeProfile || !state.activeProfile.rt) {
+          console.warn('returnStructureByGUID: Invalid parameters', { guid, hasActiveProfile: !!state.activeProfile });
+          return null;
+        }
+
         for (let rt in state.activeProfile.rt){
+          if (!state.activeProfile.rt[rt] || !state.activeProfile.rt[rt].pt) continue;
+          
           for (let pt in state.activeProfile.rt[rt].pt){
-            if (state.activeProfile.rt[rt].pt[pt]['@guid'] === guid){
+            if (state.activeProfile.rt[rt].pt[pt] && state.activeProfile.rt[rt].pt[pt]['@guid'] === guid){
               return state.activeProfile.rt[rt].pt[pt]
             }
           }
         }
+        return null; // Return null if not found instead of undefined
       }
     },
 
@@ -553,6 +562,92 @@ export const useProfileStore = defineStore('profile', {
     },
 
     /**
+    * Helper function to clean malformed valueDataType objects from profile data
+    * This prevents XML generation errors caused by empty or malformed valueDataType entries
+    *
+    * @param {Array} profileData - the raw profile data
+    * @return {Array} cleaned profile data
+    */
+    cleanProfileData(profileData) {
+      if (!profileData || !Array.isArray(profileData)) {
+        console.warn('Invalid profile data structure');
+        return profileData;
+      }
+
+      for (let profile of profileData) {
+        if (!profile.json?.Profile?.resourceTemplates) continue;
+
+        for (let rt of profile.json.Profile.resourceTemplates) {
+          if (!rt.propertyTemplates) continue;
+
+          for (let pt of rt.propertyTemplates) {
+            // Clean malformed valueDataType objects
+            if (pt.valueDataType !== undefined) {
+              // Remove empty strings, empty objects, null, or undefined valueDataType
+              if (pt.valueDataType === "" || 
+                  pt.valueDataType === null || 
+                  pt.valueDataType === undefined ||
+                  (typeof pt.valueDataType === 'object' && Object.keys(pt.valueDataType).length === 0)) {
+                delete pt.valueDataType;
+              }
+            }
+
+            // Clean malformed valueConstraint.valueDataType.dataTypeURI that cause trim() errors
+            if (pt.valueConstraint?.valueDataType?.dataTypeURI !== undefined) {
+              // Ensure dataTypeURI is a string or remove it
+              if (typeof pt.valueConstraint.valueDataType.dataTypeURI !== 'string' ||
+                  pt.valueConstraint.valueDataType.dataTypeURI === "" ||
+                  pt.valueConstraint.valueDataType.dataTypeURI === null ||
+                  pt.valueConstraint.valueDataType.dataTypeURI === undefined) {
+                delete pt.valueConstraint.valueDataType.dataTypeURI;
+                
+                // If valueDataType becomes empty, remove it entirely
+                if (Object.keys(pt.valueConstraint.valueDataType).length === 0) {
+                  delete pt.valueConstraint.valueDataType;
+                }
+              }
+            }
+
+            // Ensure valueConstraint exists and has proper structure for Hub relationships
+            if (pt.propertyURI && (
+                pt.propertyURI.includes('relatedTo') || 
+                pt.propertyURI.includes('expressionOf') ||
+                pt.propertyURI === 'http://id.loc.gov/ontologies/bibframe/relatedTo' ||
+                pt.propertyURI === 'http://id.loc.gov/ontologies/bibframe/expressionOf'
+              )) {
+              if (!pt.valueConstraint) {
+                pt.valueConstraint = {};
+              }
+              if (!pt.valueConstraint.valueTemplateRefs) {
+                pt.valueConstraint.valueTemplateRefs = [];
+              }
+            }
+
+            // Clean nested resource templates if they exist
+            if (pt.resourceTemplates && Array.isArray(pt.resourceTemplates)) {
+              for (let nestedRt of pt.resourceTemplates) {
+                if (nestedRt.propertyTemplates) {
+                  for (let nestedPt of nestedRt.propertyTemplates) {
+                    if (nestedPt.valueDataType !== undefined) {
+                      if (nestedPt.valueDataType === "" || 
+                          nestedPt.valueDataType === null || 
+                          nestedPt.valueDataType === undefined ||
+                          (typeof nestedPt.valueDataType === 'object' && Object.keys(nestedPt.valueDataType).length === 0)) {
+                        delete nestedPt.valueDataType;
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      return profileData;
+    },
+
+    /**
     * The main first process that takes the raw profiles and processes them for use
     *
     * @return {void}
@@ -565,6 +660,10 @@ export const useProfileStore = defineStore('profile', {
       try{
         let response = await fetch(config.returnUrls.profiles);
         profileData =  await response.json()
+        
+        // Clean malformed valueDataType objects that cause XML generation errors
+        profileData = this.cleanProfileData(profileData);
+        
       }catch(err){
         alert('Could not download the profiles, unable to continue.')
         console.error(err);
@@ -1053,7 +1152,11 @@ export const useProfileStore = defineStore('profile', {
                   for (let pt in this.profiles[p].rt[rt].pt){
                       // build the key to the property
                       let id = rt + '|' + this.profiles[p].rt[rt].pt[pt].propertyURI
-                      if (this.profiles[p].rt[rt].pt[pt].valueConstraint && this.profiles[p].rt[rt].pt[pt].valueConstraint.valueDataType && this.profiles[p].rt[rt].pt[pt].valueConstraint.valueDataType.dataTypeURI && this.profiles[p].rt[rt].pt[pt].valueConstraint.valueDataType.dataTypeURI.trim() != ''){
+                      if (this.profiles[p].rt[rt].pt[pt].valueConstraint && 
+                          this.profiles[p].rt[rt].pt[pt].valueConstraint.valueDataType && 
+                          this.profiles[p].rt[rt].pt[pt].valueConstraint.valueDataType.dataTypeURI && 
+                          typeof this.profiles[p].rt[rt].pt[pt].valueConstraint.valueDataType.dataTypeURI === 'string' &&
+                          this.profiles[p].rt[rt].pt[pt].valueConstraint.valueDataType.dataTypeURI.trim() != ''){
                           id = id + '|' + this.profiles[p].rt[rt].pt[pt].valueConstraint.valueDataType.dataTypeURI
                       }
                       // builds an id like this: lc:RT:bf2:35mmFeatureFilm:Work|http://id.loc.gov/ontologies/bibframe/contribution|http://id.loc.gov/ontologies/bflc/PrimaryContribution
@@ -2551,6 +2654,17 @@ export const useProfileStore = defineStore('profile', {
     * @return {void}
     */
     setValueComplex: async function(componentGuid, fieldGuid, propertyPath, URI, label, type, nodeMap=null, marcKey=null ){
+      // Debug logging for Hub relationship troubleshooting
+      console.log("setValueComplex called with:", {
+        componentGuid, 
+        fieldGuid, 
+        URI, 
+        label, 
+        type, 
+        marcKey: marcKey,
+        propertyPath: propertyPath.map(p => p.propertyURI)
+      });
+      
       // TODO: reconcile this to how the profiles are built, or dont..
       // remove the sameAs from this property path, which will be the last one, we don't need it
       propertyPath = propertyPath.filter((v)=> { return (v.propertyURI!=='http://www.w3.org/2002/07/owl#sameAs')  })
@@ -2702,47 +2816,117 @@ export const useProfileStore = defineStore('profile', {
             }
           }
 
+          // Enhanced marcKey handling with Hub-specific logic
           if (!Array.isArray(marcKey)){
             marcKey = [marcKey]
           }
 
-          for (let aMarcKeyNode of marcKey){
+          // Filter out null/undefined values
+          marcKey = marcKey.filter(item => item !== null && item !== undefined && item !== '');
 
-            // console.log("aMarcKeyNode",aMarcKeyNode)
-
-            if (!blankNode['http://id.loc.gov/ontologies/bflc/marcKey']){
-              blankNode['http://id.loc.gov/ontologies/bflc/marcKey'] = []
-            }
-            if (typeof aMarcKeyNode == 'string'){
-              blankNode['http://id.loc.gov/ontologies/bflc/marcKey'].push(
-                {
-                  '@guid': short.generate(),
-                  'http://id.loc.gov/ontologies/bflc/marcKey' : aMarcKeyNode
+          // Enhanced Hub-specific handling for expressionOf and relatedTo properties
+          const isHubRelationship = type === "http://id.loc.gov/ontologies/bibframe/Hub" || 
+                                  (URI && URI.includes('/hubs/')) ||
+                                  (lastProperty === "http://id.loc.gov/ontologies/bibframe/expressionOf" || 
+                                   lastProperty === "http://id.loc.gov/ontologies/bibframe/relatedTo");
+          
+          if (marcKey.length === 0 && isHubRelationship) {
+            console.log("No valid marcKey data for Hub relationship, attempting to generate Hub-specific default");
+            
+            // Enhanced Hub marcKey generation with better fallback logic
+            let generatedMarcKey = null;
+            
+            // First try: Use provided label
+            if (label && Array.isArray(label) && label.length > 0 && typeof label[0] === 'string') {
+              const cleanLabel = label[0].trim();
+              if (cleanLabel) {
+                // Check if it's already in MARC format
+                if (cleanLabel.includes('$')) {
+                  generatedMarcKey = cleanLabel;
+                } else {
+                  // Create proper Hub marcKey format
+                  generatedMarcKey = `1001 $a${cleanLabel}`;
                 }
-              )
-            }else if (aMarcKeyNode && aMarcKeyNode['@value']){
-              let aNode = {
-                '@guid': short.generate(),
-                'http://id.loc.gov/ontologies/bflc/marcKey' : aMarcKeyNode['@value']
               }
-              if (aMarcKeyNode['@language']){
-                aNode['@language']=aMarcKeyNode['@language']
+            } else if (typeof label === 'string' && label.trim()) {
+              const cleanLabel = label.trim();
+              if (cleanLabel.includes('$')) {
+                generatedMarcKey = cleanLabel;
+              } else {
+                generatedMarcKey = `1001 $a${cleanLabel}`;
               }
-              blankNode['http://id.loc.gov/ontologies/bflc/marcKey'].push(aNode)
-            }else if (aMarcKeyNode && aMarcKeyNode.marcKey){
+            }
+            
+            // Second try: Extract from URI
+            if (!generatedMarcKey && URI) {
+              const uriParts = URI.split('/');
+              const id = uriParts[uriParts.length - 1];
+              if (id && id !== 'hubs') {
+                // Decode URL-encoded characters and clean up
+                const decodedId = decodeURIComponent(id).replace(/[_-]/g, ' ').trim();
+                generatedMarcKey = `1001 $a${decodedId}`;
+              }
+            }
+            
+            // Third try: Use nodeMap data if available
+            if (!generatedMarcKey && nodeMap) {
+              if (nodeMap.title && typeof nodeMap.title === 'string') {
+                generatedMarcKey = `1001 $a${nodeMap.title.trim()}`;
+              } else if (nodeMap.label && typeof nodeMap.label === 'string') {
+                generatedMarcKey = `1001 $a${nodeMap.label.trim()}`;
+              }
+            }
+            
+            if (generatedMarcKey) {
+              marcKey = [generatedMarcKey];
+              console.log("Generated enhanced Hub marcKey:", generatedMarcKey, "for property:", lastProperty);
+            } else {
+              console.warn("Unable to generate marcKey for Hub relationship - insufficient data");
+            }
+          }
 
-              let aNode = {
-                '@guid': short.generate(),
-                'http://id.loc.gov/ontologies/bflc/marcKey' : aMarcKeyNode.marcKey
-              }
-              if (aMarcKeyNode['@language']){
-                aNode['@language']=aMarcKeyNode['@language']
-              }
+          // Skip marcKey processing entirely if still empty after all attempts
+          if (marcKey.length === 0) {
+            console.log("No marcKey data available, skipping marcKey section");
+          } else {
+            for (let aMarcKeyNode of marcKey){
 
-              blankNode['http://id.loc.gov/ontologies/bflc/marcKey'].push(aNode)
+              // console.log("aMarcKeyNode",aMarcKeyNode)
 
-            }else{
-              console.error("Cannot understand response from context extaction for marcKey:",marcKey)
+              if (!blankNode['http://id.loc.gov/ontologies/bflc/marcKey']){
+                blankNode['http://id.loc.gov/ontologies/bflc/marcKey'] = []
+              }
+              if (typeof aMarcKeyNode == 'string'){
+                blankNode['http://id.loc.gov/ontologies/bflc/marcKey'].push(
+                  {
+                    '@guid': short.generate(),
+                    'http://id.loc.gov/ontologies/bflc/marcKey' : aMarcKeyNode
+                  }
+                )
+              }else if (aMarcKeyNode && aMarcKeyNode['@value']){
+                let aNode = {
+                  '@guid': short.generate(),
+                  'http://id.loc.gov/ontologies/bflc/marcKey' : aMarcKeyNode['@value']
+                }
+                if (aMarcKeyNode['@language']){
+                  aNode['@language']=aMarcKeyNode['@language']
+                }
+                blankNode['http://id.loc.gov/ontologies/bflc/marcKey'].push(aNode)
+              }else if (aMarcKeyNode && aMarcKeyNode.marcKey){
+
+                let aNode = {
+                  '@guid': short.generate(),
+                  'http://id.loc.gov/ontologies/bflc/marcKey' : aMarcKeyNode.marcKey
+                }
+                if (aMarcKeyNode['@language']){
+                  aNode['@language']=aMarcKeyNode['@language']
+                }
+
+                blankNode['http://id.loc.gov/ontologies/bflc/marcKey'].push(aNode)
+
+              }else{
+                console.error("Cannot understand response from context extaction for marcKey:",marcKey)
+              }
             }
           }
 
@@ -3183,6 +3367,105 @@ export const useProfileStore = defineStore('profile', {
 
     },
 
+    /**
+    * Helper function to validate component data for Hub relationships
+    * @param {object} component - the component to validate
+    * @return {boolean} true if component is valid
+    */
+    validateComponentForHub(component) {
+      if (!component || !component.pt) return true; // Skip validation if no property templates
+
+      for (let ptKey in component.pt) {
+        let pt = component.pt[ptKey];
+        
+        // Check for malformed valueDataType that could cause XML errors
+        if (pt.valueDataType !== undefined) {
+          if (pt.valueDataType === "" || 
+              pt.valueDataType === null || 
+              (typeof pt.valueDataType === 'object' && Object.keys(pt.valueDataType).length === 0)) {
+            return false;
+          }
+        }
+
+        // Check userValue structure for Hub relationships
+        if (pt.userValue && typeof pt.userValue === 'object') {
+          for (let userValueKey in pt.userValue) {
+            if (Array.isArray(pt.userValue[userValueKey])) {
+              for (let valueItem of pt.userValue[userValueKey]) {
+                if (valueItem && typeof valueItem === 'object') {
+                  // Check for properties that might cause XML generation issues
+                  for (let prop in valueItem) {
+                    if (valueItem[prop] === null || valueItem[prop] === undefined) {
+                      // Allow null/undefined as they're handled properly
+                      continue;
+                    }
+                    if (typeof valueItem[prop] === 'string' && valueItem[prop].trim === undefined) {
+                      return false; // This would cause "trim is not a function" error
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      return true;
+    },
+
+    /**
+    * Helper function to clean component data
+    * @param {object} component - the component to clean
+    * @return {object} cleaned component
+    */
+    cleanComponentData(component) {
+      if (!component || !component.pt) return component;
+
+      for (let ptKey in component.pt) {
+        let pt = component.pt[ptKey];
+        
+        // Clean malformed valueDataType
+        if (pt.valueDataType !== undefined) {
+          if (pt.valueDataType === "" || 
+              pt.valueDataType === null || 
+              pt.valueDataType === undefined ||
+              (typeof pt.valueDataType === 'object' && Object.keys(pt.valueDataType).length === 0)) {
+            delete pt.valueDataType;
+          }
+        }
+
+        // Clean userValue structure
+        if (pt.userValue && typeof pt.userValue === 'object') {
+          for (let userValueKey in pt.userValue) {
+            if (Array.isArray(pt.userValue[userValueKey])) {
+              pt.userValue[userValueKey] = pt.userValue[userValueKey].filter(valueItem => {
+                if (!valueItem || typeof valueItem !== 'object') return false;
+                
+                // Remove items that would cause XML generation errors
+                for (let prop in valueItem) {
+                  if (valueItem[prop] !== null && valueItem[prop] !== undefined) {
+                    // Ensure string values have trim method
+                    if (typeof valueItem[prop] === 'string') {
+                      // String is valid, keep it
+                      continue;
+                    } else if (typeof valueItem[prop] === 'object') {
+                      // For objects, ensure they're not empty or malformed
+                      if (Object.keys(valueItem[prop]).length === 0) {
+                        delete valueItem[prop];
+                      }
+                    }
+                  }
+                }
+                return true;
+              });
+            }
+          }
+        }
+      }
+
+      return component;
+    },
+
 
 
     /**
@@ -3192,7 +3475,41 @@ export const useProfileStore = defineStore('profile', {
     * @return {string} - the XML string of output
     */
     buildExportXML: function(){
-      return utilsExport.buildXML(this.activeProfile)
+      try {
+        // Validate profile data before XML generation
+        if (!this.activeProfile) {
+          throw new Error('No active profile available for XML generation');
+        }
+
+        // Validate components exist
+        if (!this.activeProfile.rt || Object.keys(this.activeProfile.rt).length === 0) {
+          throw new Error('No resource templates available in active profile');
+        }
+
+        // Validate each component before processing
+        for (let rtKey in this.activeProfile.rt) {
+          if (!this.validateComponentForHub(this.activeProfile.rt[rtKey])) {
+            console.warn(`Component ${rtKey} failed validation, attempting to clean...`);
+            this.activeProfile.rt[rtKey] = this.cleanComponentData(this.activeProfile.rt[rtKey]);
+          }
+        }
+
+        return utilsExport.buildXML(this.activeProfile);
+      } catch (error) {
+        console.error('Error building XML:', error);
+        
+        // Try to recover by cleaning the profile data
+        try {
+          console.log('Attempting to recover by cleaning profile data...');
+          for (let rtKey in this.activeProfile.rt) {
+            this.activeProfile.rt[rtKey] = this.cleanComponentData(this.activeProfile.rt[rtKey]);
+          }
+          return utilsExport.buildXML(this.activeProfile);
+        } catch (recoveryError) {
+          console.error('Recovery attempt failed:', recoveryError);
+          throw new Error(`XML generation failed: ${error.message}. Recovery attempt also failed: ${recoveryError.message}`);
+        }
+      }
     },
 
     /**

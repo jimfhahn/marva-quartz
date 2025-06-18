@@ -242,6 +242,37 @@ const utilsExport = {
       const serializer = new XMLSerializer();
       let xmlString = serializer.serializeToString(node);
       
+      // Browser-specific fixes for Chrome vs Firefox differences
+      try {
+        // Test if we can parse the generated XML to catch issues early
+        const testParser = new DOMParser();
+        const testDoc = testParser.parseFromString(xmlString, 'application/xml');
+        const parseErrors = testDoc.getElementsByTagName('parsererror');
+        
+        if (parseErrors.length > 0) {
+          console.warn('Browser-specific XML serialization issue detected, applying fixes');
+          
+          // Chrome sometimes generates malformed namespace declarations
+          xmlString = xmlString.replace(/xmlns=""/g, ''); // Remove empty xmlns
+          xmlString = xmlString.replace(/\s+xmlns=""/g, ''); // Remove empty xmlns with spaces
+          
+          // Fix double-encoded entities that can occur in Chrome
+          xmlString = xmlString.replace(/&amp;amp;/g, '&amp;');
+          xmlString = xmlString.replace(/&amp;lt;/g, '&lt;');
+          xmlString = xmlString.replace(/&amp;gt;/g, '&gt;');
+          
+          // Re-test after fixes
+          const retestDoc = testParser.parseFromString(xmlString, 'application/xml');
+          const retestErrors = retestDoc.getElementsByTagName('parsererror');
+          
+          if (retestErrors.length > 0) {
+            console.error('Unable to fix XML serialization issues:', retestErrors[0].textContent);
+          }
+        }
+      } catch (error) {
+        console.warn('Error during XML validation in serializePreservingNamespaces:', error.message);
+      }
+      
       // Ensure rdfs namespace declaration is present in rdfs:label elements
       xmlString = xmlString.replace(/<rdfs:label(?![^>]*xmlns:rdfs=)/g, 
         '<rdfs:label xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"');
@@ -348,6 +379,76 @@ const utilsExport = {
     if (!userValue) {
       console.error("createBnode: userValue is undefined or null", new Error().stack);
       return document.createElement("div"); // safe fallback
+    }
+    
+    // Special handling for Hub relationships
+    if (property === 'http://id.loc.gov/ontologies/bibframe/relatedTo' ||
+        property === 'http://id.loc.gov/ontologies/bibframe/expressionOf' ||
+        (userValue['@type'] && userValue['@type'].includes('Hub'))) {
+      
+      console.log("Creating Hub bnode with enhanced structure for property:", property);
+      
+      // Create Hub element
+      let bnode = this.createElByBestNS('bf:Hub');
+      
+      // Add rdf:about if URI exists
+      if (userValue['@id']) {
+        bnode.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:about', userValue['@id']);
+      }
+      
+      // Add rdf:type for Hub
+      let rdftype = this.createElByBestNS('rdf:type');
+      rdftype.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:resource', 'http://id.loc.gov/ontologies/bibframe/Hub');
+      bnode.appendChild(rdftype);
+      
+      // Add rdfs:label if available
+      if (userValue['http://www.w3.org/2000/01/rdf-schema#label']) {
+        let labels = userValue['http://www.w3.org/2000/01/rdf-schema#label'];
+        if (!Array.isArray(labels)) labels = [labels];
+        
+        for (let labelItem of labels) {
+          let labelValue = '';
+          if (typeof labelItem === 'string') {
+            labelValue = labelItem;
+          } else if (labelItem && labelItem['http://www.w3.org/2000/01/rdf-schema#label']) {
+            labelValue = labelItem['http://www.w3.org/2000/01/rdf-schema#label'];
+          } else if (labelItem && labelItem['@value']) {
+            labelValue = labelItem['@value'];
+          }
+          
+          if (labelValue) {
+            let labelEl = this.createRdfsLabel(labelValue);
+            bnode.appendChild(labelEl);
+            console.log("Added rdfs:label to Hub:", labelValue);
+          }
+        }
+      }
+      
+      // Add bflc:marcKey if available
+      if (userValue['http://id.loc.gov/ontologies/bflc/marcKey']) {
+        let marcKeys = userValue['http://id.loc.gov/ontologies/bflc/marcKey'];
+        if (!Array.isArray(marcKeys)) marcKeys = [marcKeys];
+        
+        for (let marcKeyItem of marcKeys) {
+          let marcKeyValue = '';
+          if (typeof marcKeyItem === 'string') {
+            marcKeyValue = marcKeyItem;
+          } else if (marcKeyItem && marcKeyItem['http://id.loc.gov/ontologies/bflc/marcKey']) {
+            marcKeyValue = marcKeyItem['http://id.loc.gov/ontologies/bflc/marcKey'];
+          } else if (marcKeyItem && marcKeyItem['@value']) {
+            marcKeyValue = marcKeyItem['@value'];
+          }
+          
+          if (marcKeyValue) {
+            let marcKeyEl = this.createElByBestNS('bflc:marcKey');
+            marcKeyEl.textContent = marcKeyValue;
+            bnode.appendChild(marcKeyEl);
+            console.log("Added bflc:marcKey to Hub:", marcKeyValue);
+          }
+        }
+      }
+      
+      return bnode;
     }
     
     // some special cases here
@@ -1445,8 +1546,105 @@ const utilsExport = {
                     }
                     pLvl2.appendChild(bnodeLvl2); // Append nested bnode to nested predicate
                   } else if (value1['@id']) {
-                    xmlLog.push(`Resource found for key: ${key1}`);
-                    pLvl2.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:resource', value1['@id']);
+                    // Check if this is a Hub relationship that needs special handling
+                    const isHubRelationship = (key1 === 'http://id.loc.gov/ontologies/bibframe/expressionOf' || 
+                                             key1 === 'http://id.loc.gov/ontologies/bibframe/relatedTo') &&
+                                            value1['@id'] && value1['@id'].includes('/hubs/');
+                    
+                    if (isHubRelationship) {
+                      xmlLog.push(`Creating full Hub structure for nested ${key1} with ID: ${value1['@id']}`);
+                      
+                      // Create the Hub element with rdf:about attribute
+                      let hubElement = this.createElByBestNS('http://id.loc.gov/ontologies/bibframe/Hub');
+                      hubElement.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:about', value1['@id']);
+                      
+                      // Add rdfs:label if available
+                      if (value1.label || value1['http://www.w3.org/2000/01/rdf-schema#label']) {
+                        let labelElement = this.createElByBestNS('http://www.w3.org/2000/01/rdf-schema#label');
+                        
+                        // Enhanced label text extraction for nested Hub
+                        let labelText = '';
+                        if (typeof value1.label === 'string') {
+                          labelText = value1.label;
+                        } else if (Array.isArray(value1.label) && value1.label.length > 0) {
+                          const labelObj = value1.label[0];
+                          if (typeof labelObj === 'string') {
+                            labelText = labelObj;
+                          } else if (labelObj && labelObj['http://www.w3.org/2000/01/rdf-schema#label']) {
+                            labelText = labelObj['http://www.w3.org/2000/01/rdf-schema#label'];
+                          } else if (labelObj && labelObj['@value']) {
+                            labelText = labelObj['@value'];
+                          }
+                        } else if (value1['http://www.w3.org/2000/01/rdf-schema#label']) {
+                          const rdfsLabel = value1['http://www.w3.org/2000/01/rdf-schema#label'];
+                          if (typeof rdfsLabel === 'string') {
+                            labelText = rdfsLabel;
+                          } else if (Array.isArray(rdfsLabel) && rdfsLabel.length > 0) {
+                            const labelObj = rdfsLabel[0];
+                            if (typeof labelObj === 'string') {
+                              labelText = labelObj;
+                            } else if (labelObj && labelObj['http://www.w3.org/2000/01/rdf-schema#label']) {
+                              labelText = labelObj['http://www.w3.org/2000/01/rdf-schema#label'];
+                            } else if (labelObj && labelObj['@value']) {
+                              labelText = labelObj['@value'];
+                            }
+                          }
+                        }
+                        
+                        if (labelText && typeof labelText === 'string') {
+                          labelElement.textContent = labelText;
+                          hubElement.appendChild(labelElement);
+                          xmlLog.push(`Added nested Hub label: ${labelText}`);
+                        }
+                      }
+                      
+                      // Add bflc:marcKey if available and properly formatted
+                      if (value1.marcKey || value1['http://id.loc.gov/ontologies/bflc/marcKey']) {
+                        let marcKeyElement = this.createElByBestNS('http://id.loc.gov/ontologies/bflc/marcKey');
+                        
+                        // Enhanced marcKey text extraction for nested Hub
+                        let marcKeyText = '';
+                        if (typeof value1.marcKey === 'string') {
+                          marcKeyText = value1.marcKey;
+                        } else if (Array.isArray(value1.marcKey) && value1.marcKey.length > 0) {
+                          const marcKeyObj = value1.marcKey[0];
+                          if (typeof marcKeyObj === 'string') {
+                            marcKeyText = marcKeyObj;
+                          } else if (marcKeyObj && marcKeyObj['http://id.loc.gov/ontologies/bflc/marcKey']) {
+                            marcKeyText = marcKeyObj['http://id.loc.gov/ontologies/bflc/marcKey'];
+                          } else if (marcKeyObj && marcKeyObj['@value']) {
+                            marcKeyText = marcKeyObj['@value'];
+                          }
+                        } else if (value1['http://id.loc.gov/ontologies/bflc/marcKey']) {
+                          const bflcMarcKey = value1['http://id.loc.gov/ontologies/bflc/marcKey'];
+                          if (typeof bflcMarcKey === 'string') {
+                            marcKeyText = bflcMarcKey;
+                          } else if (Array.isArray(bflcMarcKey) && bflcMarcKey.length > 0) {
+                            const marcKeyObj = bflcMarcKey[0];
+                            if (typeof marcKeyObj === 'string') {
+                              marcKeyText = marcKeyObj;
+                            } else if (marcKeyObj && marcKeyObj['http://id.loc.gov/ontologies/bflc/marcKey']) {
+                              marcKeyText = marcKeyObj['http://id.loc.gov/ontologies/bflc/marcKey'];
+                            } else if (marcKeyObj && marcKeyObj['@value']) {
+                              marcKeyText = marcKeyObj['@value'];
+                            }
+                          }
+                        }
+                        
+                        // Only add marcKey if it's in proper MARC format (contains $ subfields)
+                        if (marcKeyText && typeof marcKeyText === 'string' && marcKeyText.includes('$')) {
+                          marcKeyElement.textContent = marcKeyText;
+                          hubElement.appendChild(marcKeyElement);
+                          xmlLog.push(`Added nested Hub marcKey: ${marcKeyText}`);
+                        }
+                      }
+                      
+                      pLvl2.appendChild(hubElement);
+                      xmlLog.push(`Created full nested Hub structure for ${key1}`);
+                    } else {
+                      xmlLog.push(`Resource found for key: ${key1}`);
+                      pLvl2.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:resource', value1['@id']);
+                    }
                   } else {
                     // Handle literal values inside the bnode
                     xmlLog.push(`Literal found for key: ${key1}`);
@@ -1509,7 +1707,104 @@ const utilsExport = {
                                    let bnodeLvl3 = this.createBnode(value2, key2);
                                    if (bnodeLvl3 && bnodeLvl3.nodeType) pLvl3.appendChild(bnodeLvl3);
                                  } else if (value2['@id']) {
-                                   pLvl3.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:resource', value2['@id']);
+                                   // Check if this is a Hub relationship that needs special handling
+                                   const isHubRelationship = (key2 === 'http://id.loc.gov/ontologies/bibframe/expressionOf' || 
+                                                            key2 === 'http://id.loc.gov/ontologies/bibframe/relatedTo') &&
+                                                           value2['@id'] && value2['@id'].includes('/hubs/');
+                                   
+                                   if (isHubRelationship) {
+                                     xmlLog.push(`Creating full Hub structure for nested sibling ${key2} with ID: ${value2['@id']}`);
+                                     
+                                     // Create the Hub element with rdf:about attribute
+                                     let hubElement = this.createElByBestNS('http://id.loc.gov/ontologies/bibframe/Hub');
+                                     hubElement.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:about', value2['@id']);
+                                     
+                                     // Add rdfs:label if available
+                                     if (value2.label || value2['http://www.w3.org/2000/01/rdf-schema#label']) {
+                                       let labelElement = this.createElByBestNS('http://www.w3.org/2000/01/rdf-schema#label');
+                                       
+                                       // Enhanced label text extraction for nested sibling Hub
+                                       let labelText = '';
+                                       if (typeof value2.label === 'string') {
+                                         labelText = value2.label;
+                                       } else if (Array.isArray(value2.label) && value2.label.length > 0) {
+                                         const labelObj = value2.label[0];
+                                         if (typeof labelObj === 'string') {
+                                           labelText = labelObj;
+                                         } else if (labelObj && labelObj['http://www.w3.org/2000/01/rdf-schema#label']) {
+                                           labelText = labelObj['http://www.w3.org/2000/01/rdf-schema#label'];
+                                         } else if (labelObj && labelObj['@value']) {
+                                           labelText = labelObj['@value'];
+                                         }
+                                       } else if (value2['http://www.w3.org/2000/01/rdf-schema#label']) {
+                                         const rdfsLabel = value2['http://www.w3.org/2000/01/rdf-schema#label'];
+                                         if (typeof rdfsLabel === 'string') {
+                                           labelText = rdfsLabel;
+                                         } else if (Array.isArray(rdfsLabel) && rdfsLabel.length > 0) {
+                                           const labelObj = rdfsLabel[0];
+                                           if (typeof labelObj === 'string') {
+                                             labelText = labelObj;
+                                           } else if (labelObj && labelObj['http://www.w3.org/2000/01/rdf-schema#label']) {
+                                             labelText = labelObj['http://www.w3.org/2000/01/rdf-schema#label'];
+                                           } else if (labelObj && labelObj['@value']) {
+                                             labelText = labelObj['@value'];
+                                           }
+                                         }
+                                       }
+                                       
+                                       if (labelText && typeof labelText === 'string') {
+                                         labelElement.textContent = labelText;
+                                         hubElement.appendChild(labelElement);
+                                         xmlLog.push(`Added nested sibling Hub label: ${labelText}`);
+                                       }
+                                     }
+                                     
+                                     // Add bflc:marcKey if available and properly formatted
+                                     if (value2.marcKey || value2['http://id.loc.gov/ontologies/bflc/marcKey']) {
+                                       let marcKeyElement = this.createElByBestNS('http://id.loc.gov/ontologies/bflc/marcKey');
+                                       
+                                       // Enhanced marcKey text extraction for nested sibling Hub
+                                       let marcKeyText = '';
+                                       if (typeof value2.marcKey === 'string') {
+                                         marcKeyText = value2.marcKey;
+                                       } else if (Array.isArray(value2.marcKey) && value2.marcKey.length > 0) {
+                                         const marcKeyObj = value2.marcKey[0];
+                                         if (typeof marcKeyObj === 'string') {
+                                           marcKeyText = marcKeyObj;
+                                         } else if (marcKeyObj && marcKeyObj['http://id.loc.gov/ontologies/bflc/marcKey']) {
+                                           marcKeyText = marcKeyObj['http://id.loc.gov/ontologies/bflc/marcKey'];
+                                         } else if (marcKeyObj && marcKeyObj['@value']) {
+                                           marcKeyText = marcKeyObj['@value'];
+                                         }
+                                       } else if (value2['http://id.loc.gov/ontologies/bflc/marcKey']) {
+                                         const bflcMarcKey = value2['http://id.loc.gov/ontologies/bflc/marcKey'];
+                                         if (typeof bflcMarcKey === 'string') {
+                                           marcKeyText = bflcMarcKey;
+                                         } else if (Array.isArray(bflcMarcKey) && bflcMarcKey.length > 0) {
+                                           const marcKeyObj = bflcMarcKey[0];
+                                           if (typeof marcKeyObj === 'string') {
+                                             marcKeyText = marcKeyObj;
+                                           } else if (marcKeyObj && marcKeyObj['http://id.loc.gov/ontologies/bflc/marcKey']) {
+                                             marcKeyText = marcKeyObj['http://id.loc.gov/ontologies/bflc/marcKey'];
+                                           } else if (marcKeyObj && marcKeyObj['@value']) {
+                                             marcKeyText = marcKeyObj['@value'];
+                                           }
+                                         }
+                                       }
+                                       
+                                       // Only add marcKey if it's in proper MARC format (contains $ subfields)
+                                       if (marcKeyText && typeof marcKeyText === 'string' && marcKeyText.includes('$')) {
+                                         marcKeyElement.textContent = marcKeyText;
+                                         hubElement.appendChild(marcKeyElement);
+                                         xmlLog.push(`Added nested sibling Hub marcKey: ${marcKeyText}`);
+                                       }
+                                     }
+                                     
+                                     pLvl3.appendChild(hubElement);
+                                     xmlLog.push(`Created full nested sibling Hub structure for ${key2}`);
+                                   } else {
+                                     pLvl3.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:resource', value2['@id']);
+                                   }
                                  } else {
                                    let literalEl3 = this.createLiteral(key2, value2);
                                    if (literalEl3) {
@@ -1523,7 +1818,106 @@ const utilsExport = {
                              pLvl2.appendChild(bnodeLvl2);
                            }
                          } else if (value1['@id']) {
-                           pLvl2.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:resource', value1['@id']);
+                           // Check if this is a Hub relationship that needs special handling
+                           const isHubRelationship = (key1 === 'http://id.loc.gov/ontologies/bibframe/expressionOf' || 
+                                                    key1 === 'http://id.loc.gov/ontologies/bibframe/relatedTo') &&
+                                                   value1['@id'] && value1['@id'].includes('/hubs/');
+                           
+                           if (isHubRelationship) {
+                             xmlLog.push(`Creating full Hub structure for sibling ${key1} with ID: ${value1['@id']}`);
+                             
+                             // Create the Hub element with rdf:about attribute
+                             let hubElement = this.createElByBestNS('http://id.loc.gov/ontologies/bibframe/Hub');
+                             hubElement.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:about', value1['@id']);
+                             
+                             // Add rdfs:label if available
+                             if (value1.label || value1['http://www.w3.org/2000/01/rdf-schema#label']) {
+                               let labelElement = this.createElByBestNS('http://www.w3.org/2000/01/rdf-schema#label');
+                               
+                               // Enhanced label text extraction for sibling Hub
+                               let labelText = '';
+                               if (typeof value1.label === 'string') {
+                                 labelText = value1.label;
+                               } else if (Array.isArray(value1.label) && value1.label.length > 0) {
+                                 const labelObj = value1.label[0];
+                                 if (typeof labelObj === 'string') {
+                                   labelText = labelObj;
+                                 } else if (labelObj && labelObj['http://www.w3.org/2000/01/rdf-schema#label']) {
+                                   labelText = labelObj['http://www.w3.org/2000/01/rdf-schema#label'];
+                                 } else if (labelObj && labelObj['@value']) {
+                                   labelText = labelObj['@value'];
+                                 }
+                               } else if (value1['http://www.w3.org/2000/01/rdf-schema#label']) {
+                                 const rdfsLabel = value1['http://www.w3.org/2000/01/rdf-schema#label'];
+                                 if (typeof rdfsLabel === 'string') {
+                                   labelText = rdfsLabel;
+                                 } else if (Array.isArray(rdfsLabel) && rdfsLabel.length > 0) {
+                                   const labelObj = rdfsLabel[0];
+                                   if (typeof labelObj === 'string') {
+                                     labelText = labelObj;
+                                   } else if (labelObj && labelObj['http://www.w3.org/2000/01/rdf-schema#label']) {
+                                     labelText = labelObj['http://www.w3.org/2000/01/rdf-schema#label'];
+                                   } else if (labelObj && labelObj['@value']) {
+                                     labelText = labelObj['@value'];
+                                   }
+                                 }
+                               }
+                               
+                               if (labelText && typeof labelText === 'string') {
+                                 labelElement.textContent = labelText;
+                                 hubElement.appendChild(labelElement);
+                                 xmlLog.push(`Added sibling Hub label: ${labelText}`);
+                               }
+                             }
+                             
+                             // Add bflc:marcKey if available and properly formatted
+                             if (value1.marcKey || value1['http://id.loc.gov/ontologies/bflc/marcKey']) {
+                               let marcKeyElement = this.createElByBestNS('http://id.loc.gov/ontologies/bflc/marcKey');
+                               
+                               // Enhanced marcKey text extraction for sibling Hub
+                               let marcKeyText = '';
+                               if (typeof value1.marcKey === 'string') {
+                                 marcKeyText = value1.marcKey;
+                               } else if (Array.isArray(value1.marcKey) && value1.marcKey.length > 0) {
+                                 const marcKeyObj = value1.marcKey[0];
+                                 if (typeof marcKeyObj === 'string') {
+                                   marcKeyText = marcKeyObj;
+                                 } else if (marcKeyObj && marcKeyObj['http://id.loc.gov/ontologies/bflc/marcKey']) {
+                                   marcKeyText = marcKeyObj['http://id.loc.gov/ontologies/bflc/marcKey'];
+                                 } else if (marcKeyObj && marcKeyObj['@value']) {
+                                   marcKeyText = marcKeyObj['@value'];
+                                 }
+                               } else if (value1['http://id.loc.gov/ontologies/bflc/marcKey']) {
+                                 const bflcMarcKey = value1['http://id.loc.gov/ontologies/bflc/marcKey'];
+                                 if (typeof bflcMarcKey === 'string') {
+                                   marcKeyText = bflcMarcKey;
+                                 } else if (Array.isArray(bflcMarcKey) && bflcMarcKey.length > 0) {
+                                   const marcKeyObj = bflcMarcKey[0];
+                                   if (typeof marcKeyObj === 'string') {
+                                     marcKeyText = marcKeyObj;
+                                   } else if (marcKeyObj && marcKeyObj['http://id.loc.gov/ontologies/bflc/marcKey']) {
+                                     marcKeyText = marcKeyObj['http://id.loc.gov/ontologies/bflc/marcKey'];
+                                   } else if (marcKeyObj && marcKeyObj['@value']) {
+                                     marcKeyText = marcKeyObj['@value'];
+                                   }
+                                 }
+                               }
+                               
+                               // Only add marcKey if it's in proper MARC format (contains $ subfields)
+                               if (marcKeyText && typeof marcKeyText === 'string' && marcKeyText.includes('$')) {
+                                 marcKeyElement.textContent = marcKeyText;
+                                 hubElement.appendChild(marcKeyElement);
+                                 xmlLog.push(`Added sibling Hub marcKey: ${marcKeyText}`);
+                               } else {
+                                 xmlLog.push(`Skipping invalid sibling marcKey format: ${marcKeyText}`);
+                               }
+                             }
+                             
+                             pLvl2.appendChild(hubElement);
+                             xmlLog.push(`Created full sibling Hub structure for ${key1}`);
+                           } else {
+                             pLvl2.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:resource', value1['@id']);
+                           }
                          } else {
                            let literalEl = this.createLiteral(key1, value1);
                            if (literalEl) {
@@ -1596,14 +1990,123 @@ const utilsExport = {
                   xmlLog.push(`Handling resource at root level for ${ptObj.propertyURI}`);
                   // ... (logic for handling root-level resources if needed) ...
                 } else if (userValueItem['@id']){
-                  // Handle simple URI references
-                  let p = this.createElByBestNS(ptObj.propertyURI);
-                  if (p && p.nodeType) { // Check if p is a valid element
-                    p.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:resource', userValueItem['@id']);
-                    rootEl.appendChild(p);
-                    componentXmlLookup[`${rt}-${pt}`] = formatXML(p.outerHTML);
+                  // Check if this is a Hub relationship that needs special handling
+                  const isHubRelationship = (ptObj.propertyURI === 'http://id.loc.gov/ontologies/bibframe/expressionOf' || 
+                                           ptObj.propertyURI === 'http://id.loc.gov/ontologies/bibframe/relatedTo') &&
+                                          userValueItem['@id'] && userValueItem['@id'].includes('/hubs/');
+                  
+                  if (isHubRelationship) {
+                    xmlLog.push(`Creating full Hub structure for ${ptObj.propertyURI} with ID: ${userValueItem['@id']}`);
+                    
+                    // Create the outer property element (e.g., <bf:expressionOf>)
+                    let p = this.createElByBestNS(ptObj.propertyURI);
+                    if (p && p.nodeType) {
+                      // Create the Hub element with rdf:about attribute
+                      let hubElement = this.createElByBestNS('http://id.loc.gov/ontologies/bibframe/Hub');
+                      hubElement.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:about', userValueItem['@id']);
+                      
+                      // Add rdfs:label if available
+                      if (userValueItem.label || userValueItem['http://www.w3.org/2000/01/rdf-schema#label']) {
+                        let labelElement = this.createElByBestNS('http://www.w3.org/2000/01/rdf-schema#label');
+                        
+                        // Enhanced label text extraction
+                        let labelText = '';
+                        if (typeof userValueItem.label === 'string') {
+                          labelText = userValueItem.label;
+                        } else if (Array.isArray(userValueItem.label) && userValueItem.label.length > 0) {
+                          const labelObj = userValueItem.label[0];
+                          if (typeof labelObj === 'string') {
+                            labelText = labelObj;
+                          } else if (labelObj && labelObj['http://www.w3.org/2000/01/rdf-schema#label']) {
+                            labelText = labelObj['http://www.w3.org/2000/01/rdf-schema#label'];
+                          } else if (labelObj && labelObj['@value']) {
+                            labelText = labelObj['@value'];
+                          }
+                        } else if (userValueItem['http://www.w3.org/2000/01/rdf-schema#label']) {
+                          const rdfsLabel = userValueItem['http://www.w3.org/2000/01/rdf-schema#label'];
+                          if (typeof rdfsLabel === 'string') {
+                            labelText = rdfsLabel;
+                          } else if (Array.isArray(rdfsLabel) && rdfsLabel.length > 0) {
+                            const labelObj = rdfsLabel[0];
+                            if (typeof labelObj === 'string') {
+                              labelText = labelObj;
+                            } else if (labelObj && labelObj['http://www.w3.org/2000/01/rdf-schema#label']) {
+                              labelText = labelObj['http://www.w3.org/2000/01/rdf-schema#label'];
+                            } else if (labelObj && labelObj['@value']) {
+                              labelText = labelObj['@value'];
+                            }
+                          }
+                        }
+                        
+                        if (labelText && typeof labelText === 'string') {
+                          labelElement.textContent = labelText;
+                          hubElement.appendChild(labelElement);
+                          xmlLog.push(`Added Hub label: ${labelText}`);
+                        } else {
+                          xmlLog.push(`Skipping invalid label data: ${JSON.stringify(userValueItem.label || userValueItem['http://www.w3.org/2000/01/rdf-schema#label'])}`);
+                        }
+                      }
+                      
+                      // Add bflc:marcKey if available and properly formatted
+                      if (userValueItem.marcKey || userValueItem['http://id.loc.gov/ontologies/bflc/marcKey']) {
+                        let marcKeyElement = this.createElByBestNS('http://id.loc.gov/ontologies/bflc/marcKey');
+                        
+                        // Enhanced marcKey text extraction
+                        let marcKeyText = '';
+                        if (typeof userValueItem.marcKey === 'string') {
+                          marcKeyText = userValueItem.marcKey;
+                        } else if (Array.isArray(userValueItem.marcKey) && userValueItem.marcKey.length > 0) {
+                          const marcKeyObj = userValueItem.marcKey[0];
+                          if (typeof marcKeyObj === 'string') {
+                            marcKeyText = marcKeyObj;
+                          } else if (marcKeyObj && marcKeyObj['http://id.loc.gov/ontologies/bflc/marcKey']) {
+                            marcKeyText = marcKeyObj['http://id.loc.gov/ontologies/bflc/marcKey'];
+                          } else if (marcKeyObj && marcKeyObj['@value']) {
+                            marcKeyText = marcKeyObj['@value'];
+                          }
+                        } else if (userValueItem['http://id.loc.gov/ontologies/bflc/marcKey']) {
+                          const bflcMarcKey = userValueItem['http://id.loc.gov/ontologies/bflc/marcKey'];
+                          if (typeof bflcMarcKey === 'string') {
+                            marcKeyText = bflcMarcKey;
+                          } else if (Array.isArray(bflcMarcKey) && bflcMarcKey.length > 0) {
+                            const marcKeyObj = bflcMarcKey[0];
+                            if (typeof marcKeyObj === 'string') {
+                              marcKeyText = marcKeyObj;
+                            } else if (marcKeyObj && marcKeyObj['http://id.loc.gov/ontologies/bflc/marcKey']) {
+                              marcKeyText = marcKeyObj['http://id.loc.gov/ontologies/bflc/marcKey'];
+                            } else if (marcKeyObj && marcKeyObj['@value']) {
+                              marcKeyText = marcKeyObj['@value'];
+                            }
+                          }
+                        }
+                        
+                        // Only add marcKey if it's in proper MARC format (contains $ subfields)
+                        if (marcKeyText && typeof marcKeyText === 'string' && marcKeyText.includes('$')) {
+                          marcKeyElement.textContent = marcKeyText;
+                          hubElement.appendChild(marcKeyElement);
+                          xmlLog.push(`Added Hub marcKey: ${marcKeyText}`);
+                        } else {
+                          xmlLog.push(`Skipping invalid marcKey format: ${JSON.stringify(userValueItem.marcKey || userValueItem['http://id.loc.gov/ontologies/bflc/marcKey'])}`);
+                        }
+                      }
+                      
+                      p.appendChild(hubElement);
+                      rootEl.appendChild(p);
+                      componentXmlLookup[`${rt}-${pt}`] = formatXML(p.outerHTML);
+                      xmlLog.push(`Created full Hub structure for ${ptObj.propertyURI}`);
+                    } else {
+                      xmlLog.push(`Failed to create element for Hub relationship ${ptObj.propertyURI}`);
+                    }
                   } else {
-                     xmlLog.push(`Failed to create element for URI reference ${ptObj.propertyURI}`);
+                    // Handle simple URI references (original logic)
+                    let p = this.createElByBestNS(ptObj.propertyURI);
+                    if (p && p.nodeType) { // Check if p is a valid element
+                      p.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:resource', userValueItem['@id']);
+                      rootEl.appendChild(p);
+                      componentXmlLookup[`${rt}-${pt}`] = formatXML(p.outerHTML);
+                    } else {
+                       xmlLog.push(`Failed to create element for URI reference ${ptObj.propertyURI}`);
+                    }
                   }
                 } else if (ptObj.propertyURI == 'http://www.w3.org/2000/01/rdf-schema#label'){
                   // Handle simple labels
@@ -3822,11 +4325,33 @@ const utilsExport = {
     if (!xmlString) return xmlString;
     
     try {
-      // Remove parser error elements and their content
+      // Remove parser error elements and their content (Chrome-specific issue)
+      xmlString = xmlString.replace(/<parsererror[^>]*>[\s\S]*?<\/parsererror>/g, '');
       xmlString = xmlString.replace(/<sourcetext[^>]*>[\s\S]*?<\/sourcetext>/g, '');
       
       // Remove undefined values that could cause parsing errors
       xmlString = xmlString.replace(/undefined/g, '');
+      
+      // Additional Chrome-specific fixes
+      xmlString = xmlString.replace(/xmlns=""/, ''); // Remove empty namespace declarations
+      xmlString = xmlString.replace(/\s+xmlns=""/g, ''); // Remove empty namespace declarations with spaces
+      
+      // Validate the XML before returning - attempt to parse and handle errors
+      try {
+        const parser = new DOMParser();
+        const testDoc = parser.parseFromString(xmlString, 'application/xml');
+        const parseErrors = testDoc.getElementsByTagName('parsererror');
+        
+        if (parseErrors.length > 0) {
+          console.warn('XML validation found parser errors after sanitization:', parseErrors[0].textContent);
+          // Attempt basic cleanup for common issues
+          xmlString = xmlString.replace(/&(?![a-zA-Z]+;|#[0-9]+;|#x[0-9a-fA-F]+;)/g, '&amp;');
+          xmlString = xmlString.replace(/<(?![\/\w])/g, '&lt;');
+          xmlString = xmlString.replace(/(?<![\/\w])>/g, '&gt;');
+        }
+      } catch (validationError) {
+        console.warn('XML validation error during sanitization:', validationError.message);
+      }
       
       return xmlString;
     } catch (error) {

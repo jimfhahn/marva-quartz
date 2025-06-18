@@ -264,6 +264,30 @@ const utilsParse = {
     let parsedDoc;
     try {
       parsedDoc = parser.parseFromString(trimmedXml, 'application/xml');
+      
+      // Browser-specific handling for parser differences
+      // Chrome and Firefox handle malformed XML differently
+      const parserErrors = parsedDoc.getElementsByTagName('parsererror');
+      if (parserErrors.length > 0) {
+        console.error("Browser-specific XML parsing error detected:", parserErrors[0].textContent);
+        
+        // Attempt to fix common issues and retry
+        let fixedXml = trimmedXml
+          .replace(/&(?![a-zA-Z]+;|#[0-9]+;|#x[0-9a-fA-F]+;)/g, '&amp;') // Fix unescaped ampersands
+          .replace(/<(?![\/\w])/g, '&lt;') // Fix unescaped less-than signs
+          .replace(/(?<![\/\w])>/g, '&gt;'); // Fix unescaped greater-than signs
+        
+        // Retry with fixed XML
+        parsedDoc = parser.parseFromString(fixedXml, 'application/xml');
+        
+        // Check again for errors
+        const retryErrors = parsedDoc.getElementsByTagName('parsererror');
+        if (retryErrors.length > 0) {
+          throw new Error(`XML parsing error persists after fixes: ${retryErrors[0].textContent}`);
+        }
+        
+        console.log("Successfully recovered from XML parsing error with automatic fixes");
+      }
     } catch (parseError) {
       console.error("DOMParser failed:", parseError, "Input XML:", trimmedXml.substring(0, 200));
       throw new Error(`DOMParser failed: ${parseError.message}`);
