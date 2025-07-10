@@ -28,6 +28,7 @@ let rtLookup = null
 const utilsRDF = {
 
   namespace: {
+    'arm': 'https://w3id.org/arm/ontology/1.0/',
     'bflc': 'http://id.loc.gov/ontologies/bflc/',
     'bf':'http://id.loc.gov/ontologies/bibframe/',
     'bfsimple':'http://id.loc.gov/ontologies/bfsimple/',
@@ -256,6 +257,27 @@ const utilsRDF = {
       return 'http://www.w3.org/2000/01/rdf-schema#Literal'
     }
     
+    // Add support for ARM ontology properties
+    if (propertyURI === 'https://w3id.org/arm/ontology/1.0/hasMarking') {
+      return 'https://w3id.org/arm/ontology/1.0/Marking';
+    }
+    if (propertyURI === 'https://w3id.org/arm/ontology/1.0/hasEnclosure') {
+      return 'https://w3id.org/arm/ontology/1.0/Enclosure';
+    }
+    if (propertyURI === 'https://w3id.org/arm/ontology/1.0/hasItemHistory') {
+      return 'https://w3id.org/arm/ontology/1.0/ItemHistory';
+    }
+    // ARM marking-related properties (literal values)
+    if (propertyURI === 'https://w3id.org/arm/ontology/1.0/markingMaterial' ||
+        propertyURI === 'https://w3id.org/arm/ontology/1.0/markingMethod' ||
+        propertyURI === 'https://w3id.org/arm/ontology/1.0/markingPosition' ||
+        propertyURI === 'https://w3id.org/arm/ontology/1.0/enclosureMaterial' ||
+        propertyURI === 'https://w3id.org/arm/ontology/1.0/enclosureType' ||
+        propertyURI === 'https://w3id.org/arm/ontology/1.0/historyType' ||
+        propertyURI === 'https://w3id.org/arm/ontology/1.0/historyDate') {
+      return 'http://www.w3.org/2000/01/rdf-schema#Literal';
+    }
+    
     // Add support for bibframe Hub relationships
     if (propertyURI === "http://id.loc.gov/ontologies/bibframe/relatedTo" || 
         propertyURI === "http://id.loc.gov/ontologies/bibframe/expressionOf") {
@@ -443,7 +465,16 @@ const utilsRDF = {
       }
     }
 
-    if (url.endsWith('.rdf')===false){
+    // Special handling for ARM URIs
+    if (url.startsWith('https://w3id.org/arm/')) {
+      // ARM ontology might require different handling
+      // Check if ARM provides .rdf endpoints or uses content negotiation
+      if (!url.endsWith('.rdf') && !url.includes('#')) {
+        console.warn('ARM URI detected, may need special handling:', url);
+        // For now, try adding .rdf suffix like other ontologies
+        url = url + '.rdf';
+      }
+    } else if (url.endsWith('.rdf')===false){
       url = url + '.rdf'
     }
 
@@ -553,6 +584,22 @@ const utilsRDF = {
     
     // Create XML elements using the existing utility
     const serializer = new XMLSerializer();
+    
+    // Special handling for ARM entities
+    if (entity.typeFull && entity.typeFull.startsWith('https://w3id.org/arm/')) {
+      const armType = entity.typeFull.split('/').pop();
+      const armEl = utilsExport.createElByBestNS(`arm:${armType}`);
+      armEl.setAttributeNS(this.namespace.rdf, 'rdf:about', entity.uri);
+      
+      const typeEl = utilsExport.createElByBestNS('rdf:type');
+      typeEl.setAttributeNS(this.namespace.rdf, 'rdf:resource', entity.typeFull);
+      armEl.appendChild(typeEl);
+      
+      const labelEl = utilsExport.createRdfsLabel(entity.title || entity.label || '');
+      armEl.appendChild(labelEl);
+      
+      return returnElement ? armEl : serializer.serializeToString(armEl);
+    }
     
     // Special handling for Hub entities
     if (entity.type === 'Hub' || entity.typeFull === 'http://id.loc.gov/ontologies/bibframe/Hub') {

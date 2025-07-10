@@ -1177,6 +1177,21 @@
                             {
                                 "mandatory": "false",
                                 "repeatable": "true",
+                                "type": "lookup",
+                                "resourceTemplates": [],
+                                "valueConstraint": {
+                                    "valueTemplateRefs": [],
+                                    "useValuesFrom": ["https://id.loc.gov/vocabulary/relators", "https://id.loc.gov/vocabulary/preservation/relationshipSubType"],
+                                    "valueDataType": {},
+                                    "defaults": []
+                                },
+                                "propertyURI": "http://id.loc.gov/ontologies/bibframe/expressionOf",
+                                "propertyLabel": "Expression of",
+                                "remark": "https://original.rdatoolkit.org/24.4.3.html"
+                            },
+                            {
+                                "mandatory": "false",
+                                "repeatable": "true",
                                 "type": "resource",
                                 "resourceTemplates": [],
                                 "valueConstraint": {
@@ -1777,6 +1792,21 @@
                 "resourceTemplates": [
                     {
                         "propertyTemplates": [
+                            {
+                                "mandatory": "false",
+                                "repeatable": "true",
+                                "type": "lookup",
+                                "resourceTemplates": [],
+                                "valueConstraint": {
+                                    "valueTemplateRefs": [],
+                                    "useValuesFrom": ["https://id.loc.gov/resources/hubs"],
+                                    "defaults": [],
+                                    "valueDataType": {"dataTypeURI": "http://id.loc.gov/ontologies/bibframe/Hub"}
+                                },
+                                "propertyURI": "http://id.loc.gov/ontologies/bibframe/expressionOf",
+                                "propertyLabel": "Expression of [search for a Hub]",
+                                "remark": "https://staff.loc.gov/wikis/display/BP2/Marva+cataloging+updates#Marvacatalogingupdates-Work/ExpressionTitles"
+                            },
                             {
                                 "mandatory": "false",
                                 "repeatable": "true",
@@ -2860,6 +2890,21 @@
                 "resourceTemplates": [
                     {
                         "propertyTemplates": [
+                            {
+                                "mandatory": "false",
+                                "repeatable": "true",
+                                "type": "lookup",
+                                "resourceTemplates": [],
+                                "valueConstraint": {
+                                    "valueTemplateRefs": [],
+                                    "useValuesFrom": ["https://id.loc.gov/resources/hubs"],
+                                    "defaults": [],
+                                    "valueDataType": {"dataTypeURI": "http://id.loc.gov/ontologies/bibframe/Hub"}
+                                },
+                                "propertyURI": "http://id.loc.gov/ontologies/bibframe/expressionOf",
+                                "propertyLabel": "Expression of [search for a Hub]",
+                                "remark": "https://staff.loc.gov/wikis/display/BP2/Marva+cataloging+updates#Marvacatalogingupdates-Work/ExpressionTitles"
+                            },
                             {
                                 "mandatory": "true",
                                 "repeatable": "true",
@@ -4961,6 +5006,51 @@
                                 "type": "resource",
                                 "resourceTemplates": [],
                                 "valueConstraint": {
+                                    "valueTemplateRefs": ["lc:RT:arm:Marking"],
+                                    "useValuesFrom": [],
+                                    "valueDataType": {},
+                                    "defaults": []
+                                },
+                                "propertyURI": "https://w3id.org/arm/ontology/1.0/hasMarking",
+                                "propertyLabel": "Marking",
+                                "remark": "A symbol, notation, or other mark present in or applied to an object during or after creation."
+                            },
+                            {
+                                "mandatory": "false",
+                                "repeatable": "true",
+                                "type": "resource",
+                                "resourceTemplates": [],
+                                "valueConstraint": {
+                                    "valueTemplateRefs": ["lc:RT:arm:Enclosure"],
+                                    "useValuesFrom": [],
+                                    "valueDataType": {},
+                                    "defaults": []
+                                },
+                                "propertyURI": "https://w3id.org/arm/ontology/1.0/hasEnclosure",
+                                "propertyLabel": "Enclosure",
+                                "remark": "A container, folder, housing, sleeve, or other enclosure or support for the resource."
+                            },
+                            {
+                                "mandatory": "false",
+                                "repeatable": "true",
+                                "type": "resource",
+                                "resourceTemplates": [],
+                                "valueConstraint": {
+                                    "valueTemplateRefs": ["lc:RT:arm:ItemHistory"],
+                                    "useValuesFrom": [],
+                                    "valueDataType": {},
+                                    "defaults": []
+                                },
+                                "propertyURI": "https://w3id.org/arm/ontology/1.0/hasItemHistory",
+                                "propertyLabel": "Item History",
+                                "remark": "History of events in the life of a resource."
+                            },
+                            {
+                                "mandatory": "false",
+                                "repeatable": "true",
+                                "type": "resource",
+                                "resourceTemplates": [],
+                                "valueConstraint": {
                                     "valueTemplateRefs": ["lc:RT:bf2:Title:VarTitle"],
                                     "useValuesFrom": [],
                                     "valueDataType": {},
@@ -5112,6 +5202,171 @@
                         "id": "lc:RT:bf2:RareMat:RefTitle",
                         "resourceURI": "http://id.loc.gov/ontologies/bibframe/Title",
                         "resourceLabel": "Title"
+                    },
+                    {
+                        "propertyTemplates": [
+                            {
+                                "mandatory": "false",
+                                "repeatable": "true",
+                                "type": "literal",
+                                "resourceTemplates": [],
+                                "valueConstraint": {
+                                    "valueTemplateRefs": [],
+                                    "useValuesFrom": [],
+                                    "valueDataType": {},
+                                    "defaults": []
+                                },
+                                "propertyURI": "http://www.w3.org/2000/01/rdf-schema#label",
+                                "propertyLabel": "Marking description"
+                            },
+                            {
+                                "mandatory": "false",
+                                "repeatable": "true",
+                                "type": "literal",
+                                "resourceTemplates": [],
+                                "valueConstraint": {
+                                    "valueTemplateRefs": [],
+                                    "useValuesFrom": [],
+                                    "defaults": [],
+                                    "valueDataType": {}
+                                },
+                                "propertyURI": "https://w3id.org/arm/ontology/1.0/markingMaterial",
+                                "propertyLabel": "Marking material"
+                            },
+                            {
+                                "mandatory": "false",
+                                "repeatable": "true",
+                                "type": "literal",
+                                "resourceTemplates": [],
+                                "valueConstraint": {
+                                    "valueTemplateRefs": [],
+                                    "useValuesFrom": [],
+                                    "defaults": [],
+                                    "valueDataType": {}
+                                },
+                                "propertyURI": "https://w3id.org/arm/ontology/1.0/markingMethod",
+                                "propertyLabel": "Marking method"
+                            },
+                            {
+                                "mandatory": "false",
+                                "repeatable": "true",
+                                "type": "literal",
+                                "resourceTemplates": [],
+                                "valueConstraint": {
+                                    "valueTemplateRefs": [],
+                                    "useValuesFrom": [],
+                                    "valueDataType": {},
+                                    "defaults": []
+                                },
+                                "propertyURI": "https://w3id.org/arm/ontology/1.0/markingPosition",
+                                "propertyLabel": "Marking position"
+                            }
+                        ],
+                        "id": "lc:RT:arm:Marking",
+                        "resourceURI": "https://w3id.org/arm/ontology/1.0/Marking",
+                        "resourceLabel": "Marking"
+                    },
+                    {
+                        "propertyTemplates": [
+                            {
+                                "mandatory": "false",
+                                "repeatable": "true",
+                                "type": "literal",
+                                "resourceTemplates": [],
+                                "valueConstraint": {
+                                    "valueTemplateRefs": [],
+                                    "useValuesFrom": [],
+                                    "valueDataType": {},
+                                    "defaults": []
+                                },
+                                "propertyURI": "http://www.w3.org/2000/01/rdf-schema#label",
+                                "propertyLabel": "Enclosure description"
+                            },
+                            {
+                                "mandatory": "false",
+                                "repeatable": "true",
+                                "type": "literal",
+                                "resourceTemplates": [],
+                                "valueConstraint": {
+                                    "valueTemplateRefs": [],
+                                    "useValuesFrom": [],
+                                    "defaults": [],
+                                    "valueDataType": {}
+                                },
+                                "propertyURI": "https://w3id.org/arm/ontology/1.0/enclosureMaterial",
+                                "propertyLabel": "Enclosure material"
+                            },
+                            {
+                                "mandatory": "false",
+                                "repeatable": "true",
+                                "type": "literal",
+                                "resourceTemplates": [],
+                                "valueConstraint": {
+                                    "valueTemplateRefs": [],
+                                    "useValuesFrom": [],
+                                    "defaults": [],
+                                    "valueDataType": {}
+                                },
+                                "propertyURI": "https://w3id.org/arm/ontology/1.0/enclosureType",
+                                "propertyLabel": "Enclosure type"
+                            }
+                        ],
+                        "id": "lc:RT:arm:Enclosure",
+                        "resourceURI": "https://w3id.org/arm/ontology/1.0/Enclosure",
+                        "resourceLabel": "Enclosure"
+                    },
+                    {
+                        "propertyTemplates": [
+                            {
+                                "mandatory": "false",
+                                "repeatable": "true",
+                                "type": "literal",
+                                "resourceTemplates": [],
+                                "valueConstraint": {
+                                    "valueTemplateRefs": [],
+                                    "useValuesFrom": [],
+                                    "valueDataType": {},
+                                    "defaults": []
+                                },
+                                "propertyURI": "http://www.w3.org/2000/01/rdf-schema#label",
+                                "propertyLabel": "Item history note"
+                            },
+                            {
+                                "mandatory": "false",
+                                "repeatable": "true",
+                                "type": "literal",
+                                "resourceTemplates": [],
+                                "valueConstraint": {
+                                    "valueTemplateRefs": [],
+                                    "useValuesFrom": [],
+                                    "defaults": [],
+                                    "valueDataType": {}
+                                },
+                                "propertyURI": "https://w3id.org/arm/ontology/1.0/historyType",
+                                "propertyLabel": "History type"
+                            },
+                            {
+                                "mandatory": "false",
+                                "repeatable": "true",
+                                "type": "literal",
+                                "resourceTemplates": [],
+                                "valueConstraint": {
+                                    "valueTemplateRefs": [],
+                                    "useValuesFrom": [],
+                                    "defaults": [],
+                                    "valueDataType": {
+                                        "dataTypeURI": "http://www.loc.gov/standards/datetime/pre-submission.html",
+                                        "dataTypeLabel": "EDTF",
+                                        "dataTypeLabelHint": "ISO"
+                                    }
+                                },
+                                "propertyURI": "https://w3id.org/arm/ontology/1.0/historyDate",
+                                "propertyLabel": "History date"
+                            }
+                        ],
+                        "id": "lc:RT:arm:ItemHistory",
+                        "resourceURI": "https://w3id.org/arm/ontology/1.0/ItemHistory",
+                        "resourceLabel": "Item History"
                     }
                 ],
                 "id": "lc:profile:bf2:RareMat",
@@ -5138,6 +5393,21 @@
                 "resourceTemplates": [
                     {
                         "propertyTemplates": [
+                            {
+                                "mandatory": "false",
+                                "repeatable": "true",
+                                "type": "lookup",
+                                "resourceTemplates": [],
+                                "valueConstraint": {
+                                    "valueTemplateRefs": [],
+                                    "useValuesFrom": ["https://id.loc.gov/resources/hubs"],
+                                    "defaults": [],
+                                    "valueDataType": {"dataTypeURI": "http://id.loc.gov/ontologies/bibframe/Hub"}
+                                },
+                                "propertyURI": "http://id.loc.gov/ontologies/bibframe/expressionOf",
+                                "propertyLabel": "Expression of [search for a Hub]",
+                                "remark": "https://staff.loc.gov/wikis/display/BP2/Marva+cataloging+updates#Marvacatalogingupdates-Work/ExpressionTitles"
+                            },
                             {
                                 "mandatory": "false",
                                 "repeatable": "true",
@@ -6154,6 +6424,21 @@
                 "resourceTemplates": [
                     {
                         "propertyTemplates": [
+                            {
+                                "mandatory": "false",
+                                "repeatable": "true",
+                                "type": "lookup",
+                                "resourceTemplates": [],
+                                "valueConstraint": {
+                                    "valueTemplateRefs": [],
+                                    "useValuesFrom": ["https://id.loc.gov/resources/hubs"],
+                                    "defaults": [],
+                                    "valueDataType": {"dataTypeURI": "http://id.loc.gov/ontologies/bibframe/Hub"}
+                                },
+                                "propertyURI": "http://id.loc.gov/ontologies/bibframe/expressionOf",
+                                "propertyLabel": "Expression of [search for a Hub]",
+                                "remark": "https://staff.loc.gov/wikis/display/BP2/Marva+cataloging+updates#Marvacatalogingupdates-Work/ExpressionTitles"
+                            },
                             {
                                 "mandatory": "false",
                                 "repeatable": "true",
@@ -7363,6 +7648,21 @@
                     {
                         "propertyTemplates": [
                             {
+                                "mandatory": "false",
+                                "repeatable": "true",
+                                "type": "lookup",
+                                "resourceTemplates": [],
+                                "valueConstraint": {
+                                    "valueTemplateRefs": [],
+                                    "useValuesFrom": ["https://id.loc.gov/resources/hubs"],
+                                    "defaults": [],
+                                    "valueDataType": {"dataTypeURI": "http://id.loc.gov/ontologies/bibframe/Hub"}
+                                },
+                                "propertyURI": "http://id.loc.gov/ontologies/bibframe/expressionOf",
+                                "propertyLabel": "Expression of [search for a Hub]",
+                                "remark": "https://staff.loc.gov/wikis/display/BP2/Marva+cataloging+updates#Marvacatalogingupdates-Work/ExpressionTitles"
+                            },
+                            {
                                 "mandatory": "true",
                                 "repeatable": "true",
                                 "type": "resource",
@@ -7876,6 +8176,21 @@
                                 "propertyURI": "http://id.loc.gov/ontologies/bibframe/relation",
                                 "propertyLabel": "Search series Hub (optional)",
                                 "remark": "https://staff.loc.gov/wikis/display/BP2/Marva+cataloging+updates#Marvacatalogingupdates-Series(490,8XX)"
+                            },
+                            {
+                                "mandatory": "false",
+                                "repeatable": "true",
+                                "type": "lookup",
+                                "resourceTemplates": [],
+                                "valueConstraint": {
+                                    "valueTemplateRefs": [],
+                                    "useValuesFrom": ["https://id.loc.gov/vocabulary/relators", "https://id.loc.gov/vocabulary/preservation/relationshipSubType"],
+                                    "valueDataType": {},
+                                    "defaults": []
+                                },
+                                "propertyURI": "http://id.loc.gov/ontologies/bibframe/expressionOf",
+                                "propertyLabel": "Expression of",
+                                "remark": "https://original.rdatoolkit.org/24.4.3.html"
                             },
                             {
                                 "mandatory": "false",
@@ -10476,6 +10791,21 @@
                             {
                                 "mandatory": "false",
                                 "repeatable": "true",
+                                "type": "lookup",
+                                "resourceTemplates": [],
+                                "valueConstraint": {
+                                    "valueTemplateRefs": [],
+                                    "useValuesFrom": ["https://id.loc.gov/vocabulary/relators", "https://id.loc.gov/vocabulary/preservation/relationshipSubType"],
+                                    "valueDataType": {},
+                                    "defaults": []
+                                },
+                                "propertyURI": "http://id.loc.gov/ontologies/bibframe/expressionOf",
+                                "propertyLabel": "Expression of",
+                                "remark": "https://original.rdatoolkit.org/24.4.3.html"
+                            },
+                            {
+                                "mandatory": "false",
+                                "repeatable": "true",
                                 "type": "resource",
                                 "resourceTemplates": [],
                                 "valueConstraint": {
@@ -11145,6 +11475,21 @@
                 "resourceTemplates": [
                     {
                         "propertyTemplates": [
+                            {
+                                "mandatory": "false",
+                                "repeatable": "true",
+                                "type": "lookup",
+                                "resourceTemplates": [],
+                                "valueConstraint": {
+                                    "valueTemplateRefs": [],
+                                    "useValuesFrom": ["https://id.loc.gov/resources/hubs"],
+                                    "defaults": [],
+                                    "valueDataType": {"dataTypeURI": "http://id.loc.gov/ontologies/bibframe/Hub"}
+                                },
+                                "propertyURI": "http://id.loc.gov/ontologies/bibframe/expressionOf",
+                                "propertyLabel": "Expression of [search for a Hub]",
+                                "remark": "https://staff.loc.gov/wikis/display/BP2/Marva+cataloging+updates#Marvacatalogingupdates-Work/ExpressionTitles"
+                            },
                             {
                                 "mandatory": "false",
                                 "repeatable": "true",
@@ -12152,6 +12497,21 @@
                             {
                                 "mandatory": "false",
                                 "repeatable": "true",
+                                "type": "lookup",
+                                "resourceTemplates": [],
+                                "valueConstraint": {
+                                    "valueTemplateRefs": [],
+                                    "useValuesFrom": ["https://id.loc.gov/resources/hubs"],
+                                    "defaults": [],
+                                    "valueDataType": {"dataTypeURI": "http://id.loc.gov/ontologies/bibframe/Hub"}
+                                },
+                                "propertyURI": "http://id.loc.gov/ontologies/bibframe/expressionOf",
+                                "propertyLabel": "Expression of [search for a Hub]",
+                                "remark": "https://staff.loc.gov/wikis/display/BP2/Marva+cataloging+updates#Marvacatalogingupdates-Work/ExpressionTitles"
+                            },
+                            {
+                                "mandatory": "false",
+                                "repeatable": "true",
                                 "type": "resource",
                                 "resourceTemplates": [],
                                 "valueConstraint": {
@@ -13115,6 +13475,21 @@
                 "resourceTemplates": [
                     {
                         "propertyTemplates": [
+                            {
+                                "mandatory": "false",
+                                "repeatable": "true",
+                                "type": "lookup",
+                                "resourceTemplates": [],
+                                "valueConstraint": {
+                                    "valueTemplateRefs": [],
+                                    "useValuesFrom": ["https://id.loc.gov/resources/hubs"],
+                                    "defaults": [],
+                                    "valueDataType": {"dataTypeURI": "http://id.loc.gov/ontologies/bibframe/Hub"}
+                                },
+                                "propertyURI": "http://id.loc.gov/ontologies/bibframe/expressionOf",
+                                "propertyLabel": "Expression of [search for a Hub]",
+                                "remark": "https://staff.loc.gov/wikis/display/BP2/Marva+cataloging+updates#Marvacatalogingupdates-Work/ExpressionTitles"
+                            },
                             {
                                 "mandatory": "false",
                                 "repeatable": "true",
