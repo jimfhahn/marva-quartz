@@ -729,25 +729,44 @@ const utilsProfile = {
   suggestURI: function(profile,type,URI){
     // for items find the instance URI and then count up the items and add it as a suffix to the instance URI pattern
     if (type === 'bf:Item'){
+        // Count existing items to ensure unique suffixes
+        let itemCount = 0
+        let existingItemUris = [];
+        
         for (let rtId in profile.rt){
-            if (profile.rt[rtId].URI == URI){
-                let newURI = profile.rt[rtId].URI.replace('/instances/','/items/')
-                let itemCount = 0
-                for (let rtId2 in profile.rt){
-                    if (rtId2.includes(":Item")){
-                        itemCount++
-                    }
+            if (rtId.includes(":Item")){
+                // Only count items that already have a URI assigned
+                if (profile.rt[rtId].URI) {
+                    itemCount++;
+                    existingItemUris.push(profile.rt[rtId].URI);
                 }
-                let itemCountLabel = String(itemCount).padStart(4, '0');
-                //if there is only 1 item, it should match the instance URI
-                if (itemCount == 1){
-                  newURI = newURI
-                } else {
-                  newURI = newURI + '-' + itemCountLabel
-                }
-                return newURI
             }
         }
+        
+        // Use the profile's eId to create the item URI, or generate a UUID if not available
+        const itemId = profile.eId || short.generate();
+        
+        if (!profile.eId) {
+            console.warn('No eId found in profile for item URI generation, using generated UUID:', itemId);
+        }
+        
+        // Create the new URI format with underscore between item and ID
+        let newUri;
+        if (itemCount === 0){
+            newUri = `_b:item_${itemId}`;
+        } else {
+            // Start with suffix 2 for the second item
+            let suffix = 2;
+            newUri = `_b:item_${itemId}-${suffix}`;
+            
+            // Make sure this URI doesn't already exist
+            while (existingItemUris.includes(newUri)) {
+                suffix++;
+                newUri = `_b:item_${itemId}-${suffix}`;
+            }
+        }
+        
+        return newUri;
     }
 
     if (type === 'bf:Instance'){
