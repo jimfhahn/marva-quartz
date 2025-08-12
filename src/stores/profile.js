@@ -2591,7 +2591,11 @@ export const useProfileStore = defineStore('profile', {
               // if it is deepHierarchy then then we are copy pasting what came into the system and they cann change it anyway.
               if (pt.deepHierarchy){uneditable=true}
 
-              if (URI && label){
+              // Check if URI is a blank node (starts with _:) - these should be treated as literals
+              const isBlankNode = URI && URI.startsWith('_:');
+              
+              if (URI && label && !isBlankNode){
+                // Controlled/linked term with label
                 values.push({
                   '@guid':v['@guid'],
                   URI: URI,
@@ -2602,7 +2606,8 @@ export const useProfileStore = defineStore('profile', {
                   uneditable: uneditable,
                   type:v['@type']
                 })
-              }else if (URI && !label){
+              }else if (URI && !label && !isBlankNode){
+                // Controlled/linked term that needs dereferencing
                 values.push({
                   '@guid':v['@guid'],
                   URI: URI,
@@ -2613,8 +2618,8 @@ export const useProfileStore = defineStore('profile', {
                   uneditable: uneditable,
                   type:v['@type']
                 })
-              }else if (!URI && label){
-
+              }else if (!URI && label || isBlankNode){
+                // Literal value (including blank nodes)
                 values.push({
                   '@guid':v['@guid'],
                   URI: URI,

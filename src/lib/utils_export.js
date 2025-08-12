@@ -263,7 +263,7 @@ const utilsExport = {
       
       // Browser-specific fixes for Chrome vs Firefox differences
       try {
-        // Test if we can parse the generated XML to catch issues early
+        // Test if we can parse the
         const testParser = new DOMParser();
         const testDoc = testParser.parseFromString(xmlString, 'application/xml');
         const parseErrors = testDoc.getElementsByTagName('parsererror');
@@ -400,10 +400,176 @@ const utilsExport = {
       return document.createElement("div"); // safe fallback
     }
     
-    // Special handling for Hub relationships
-    if (property === 'http://id.loc.gov/ontologies/bibframe/relatedTo' ||
+    // Check if this is a blank node (ID starts with _:) - prioritize this check
+    if (userValue['@id'] && userValue['@id'].startsWith('_:')) {
+      console.log("createBnode: Processing blank node with ID:", userValue['@id']);
+      console.log("createBnode: User value structure:", JSON.stringify(userValue, null, 2));
+      
+      // Check if it has meaningful content to embed (has rdfs:label or other properties)
+      const hasRdfsLabel = userValue['http://www.w3.org/2000/01/rdf-schema#label'];
+      const hasOtherProperties = Object.keys(userValue).some(key => 
+        !key.startsWith('@') && key !== 'http://www.w3.org/2000/01/rdf-schema#label'
+      );
+      
+      // Check if this is specifically a Hub (has @type containing 'Hub' or is for expressionOf/relatedTo)
+      const isHub = (userValue['@type'] && userValue['@type'].includes('Hub')) ||
+                    property === 'http://id.loc.gov/ontologies/bibframe/relatedTo' ||
+                    property === 'http://id.loc.gov/ontologies/bibframe/expressionOf';
+      
+      if (hasRdfsLabel || hasOtherProperties) {
+        console.log("createBnode: Creating embedded blank node with content");
+        
+        // Use Hub logic for Hub blank nodes, otherwise use simple Resource logic
+        if (isHub) {
+          console.log("createBnode: Processing as Hub blank node");
+          // Use Hub element
+          let bnode = this.createElByBestNS('bf:Hub');
+          
+          // Add rdf:about with the blank node ID
+          bnode.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:about', userValue['@id']);
+          
+          // Add rdf:type for Hub
+          let rdftype = this.createElByBestNS('rdf:type');
+          rdftype.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:resource', 'http://id.loc.gov/ontologies/bibframe/Hub');
+          bnode.appendChild(rdftype);
+          
+          // Add rdfs:label if available
+          if (hasRdfsLabel) {
+            let labels = userValue['http://www.w3.org/2000/01/rdf-schema#label'];
+            if (!Array.isArray(labels)) labels = [labels];
+            
+            for (let labelItem of labels) {
+              let labelValue = '';
+              if (typeof labelItem === 'string') {
+                labelValue = labelItem;
+              } else if (labelItem && labelItem['@value']) {
+                labelValue = labelItem['@value'];
+              }
+              
+              if (labelValue) {
+                let labelEl = this.createRdfsLabel(labelValue);
+                bnode.appendChild(labelEl);
+                console.log("Added rdfs:label to Hub blank node:", labelValue);
+              }
+            }
+          }
+          
+          // Add bflc:marcKey if available
+          if (userValue['http://id.loc.gov/ontologies/bflc/marcKey']) {
+            let marcKeys = userValue['http://id.loc.gov/ontologies/bflc/marcKey'];
+            if (!Array.isArray(marcKeys)) marcKeys = [marcKeys];
+            
+            for (let marcKeyItem of marcKeys) {
+              let marcKeyValue = '';
+              if (typeof marcKeyItem === 'string') {
+                marcKeyValue = marcKeyItem;
+              } else if (marcKeyItem && marcKeyItem['@value']) {
+                marcKeyValue = marcKeyItem['@value'];
+              }
+              
+              if (marcKeyValue) {
+                let marcKeyEl = this.createElByBestNS('bflc:marcKey');
+                marcKeyEl.textContent = marcKeyValue;
+                bnode.appendChild(marcKeyEl);
+                console.log("Added bflc:marcKey to Hub blank node:", marcKeyValue);
+              }
+            }
+          }
+          
+          return bnode;
+        } else {
+          console.log("createBnode: Processing as literal blank node");
+          // Create rdfs:Resource for literal blank nodes
+          let elementType = 'rdfs:Resource';
+          if (userValue['@type'] && 
+              userValue['@type'] !== 'rdfs:Resource' && 
+              userValue['@type'] !== 'http://www.w3.org/2000/01/rdf-schema#Resource') {
+            elementType = userValue['@type'];
+          }
+          
+          let bnode = this.createElByBestNS(elementType);
+          
+          // Add rdf:about with the blank node ID
+          bnode.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:about', userValue['@id']);
+          
+          // Add rdfs:label if available (only once)
+          if (hasRdfsLabel) {
+            let labels = userValue['http://www.w3.org/2000/01/rdf-schema#label'];
+            if (!Array.isArray(labels)) labels = [labels];
+            
+            // Only add the first label to prevent duplicates
+            let labelItem = labels[0];
+            let labelValue = '';
+            if (typeof labelItem === 'string') {
+              labelValue = labelItem;
+            } else if (labelItem && labelItem['@value']) {
+              labelValue = labelItem['@value'];
+            }
+            
+            if (labelValue) {
+              let labelEl = this.createRdfsLabel(labelValue);
+              bnode.appendChild(labelEl);
+              console.log("Added single rdfs:label to literal blank node:", labelValue);
+            }
+          }
+          
+          return bnode;
+        }
+      }
+    }
+    
+    // Check if this is a literal blank node using the original logic as fallback
+    const keys = Object.keys(userValue);
+    const hasBlankNodeId = userValue['@id'] && userValue['@id'].startsWith('_:');
+    const hasRdfsLabel = keys.includes('http://www.w3.org/2000/01/rdf-schema#label');
+    const hasNoMeaningfulType = !userValue['@type'] || 
+                                userValue['@type'] === 'rdfs:Resource' || 
+                                userValue['@type'] === 'http://www.w3.org/2000/01/rdf-schema#Resource';
+    const isLiteralBlankNode = hasBlankNodeId && hasRdfsLabel && hasNoMeaningfulType;
+    
+    // Special handling for literal blank nodes (fallback)
+    if (isLiteralBlankNode) {
+      console.log("createBnode: Creating literal blank node with label for ID:", userValue['@id']);
+      // Create rdfs:Resource for literal blank nodes
+      let bnode = this.createElByBestNS('rdfs:Resource');
+      
+      // Add rdf:about if URI exists
+      if (userValue['@id']) {
+        bnode.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:about', userValue['@id']);
+      }
+      
+      // Add rdfs:label if available
+      if (userValue['http://www.w3.org/2000/01/rdf-schema#label']) {
+        let labels = userValue['http://www.w3.org/2000/01/rdf-schema#label'];
+        if (!Array.isArray(labels)) labels = [labels];
+        
+        // Only add the first label to prevent duplicates
+        let labelItem = labels[0];
+        let labelValue = '';
+        if (typeof labelItem === 'string') {
+          labelValue = labelItem;
+        } else if (labelItem && labelItem['@value']) {
+          labelValue = labelItem['@value'];
+        } else if (labelItem && labelItem['http://www.w3.org/2000/01/rdf-schema#label']) {
+          // Handle nested label structure
+          labelValue = labelItem['http://www.w3.org/2000/01/rdf-schema#label'];
+        }
+        
+        if (labelValue) {
+          let labelEl = this.createRdfsLabel(labelValue);
+          bnode.appendChild(labelEl);
+          console.log("Added rdfs:label to literal blank node:", labelValue);
+        }
+      }
+      
+      return bnode;
+    }
+    
+    // Special handling for Hub relationships (existing logic) - but skip if already processed above
+    if ((property === 'http://id.loc.gov/ontologies/bibframe/relatedTo' ||
         property === 'http://id.loc.gov/ontologies/bibframe/expressionOf' ||
-        (userValue['@type'] && userValue['@type'].includes('Hub'))) {
+        (userValue['@type'] && userValue['@type'].includes('Hub'))) &&
+        !(userValue['@id'] && userValue['@id'].startsWith('_:'))) { // Skip if blank node already processed above
       
       console.log("Creating Hub bnode with enhanced structure for property:", property);
       
@@ -668,13 +834,48 @@ const utilsExport = {
       
       // If userValue is an object, try to extract the value
       if (userValue && typeof userValue === 'object') {
-        if (userValue[property]) {
+        // Check if this is a literal blank node using improved detection
+        const keys = Object.keys(userValue);
+        const hasBlankNodeId = userValue['@id'] && userValue['@id'].startsWith('_:');
+        const hasRdfsLabel = keys.includes('http://www.w3.org/2000/01/rdf-schema#label');
+        const hasNoMeaningfulType = !userValue['@type'] || 
+                                    userValue['@type'] === 'rdfs:Resource' || 
+                                    userValue['@type'] === 'http://www.w3.org/2000/01/rdf-schema#Resource';
+        const isLiteralBlankNode = hasBlankNodeId && hasRdfsLabel && hasNoMeaningfulType;
+        
+        if (isLiteralBlankNode) {
+          // For literal blank nodes, embed the blank node content instead of using rdf:resource
+          console.log("createLiteral: Detected literal blank node, embedding content for ID:", userValue['@id']);
+          let bnodeEl = this.createBnode(userValue, property);
+          return bnodeEl;
+        } else if (userValue[property]) {
           val = userValue[property];
         } else if (userValue['rdf:value']) {
           val = userValue['rdf:value'];
         } else if (userValue['@id']) {
-          pEl.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:resource', userValue['@id']);
-          return pEl;
+          // Check if this is a blank node (ID starts with _:)
+          console.log("createLiteral: Processing @id userValue:", JSON.stringify(userValue, null, 2));
+          
+          if (userValue['@id'].startsWith('_:')) {
+            console.log("createLiteral: Detected blank node ID:", userValue['@id']);
+            console.log("createLiteral: Available keys:", Object.keys(userValue));
+            console.log("createLiteral: Has rdfs:label?", !!userValue['http://www.w3.org/2000/01/rdf-schema#label']);
+            console.log("createLiteral: @type value:", userValue['@type']);
+            
+            // Always embed blank nodes - don't use rdf:resource for blank nodes
+            console.log("createLiteral: Creating embedded structure for blank node:", userValue['@id']);
+            
+            // Use the createBnode function to create the embedded structure
+            let bnodeEl = this.createBnode(userValue, property);
+            
+            // Add the bnode to the property element
+            pEl.appendChild(bnodeEl);
+            return pEl;
+          } else {
+            // Regular resource reference (not a blank node)
+            pEl.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:resource', userValue['@id']);
+            return pEl;
+          }
         } else {
           // Look for any property that might contain a value
           let found = false;
@@ -741,7 +942,13 @@ const utilsExport = {
   * @return {boolean}
   */
 	isBnode: function(userValue){
+		// Check for traditional blank nodes with @type
 		if (userValue['@type']){
+			return true
+		}
+		// Check for literal blank nodes with blank node IDs
+		if (userValue['@id'] && userValue['@id'].startsWith('_:')) {
+			console.log("isBnode: Detected blank node by ID:", userValue['@id']);
 			return true
 		}
 		return false
@@ -1553,7 +1760,7 @@ const utilsExport = {
                         } else {
                           let literalEl3 = this.createLiteral(key2, value2);
                           if (literalEl3) {
-                            bnodeLvl2.appendChild(literalEl3); // Append literal directly to bnodeLvl2
+                                                       bnodeLvl2.appendChild(literalEl3); // Append literal directly to bnodeLvl2
                             continue; // Skip appending pLvl3 since literal is handled
                           } else {
                             xmlLog.push(`Could not create literal for key2: ${key2}`);
@@ -1816,6 +2023,8 @@ const utilsExport = {
                                          marcKeyElement.textContent = marcKeyText;
                                          hubElement.appendChild(marcKeyElement);
                                          xmlLog.push(`Added nested sibling Hub marcKey: ${marcKeyText}`);
+                                       } else {
+                                         xmlLog.push(`Skipping invalid nested sibling marcKey format: ${marcKeyText}`);
                                        }
                                      }
                                      
@@ -1825,53 +2034,39 @@ const utilsExport = {
                                      pLvl3.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:resource', value2['@id']);
                                    }
                                  } else {
-                                   let literalEl3 = this.createLiteral(key2, value2);
-                                   if (literalEl3) {
-                                     bnodeLvl2.appendChild(literalEl3);
-                                     continue;
-                                   } else continue;
+                                  let literalEl3 = this.createLiteral(key2, value2);
+                                  if (literalEl3) {
+                                    bnodeLvl2.appendChild(literalEl3);
+                                    continue;
+                                  } else continue;
                                  }
                                  bnodeLvl2.appendChild(pLvl3);
                                }
                              }
-                             pLvl2.appendChild(bnodeLvl2);
-                           }
-                         } else if (value1['@id']) {
-                           // Check if this is a Hub relationship that needs special handling
-                           const isHubRelationship = (key1 === 'http://id.loc.gov/ontologies/bibframe/expressionOf' || 
-                                                    key1 === 'http://id.loc.gov/ontologies/bibframe/relatedTo') &&
-                                                   value1['@id'] && value1['@id'].includes('/hubs/');
-                           
-                           if (isHubRelationship) {
-                             xmlLog.push(`Creating full Hub structure for sibling ${key1} with ID: ${value1['@id']}`);
+                             pLvl2.appendChild(bnodeLvl2); // Append nested bnode to nested predicate
+                           } else if (value1['@id']) {
+                             // Check if this is a Hub relationship that needs special handling
+                             const isHubRelationship = (key1 === 'http://id.loc.gov/ontologies/bibframe/expressionOf' || 
+                                                      key1 === 'http://id.loc.gov/ontologies/bibframe/relatedTo') &&
+                                                     value1['@id'] && value1['@id'].includes('/hubs/');
                              
-                             // Create the Hub element with rdf:about attribute
-                             let hubElement = this.createElByBestNS('http://id.loc.gov/ontologies/bibframe/Hub');
-                             hubElement.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:about', value1['@id']);
-                             
-                             // Add rdfs:label if available
-                             if (value1.label || value1['http://www.w3.org/2000/01/rdf-schema#label']) {
-                               let labelElement = this.createElByBestNS('http://www.w3.org/2000/01/rdf-schema#label');
+                             if (isHubRelationship) {
+                               xmlLog.push(`Creating full Hub structure for sibling ${key1} with ID: ${value1['@id']}`);
                                
-                               // Enhanced label text extraction for sibling Hub
-                               let labelText = '';
-                               if (typeof value1.label === 'string') {
-                                 labelText = value1.label;
-                               } else if (Array.isArray(value1.label) && value1.label.length > 0) {
-                                 const labelObj = value1.label[0];
-                                 if (typeof labelObj === 'string') {
-                                   labelText = labelObj;
-                                 } else if (labelObj && labelObj['http://www.w3.org/2000/01/rdf-schema#label']) {
-                                   labelText = labelObj['http://www.w3.org/2000/01/rdf-schema#label'];
-                                 } else if (labelObj && labelObj['@value']) {
-                                   labelText = labelObj['@value'];
-                                 }
-                               } else if (value1['http://www.w3.org/2000/01/rdf-schema#label']) {
-                                 const rdfsLabel = value1['http://www.w3.org/2000/01/rdf-schema#label'];
-                                 if (typeof rdfsLabel === 'string') {
-                                   labelText = rdfsLabel;
-                                 } else if (Array.isArray(rdfsLabel) && rdfsLabel.length > 0) {
-                                   const labelObj = rdfsLabel[0];
+                               // Create the Hub element with rdf:about attribute
+                               let hubElement = this.createElByBestNS('http://id.loc.gov/ontologies/bibframe/Hub');
+                               hubElement.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:about', value1['@id']);
+                               
+                               // Add rdfs:label if available
+                               if (value1.label || value1['http://www.w3.org/2000/01/rdf-schema#label']) {
+                                 let labelElement = this.createElByBestNS('http://www.w3.org/2000/01/rdf-schema#label');
+                                 
+                                 // Enhanced label text extraction for sibling Hub
+                                 let labelText = '';
+                                 if (typeof value1.label === 'string') {
+                                   labelText = value1.label;
+                                 } else if (Array.isArray(value1.label) && value1.label.length > 0) {
+                                   const labelObj = value1.label[0];
                                    if (typeof labelObj === 'string') {
                                      labelText = labelObj;
                                    } else if (labelObj && labelObj['http://www.w3.org/2000/01/rdf-schema#label']) {
@@ -1879,39 +2074,39 @@ const utilsExport = {
                                    } else if (labelObj && labelObj['@value']) {
                                      labelText = labelObj['@value'];
                                    }
+                                 } else if (value1['http://www.w3.org/2000/01/rdf-schema#label']) {
+                                   const rdfsLabel = value1['http://www.w3.org/2000/01/rdf-schema#label'];
+                                   if (typeof rdfsLabel === 'string') {
+                                     labelText = rdfsLabel;
+                                   } else if (Array.isArray(rdfsLabel) && rdfsLabel.length > 0) {
+                                     const labelObj = rdfsLabel[0];
+                                     if (typeof labelObj === 'string') {
+                                       labelText = labelObj;
+                                     } else if (labelObj && labelObj['http://www.w3.org/2000/01/rdf-schema#label']) {
+                                       labelText = labelObj['http://www.w3.org/2000/01/rdf-schema#label'];
+                                     } else if (labelObj && labelObj['@value']) {
+                                       labelText = labelObj['@value'];
+                                     }
+                                   }
+                                 }
+                                 
+                                 if (labelText && typeof labelText === 'string') {
+                                   labelElement.textContent = labelText;
+                                   hubElement.appendChild(labelElement);
+                                   xmlLog.push(`Added sibling Hub label: ${labelText}`);
                                  }
                                }
                                
-                               if (labelText && typeof labelText === 'string') {
-                                 labelElement.textContent = labelText;
-                                 hubElement.appendChild(labelElement);
-                                 xmlLog.push(`Added sibling Hub label: ${labelText}`);
-                               }
-                             }
-                             
-                             // Add bflc:marcKey if available and properly formatted
-                             if (value1.marcKey || value1['http://id.loc.gov/ontologies/bflc/marcKey']) {
-                               let marcKeyElement = this.createElByBestNS('http://id.loc.gov/ontologies/bflc/marcKey');
-                               
-                               // Enhanced marcKey text extraction for sibling Hub
-                               let marcKeyText = '';
-                               if (typeof value1.marcKey === 'string') {
-                                 marcKeyText = value1.marcKey;
-                               } else if (Array.isArray(value1.marcKey) && value1.marcKey.length > 0) {
-                                 const marcKeyObj = value1.marcKey[0];
-                                 if (typeof marcKeyObj === 'string') {
-                                   marcKeyText = marcKeyObj;
-                                 } else if (marcKeyObj && marcKeyObj['http://id.loc.gov/ontologies/bflc/marcKey']) {
-                                   marcKeyText = marcKeyObj['http://id.loc.gov/ontologies/bflc/marcKey'];
-                                 } else if (marcKeyObj && marcKeyObj['@value']) {
-                                   marcKeyText = marcKeyObj['@value'];
-                                 }
-                               } else if (value1['http://id.loc.gov/ontologies/bflc/marcKey']) {
-                                 const bflcMarcKey = value1['http://id.loc.gov/ontologies/bflc/marcKey'];
-                                 if (typeof bflcMarcKey === 'string') {
-                                   marcKeyText = bflcMarcKey;
-                                 } else if (Array.isArray(bflcMarcKey) && bflcMarcKey.length > 0) {
-                                   const marcKeyObj = bflcMarcKey[0];
+                               // Add bflc:marcKey if available and properly formatted
+                               if (value1.marcKey || value1['http://id.loc.gov/ontologies/bflc/marcKey']) {
+                                 let marcKeyElement = this.createElByBestNS('http://id.loc.gov/ontologies/bflc/marcKey');
+                                 
+                                 // Enhanced marcKey text extraction for sibling Hub
+                                 let marcKeyText = '';
+                                 if (typeof value1.marcKey === 'string') {
+                                   marcKeyText = value1.marcKey;
+                                 } else if (Array.isArray(value1.marcKey) && value1.marcKey.length > 0) {
+                                   const marcKeyObj = value1.marcKey[0];
                                    if (typeof marcKeyObj === 'string') {
                                      marcKeyText = marcKeyObj;
                                    } else if (marcKeyObj && marcKeyObj['http://id.loc.gov/ontologies/bflc/marcKey']) {
@@ -1919,37 +2114,51 @@ const utilsExport = {
                                    } else if (marcKeyObj && marcKeyObj['@value']) {
                                      marcKeyText = marcKeyObj['@value'];
                                    }
+                                 } else if (value1['http://id.loc.gov/ontologies/bflc/marcKey']) {
+                                   const bflcMarcKey = value1['http://id.loc.gov/ontologies/bflc/marcKey'];
+                                   if (typeof bflcMarcKey === 'string') {
+                                     marcKeyText = bflcMarcKey;
+                                   } else if (Array.isArray(bflcMarcKey) && bflcMarcKey.length > 0) {
+                                     const marcKeyObj = bflcMarcKey[0];
+                                     if (typeof marcKeyObj === 'string') {
+                                       marcKeyText = marcKeyObj;
+                                     } else if (marcKeyObj && marcKeyObj['http://id.loc.gov/ontologies/bflc/marcKey']) {
+                                       marcKeyText = marcKeyObj['http://id.loc.gov/ontologies/bflc/marcKey'];
+                                     } else if (marcKeyObj && marcKeyObj['@value']) {
+                                       marcKeyText = marcKeyObj['@value'];
+                                     }
+                                   }
+                                 }
+                                 
+                                 // Only add marcKey if it's in proper MARC format (contains $ subfields)
+                                 if (marcKeyText && typeof marcKeyText === 'string' && marcKeyText.includes('$')) {
+                                   marcKeyElement.textContent = marcKeyText;
+                                   hubElement.appendChild(marcKeyElement);
+                                   xmlLog.push(`Added sibling Hub marcKey: ${marcKeyText}`);
+                                 } else {
+                                   xmlLog.push(`Skipping invalid sibling marcKey format: ${marcKeyText}`);
                                  }
                                }
                                
-                               // Only add marcKey if it's in proper MARC format (contains $ subfields)
-                               if (marcKeyText && typeof marcKeyText === 'string' && marcKeyText.includes('$')) {
-                                 marcKeyElement.textContent = marcKeyText;
-                                 hubElement.appendChild(marcKeyElement);
-                                 xmlLog.push(`Added sibling Hub marcKey: ${marcKeyText}`);
-                               } else {
-                                 xmlLog.push(`Skipping invalid sibling marcKey format: ${marcKeyText}`);
-                               }
+                               pLvl2.appendChild(hubElement);
+                               xmlLog.push(`Created full sibling Hub structure for ${key1}`);
+                             } else {
+                               pLvl2.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:resource', value1['@id']);
                              }
-                             
-                             pLvl2.appendChild(hubElement);
-                             xmlLog.push(`Created full sibling Hub structure for ${key1}`);
                            } else {
-                             pLvl2.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:resource', value1['@id']);
+                            let literalEl = this.createLiteral(key1, value1);
+                            if (literalEl) {
+                              siblingBnodeLvl1.appendChild(literalEl);
+                              continue;
+                            } else continue;
                            }
-                         } else {
-                           let literalEl = this.createLiteral(key1, value1);
-                           if (literalEl) {
-                             siblingBnodeLvl1.appendChild(literalEl);
-                             continue;
-                           } else continue;
+                           siblingBnodeLvl1.appendChild(pLvl2);
                          }
-                         siblingBnodeLvl1.appendChild(pLvl2);
                        }
+                       siblingPLvl1.appendChild(siblingBnodeLvl1);
+                       rootEl.appendChild(siblingPLvl1);
+                       // Optionally add to componentXmlLookup if needed for siblings
                      }
-                     siblingPLvl1.appendChild(siblingBnodeLvl1);
-                     rootEl.appendChild(siblingPLvl1);
-                     // Optionally add to componentXmlLookup if needed for siblings
                    }
                  }
               }
@@ -2050,7 +2259,7 @@ const utilsExport = {
                             if (typeof labelObj === 'string') {
                               labelText = labelObj;
                             } else if (labelObj && labelObj['http://www.w3.org/2000/01/rdf-schema#label']) {
-                              labelText = labelObj['http://www.w3.org/2000/01/rdf-schema#label'];
+                                labelText = labelObj['http://www.w3.org/2000/01/rdf-schema#label'];
                             } else if (labelObj && labelObj['@value']) {
                               labelText = labelObj['@value'];
                             }
@@ -2242,12 +2451,10 @@ const utilsExport = {
                 // If no ID, look for nested label structures (like those causing the problem)
                 if (!locationId) {
                      const rdfsLabelURI = 'http://www.w3.org/2000/01/rdf-schema#label';
-                     if (userValue[rdfsLabelURI] && userValue[rdfsLabelURI][0]) {
-                         if (userValue[rdfsLabelURI][0]['@id']) {
-                             locationId = userValue[rdfsLabelURI][0]['@id']; // Found ID inside label object
-                         } else if (userValue[rdfsLabelURI][0]['@value']) {
-                             locationLabel = userValue[rdfsLabelURI][0]['@value']; // Found label value inside label object
-                         }
+                     if (userValue[rdfsLabelURI] && userValue[rdfsLabelURI][0] && userValue[rdfsLabelURI][0]['@id']) {
+                         locationId = userValue[rdfsLabelURI][0]['@id']; // Found ID inside label object
+                     } else if (userValue[rdfsLabelURI] && userValue[rdfsLabelURI][0] && userValue[rdfsLabelURI][0]['@value']) {
+                         locationLabel = userValue[rdfsLabelURI][0]['@value']; // Found label value inside label object
                      }
                      // Check for doubly nested physicalLocation structure seen in logs
                      else if (userValue[ptObj.propertyURI] && userValue[ptObj.propertyURI][0] && userValue[ptObj.propertyURI][0][rdfsLabelURI] && userValue[ptObj.propertyURI][0][rdfsLabelURI][0]['@id']) {
@@ -3254,25 +3461,20 @@ const utilsExport = {
    */
   sanitizeXmlString: function(xmlString) {
     if (!xmlString) return xmlString;
-    
     try {
       // Remove parser error elements and their content (Chrome-specific issue)
       xmlString = xmlString.replace(/<parsererror[^>]*>[\s\S]*?<\/parsererror>/g, '');
       xmlString = xmlString.replace(/<sourcetext[^>]*>[\s\S]*?<\/sourcetext>/g, '');
-      
       // Remove undefined values that could cause parsing errors
       xmlString = xmlString.replace(/undefined/g, '');
-      
       // Additional Chrome-specific fixes
       xmlString = xmlString.replace(/xmlns=""/, ''); // Remove empty namespace declarations
       xmlString = xmlString.replace(/\s+xmlns=""/g, ''); // Remove empty namespace declarations with spaces
-      
       // Validate the XML before returning - attempt to parse and handle errors
       try {
         const parser = new DOMParser();
         const testDoc = parser.parseFromString(xmlString, 'application/xml');
         const parseErrors = testDoc.getElementsByTagName('parsererror');
-        
         if (parseErrors.length > 0) {
           console.warn('XML validation found parser errors after sanitization:', parseErrors[0].textContent);
           // Attempt basic cleanup for common issues
@@ -3283,14 +3485,12 @@ const utilsExport = {
       } catch (validationError) {
         console.warn('XML validation error during sanitization:', validationError.message);
       }
-      
       return xmlString;
     } catch (error) {
       console.error("Error sanitizing XML:", error);
       return xmlString; // Return original if error occurs
     }
-  },
+  }
 };
-
 
 export default utilsExport;

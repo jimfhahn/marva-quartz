@@ -75,11 +75,11 @@
                   <span v-if="!avl.needsDereference && !avl.uneditable " style="padding-right: 0.3em; font-weight: bold">
                     <a href="#" :class="['entity-link']" @click="openAuthority()" ref="el">{{avl.label}}</a>
                     <ValidationIcon :value="avl" />
-                    <!-- <span class="uncontrolled" v-if="avl.isLiteral">
+                    <span class="uncontrolled" v-if="avl.isLiteral">
                       (uncontrolled)
                     </span>
                     <span v-if="!avl.isLiteral" title="Controlled Term" class="selected-value-icon" style="">
-                    </span> -->
+                    </span>
 
                   </span>
                   <span v-else-if="avl.needsDereference" style="padding-right: 0.3em; font-weight: bold"><LabelDereference :URI="avl.URI"/><span v-if="!avl.isLiteral" title="Controlled Term" class="selected-value-icon"><span class="material-icons check-mark">check_circle_outline</span></span></span>

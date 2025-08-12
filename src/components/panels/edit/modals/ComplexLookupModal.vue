@@ -236,6 +236,46 @@
             this.activeComplexSearchInProgress = true;
             this.activeComplexSearch = [];
             this.activeComplexSearch = await utilsNetwork.searchComplex(searchPayload);
+            // --- Inject literal create option for any Work/Hub search field ---
+            try {
+              if (
+                !this.isSimpleLookup() &&
+                this.searchValueLocal &&
+                this.searchValueLocal.trim() !== '' &&
+                this.structure &&
+                this.structure.valueConstraint &&
+                this.isWorkOrHubSearch()
+              ) {
+                // Prevent duplicate literal option if user types further (replace existing one)
+                this.activeComplexSearch = this.activeComplexSearch.filter(r => !r._isLiteralOption);
+                
+                // Create proper blank node ID and structure
+                const blankNodeId = `_:n${Math.random().toString(36).substring(2, 9)}`;
+                const literalValue = this.searchValueLocal.trim();
+                
+                this.activeComplexSearch.push({
+                  _isLiteralOption: true,
+                  literal: true,
+                  fullText: literalValue,
+                  label: literalValue,
+                  suggestLabel: `[Create as literal] ${literalValue}`,
+                  uri: blankNodeId,
+                  nodeMap: {
+                    [blankNodeId]: {
+                      "@id": blankNodeId,
+                      "http://www.w3.org/2000/01/rdf-schema#label": [
+                        {
+                          "@value": literalValue
+                        }
+                      ]
+                      // NO @type property - this prevents wrapping in bf:Hub/rdfs:Resource
+                    }
+                  },
+                  extra: {}
+                });
+              }
+            } catch(e){ console.warn('Literal option injection failed', e); }
+            // -----------------------------------------------------------
             this.activeComplexSearchInProgress = false;
             this.initalSearchState = false;
           }, 400);
@@ -587,6 +627,34 @@
           // First check if it's a complex search result
           toLoad = this.activeComplexSearch[selectedIndex];
           
+          // Special handling for literal options
+          if (toLoad && toLoad._isLiteralOption) {
+            console.log("SelectChange - Literal option selected:", toLoad);
+            
+            // Create a new blank node structure for the literal
+            const blankNodeId = `_:n${Math.random().toString(36).substring(2, 9)}`;
+            const literalValue = toLoad.label;
+            
+            toLoad = {
+              label: literalValue,
+              uri: blankNodeId,
+              literal: true,
+              fullText: literalValue,
+              nodeMap: {
+                [blankNodeId]: {
+                  "@id": blankNodeId,
+                  "http://www.w3.org/2000/01/rdf-schema#label": [
+                    {
+                      "@value": literalValue
+                    }
+                  ]
+                  // NO @type property - this prevents wrapping in bf:Hub/rdfs:Resource
+                }
+              },
+              extra: {}
+            };
+          }
+          
           // Enhanced Hub selection debugging
           if (toLoad) {
             console.log("SelectChange - Complex search result selected:", {
@@ -662,16 +730,16 @@
         this.activeContext = {
           "contextValue": true,
           "source": [],
-          "type": (toLoad.literal) ? "Literal Value" : null,
+          "type": (toLoad.literal) ? null : null, // No type for literal blank nodes
           "variant": [],
-          "uri": (toLoad.literal) ? null : toLoad.uri,
+          "uri": (toLoad.literal) ? toLoad.uri : toLoad.uri, // Use blank node URI for literals
           "title": titleValue,
           "text": titleValue, // Add text property
           "value": titleValue, // Add value property
           "contributor": [],
           "date": null,
           "genreForm": null,
-          "nodeMap": {},
+          "nodeMap": toLoad.nodeMap || {}, // Include the nodeMap from toLoad
           "precoordinated" : false,
           "literal": toLoad.literal === true,
           "isLiteral": toLoad.literal === true, // Explicit boolean property
@@ -792,42 +860,71 @@
           console.log("Active context marcKey:", this.activeContext?.marcKey);
           console.log("Active context nodeMap:", this.activeContext?.nodeMap);
           
-          // For literal values, create a structure specifically for literals that matches expected format
+          // For literal values, emit the proper blank node structure
           if (this.activeContext && this.activeContext.literal === true) {
             // Get the best literal value
             let literalValue = this.searchValueLocal || this.activeContext.fullLiteralValue || this.activeContext.title;
             
-            console.log("Emitting literal value:", literalValue);
+            console.log("Emitting literal blank node:", literalValue);
+            console.log("Active context nodeMap:", this.activeContext.nodeMap);
             
-            // Create an object that matches exactly what LookupComplex expects
+            // Use the existing nodeMap if available, or create a new blank node
+            let nodeMap = this.activeContext.nodeMap || {};
+            let uri = this.activeContext.uri;
+            
+            // If no nodeMap exists, create one
+            if (Object.keys(nodeMap).length === 0) {
+              const blankNodeId = `_:n${Math.random().toString(36).substring(2, 9)}`;
+              uri = blankNodeId;
+              nodeMap = {
+                [blankNodeId]: {
+                  "@id": blankNodeId,
+                  "http://www.w3.org/2000/01/rdf-schema#label": [
+                    {
+                      "@value": literalValue
+                    }
+                  ]
+                  // NO @type property - this prevents wrapping in bf:Hub/rdfs:Resource
+                }
+              };
+            }
+            
+            // Create the literal object with proper blank node structure
             const literalObject = {
               contextValue: true,
               source: [],
-              type: "Literal Value",
+              type: null, // No type for literal blank nodes
               variant: [],
-              uri: null,
-              // Keep title as an array - this is what LookupComplex expects for simple values
+              uri: uri, // Use the blank node ID as URI
+              "@id": uri, // Include @id for blank node detection
+              "http://www.w3.org/2000/01/rdf-schema#label": [
+                {
+                  "@value": literalValue
+                }
+              ], // Include rdfs:label directly in the main object
               title: [literalValue],
               text: literalValue,
               value: literalValue,
               contributor: [],
               date: null,
               genreForm: null,
-              nodeMap: {},
+              nodeMap: nodeMap, // Include the proper blank node structure
               precoordinated: false,
               literal: true,
               isLiteral: true,
               loading: false,
-              extra: {},  // Empty object for simple lookups
+              extra: { 
+                isBlankNodeLiteral: true, // Flag to distinguish literal blank nodes
+                nodeMap: nodeMap // Include nodeMap in extra to ensure setValueComplex is used
+              },
               marcKey: '',
               label: literalValue,
               displayLabel: literalValue
             };
             
-            console.log("EMITTING LITERAL:", literalValue);
-            console.log("LITERAL OBJECT:", literalObject);
+            console.log("EMITTING LITERAL BLANK NODE:", literalObject);
             
-            // Emit the properly formatted literal object
+            // Emit the properly formatted literal object with blank node structure
             this.$emit('emitComplexValue', literalObject);
             return;
           }
@@ -968,6 +1065,45 @@
           this.searchType = "left";
         }
         this.doSearch();
+      },
+
+      /**
+       * Check if this search field is for Works or Hubs
+       * @return {boolean} true if the field searches for Works or Hubs
+       */
+      isWorkOrHubSearch: function(){
+        if (!this.structure || !this.structure.valueConstraint) {
+          return false;
+        }
+
+        // Check if any of the valueTemplateRefs point to Hub or Work templates
+        if (this.structure.valueConstraint.valueTemplateRefs) {
+          for (let templateRef of this.structure.valueConstraint.valueTemplateRefs) {
+            if (templateRef.includes(':Hub:') || templateRef.includes(':Work:')) {
+              return true;
+            }
+          }
+        }
+
+        // Check if useValuesFrom includes works or hubs endpoints
+        if (this.structure.valueConstraint.useValuesFrom) {
+          for (let endpoint of this.structure.valueConstraint.useValuesFrom) {
+            if (endpoint.includes('/works') || endpoint.includes('/hubs')) {
+              return true;
+            }
+          }
+        }
+
+        // Check if the dataTypeURI indicates Hub or Work
+        if (this.structure.valueConstraint.valueDataType && 
+            this.structure.valueConstraint.valueDataType.dataTypeURI) {
+          const dataType = this.structure.valueConstraint.valueDataType.dataTypeURI;
+          if (dataType.includes('/Hub') || dataType.includes('/Work')) {
+            return true;
+          }
+        }
+
+        return false;
       },
     },
 
@@ -1131,7 +1267,7 @@
                   <template v-if="!isSimpleLookup()">
                     <option v-for="(r,idx) in activeComplexSearch" :data-label="r.label" :value="r.uri" v-bind:key="idx" :style="(r.depreciated || r.undifferentiated) ? 'color:red' : ''" class="complex-lookup-result">
                       <div class="option-text">
-                        {{ (!r.literal ? (r.suggestLabel || r.label) : r.label) + ((r.literal) ? ' [Literal]' : '') }}
+                        {{ r._isLiteralOption ? r.suggestLabel : ((!r.literal ? (r.suggestLabel || r.label) : r.label) + (r.literal && !r._isLiteralOption ? ' [Literal]' : '')) }}
                       </div>
                     </option>
                   </template>
@@ -1330,7 +1466,7 @@
 }
 
 .complex-lookup-modal-content{
-  /* Empty for future use */
+  display: block; /* non-empty to avoid lint error */
 }
 
 @media all and (max-width: 1024px) {
@@ -1372,7 +1508,7 @@
     margin-bottom: 0;
   }
   .modal-context-data-li{
-    /* Empty for future use */
+    list-style: none; /* minimal style to avoid lint error */
   }
 
   h3{
