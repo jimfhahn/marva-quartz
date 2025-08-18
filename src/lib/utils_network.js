@@ -1300,16 +1300,32 @@ const utilsNetwork = {
             const normalizeItem = (item) => {
               // If item is a plain string, treat as marc stdout
               if (typeof item === 'string') {
-                return { marc: item, preview: htmlFormat ? `<div class="marc-preview">${item}</div>` : item };
+                return { 
+                  marc: item, 
+                  preview: htmlFormat ? `<div class="marc-preview">${item}</div>` : item,
+                  version: 'current',
+                  name: 'current'
+                };
               }
 
               // If item already has marc/preview shape
               const marcVal = item && (item.marc || (item.results && item.results.stdout) || item.stdout || item.value || item.output || null);
               const previewVal = item && (item.preview || item.html || item.preview_html || item.marcRecord || null);
+              
+              // Extract version information from various possible locations
+              const versionVal = item && (
+                item.version || 
+                item.name || 
+                (item.results && (item.results.version || item.results.name)) ||
+                (item.metadata && (item.metadata.version || item.metadata.name)) ||
+                'current'
+              );
 
               return {
                 marc: marcVal || marcXml,
                 preview: previewVal || (htmlFormat ? `<div class="marc-preview">${marcVal || marcXml}</div>` : (marcVal || marcXml)),
+                version: versionVal,
+                name: versionVal,
                 // keep original results for debugging if present
                 results: item && item.results ? item.results : (item && item.stdout ? { stdout: item.stdout } : {})
               };
@@ -1501,6 +1517,123 @@ const utilsNetwork = {
       } catch (err) {
         console.error('[saveRecord] error saving record:', err);
         return false;
+      }
+    },
+
+    /**
+     * Fetches BFDB XML content from a URL with environment-specific URL handling
+     * @async
+     * @param {string} url - the BFDB URL to fetch XML from
+     * @return {string|boolean} - returns the XML content as string or false on error
+     */
+    fetchBfdbXML: async function(url) {
+      if (!url || typeof url !== 'string') {
+        console.error("[fetchBfdbXML] Invalid URL provided:", url)
+        return false
+      }
+
+      try {
+        const { useConfigStore } = await import('@/stores/config')
+        let returnUrls = useConfigStore().returnUrls
+        
+        // Apply environment-specific URL transformations like other functions
+        if (returnUrls.env == "production") {
+          url = url.replace('http://id.loc.gov/', returnUrls.id)
+          url = url.replace('https://id.loc.gov/', returnUrls.id)
+        }
+        
+        if (returnUrls.env == 'staging' && !returnUrls.dev) {
+          let stageUrlPrefix = returnUrls.id.split('loc.gov/')[0]
+          url = url.replace('http://id.loc.gov/', stageUrlPrefix + 'loc.gov/')
+          url = url.replace('https://id.loc.gov/', stageUrlPrefix + 'loc.gov/')
+        }
+
+        console.log("[fetchBfdbXML] Fetching BFDB XML from URL:", url)
+        
+        const response = await fetch(url)
+        console.log("[fetchBfdbXML] Response status:", response.status)
+        
+        if (response.status == 404) {
+          console.warn("[fetchBfdbXML] 404 Not Found for URL:", url)
+          return false
+        }
+        
+        if (!response.ok) {
+          console.error("[fetchBfdbXML] HTTP error for URL:", url, "Status:", response.status)
+          return false
+        }
+        
+        const xmlData = await response.text()
+        console.log("[fetchBfdbXML] XML response (first 200 chars):", xmlData ? xmlData.substring(0,200) : "EMPTY")
+        
+        if (!xmlData || xmlData.trim() === '') {
+          console.warn("[fetchBfdbXML] Empty XML response from URL:", url)
+          return false
+        }
+        
+        return xmlData
+        
+      } catch (err) {
+        console.error("[fetchBfdbXML] Error fetching XML from URL:", url, "Error:", err)
+        return false
+      }
+    },
+
+    /**
+     * Validates RDF/XML against SHACL shapes
+     * @async
+     * @param {string} rdfXml - the RDF/XML to validate
+     * @param {string} profileId - the profile ID to validate against
+     * @return {object} - returns validation results with conforms boolean and violations array
+     */
+    validate: async function(rdfXml, profileId = null) {
+      try {
+        const { useConfigStore } = await import('@/stores/config')
+        const returnUrls = useConfigStore().returnUrls || {};
+        
+        if (!returnUrls.validate) {
+          console.error('[validate] No validate URL configured');
+          return {
+            conforms: false,
+            violations: ['No validation service URL configured']
+          };
+        }
+        
+        // Use template from activeProfile, defaulting to 'monograph'
+        const templateValue = (useConfigStore().activeProfile && useConfigStore().activeProfile.templateType) || profileId || 'monograph';
+        const url = returnUrls.validate + "?template=" + templateValue;
+        console.log('[validate] Validating against:', url);
+        
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/rdf+xml'
+          },
+          body: rdfXml
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`[validate] Validation failed: ${response.status} ${response.statusText}: ${errorText}`);
+          return {
+            conforms: false,
+            violations: [`Validation failed: ${response.status} ${response.statusText}`]
+          };
+        }
+        
+        const result = await response.json();
+        console.log('[validate] Validation result:', result);
+        
+        // Return the result as-is, assuming it already has the right format
+        return result;
+        
+      } catch (error) {
+        console.error('[validate] Error during validation:', error);
+        return {
+          conforms: false,
+          violations: [`Validation error: ${error.message}`]
+        };
       }
     },
 

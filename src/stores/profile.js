@@ -3537,10 +3537,17 @@ export const useProfileStore = defineStore('profile', {
       // Create a version object with the data we need
       if (preview && preview.length > 0) {
         let marcItem = preview[0]
+
+        // prefer an explicit version returned by the backend; fall back to name or 'current'
+        let versionLabel = marcItem.version || marcItem.name || (marcItem.results && (marcItem.results.version || marcItem.results.name)) || 'current'
+
+        // Use returned results object if available, otherwise build a simple stdout wrapper
+        let resultsObj = (marcItem.results && Object.keys(marcItem.results || {}).length) ? marcItem.results : { stdout: (marcItem.marc || '') }
+
         let versionObj = {
-          version: "current",
-          marcRecord: marcItem.preview,
-          results: { stdout: marcItem.marc },
+          version: versionLabel,
+          marcRecord: marcItem.preview || marcItem.marcRecord || '',
+          results: resultsObj,
           default: true,
           error: false
         }
