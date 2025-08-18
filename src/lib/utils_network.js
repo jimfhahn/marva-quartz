@@ -1141,7 +1141,7 @@ const utilsNetwork = {
                     if (nodeMap[k].length>0){
                       results.nodeMap[k]=nodeMap[k]
                     }
-                  }else if (k == 'LC Classification'){
+                  } else if (k == 'LC Classification'){
                     if (nodeMap[k].length>0){
                       results.nodeMap[k]=nodeMap[k]
                     }
@@ -1251,19 +1251,259 @@ const utilsNetwork = {
           }
     },
 
-    /**
-    * Generates MARC preview from MARC XML
-    */
+    // Generates MARC preview from MARC XML
     marcPreview: async function(marcXml, htmlFormat = false) {
-    // Return an array instead of an object to match expected format
-    if (!marcXml) return []
-    
-    // Return array format that the calling code expects
-    return [{
-      marc: marcXml,
-      preview: htmlFormat ? `<div class="marc-preview">${marcXml}</div>` : marcXml
-    }]
-  }
+      if (!marcXml) return [];
+      const fallbackPreview = (xml) => [{ marc: xml, preview: htmlFormat ? `<div class="marc-preview">${xml}</div>` : xml }];
+
+      try {
+        const returnUrls = useConfigStore().returnUrls || {};
+        if (returnUrls.util) {
+          let url = returnUrls.util + 'marcpreview';
+          url = url + (htmlFormat ? '/html' : '/text');
+          const rawResponse = await fetch(url, {
+            method: 'POST',
+            headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rdfxml: marcXml })
+          });
+
+          if (!rawResponse.ok) {
+            console.warn('[marcPreview] non-OK response', rawResponse.status);
+          } else {
+            // Try to safely extract content in multiple ways
+            let content = null;
+            const contentType = (rawResponse.headers.get('content-type') || '').toLowerCase();
+            try {
+              if (contentType.includes('application/json') || contentType.includes('json')) {
+                content = await rawResponse.json();
+              } else {
+                // Some servers return JSON-like text or empty body; try parsing text first
+                const txt = await rawResponse.text();
+                if (txt && txt.trim() !== '') {
+                  try {
+                    content = JSON.parse(txt);
+                  } catch (err) {
+                    // Not JSON, treat as raw marc output
+                    content = txt;
+                  }
+                } else {
+                  // empty body
+                  content = null;
+                }
+              }
+            } catch (err) {
+              console.warn('[marcPreview] parse error', err);
+              content = null;
+            }
+
+            // Normalize into expected array format
+            const normalizeItem = (item) => {
+              // If item is a plain string, treat as marc stdout
+              if (typeof item === 'string') {
+                return { marc: item, preview: htmlFormat ? `<div class="marc-preview">${item}</div>` : item };
+              }
+
+              // If item already has marc/preview shape
+              const marcVal = item && (item.marc || (item.results && item.results.stdout) || item.stdout || item.value || item.output || null);
+              const previewVal = item && (item.preview || item.html || item.preview_html || item.marcRecord || null);
+
+              return {
+                marc: marcVal || marcXml,
+                preview: previewVal || (htmlFormat ? `<div class="marc-preview">${marcVal || marcXml}</div>` : (marcVal || marcXml)),
+                // keep original results for debugging if present
+                results: item && item.results ? item.results : (item && item.stdout ? { stdout: item.stdout } : {})
+              };
+            };
+
+            if (Array.isArray(content)) {
+              const out = content.map(normalizeItem);
+              return out;
+            } else if (content && typeof content === 'object') {
+              // object response, possibly { marc:..., preview:... } or { results: { stdout: ... }, preview: ... }
+              return [normalizeItem(content)];
+            } else if (typeof content === 'string') {
+              // raw string marc output
+              return [normalizeItem(content)];
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[marcPreview] error', err);
+      }
+
+      // fallback
+      return fallbackPreview(marcXml);
+    },
+
+    // Add searchSavedRecords to query saved records endpoints
+    searchSavedRecords: async function(user, search) {
+      try {
+        const returnUrls = useConfigStore().returnUrls || {};
+        const utilUrl = returnUrls.util || '';
+        const utilPath = returnUrls.env || '';
+
+        let url;
+        if (user && !search) {
+          url = `${utilUrl}myrecords/${utilPath}/${user}`;
+        } else if (user && search) {
+          url = `${utilUrl}allrecords/${utilPath}/${search}/${user}`;
+        } else {
+          url = `${utilUrl}allrecords/${utilPath}/`;
+        }
+
+        const r = await this.fetchSimpleLookup(url);
+        if (r !== false && r !== null) {
+          const results = [];
+          // normalise object keyed by id into array
+          if (Array.isArray(r)) {
+            for (const it of r) results.push(it);
+          } else if (typeof r === 'object') {
+            for (const k in r) {
+              if (Object.prototype.hasOwnProperty.call(r, k)) results.push(r[k]);
+            }
+          }
+          // sort by timestamp/time if present
+          results.sort((a, b) => {
+            const at = (a && (a.timestamp || a.time)) ? Number(a.timestamp || a.time) : 0;
+            const bt = (b && (b.timestamp || b.time)) ? Number(b.timestamp || b.time) : 0;
+            return bt - at;
+          });
+          console.log('[searchSavedRecords] Records data received:', results);
+          return results;
+        }
+      } catch (err) {
+        console.error('[searchSavedRecords] error', err);
+      }
+      return [];
+    },
+
+    // Add loadSavedRecord to fetch a saved record from the backend
+    loadSavedRecord: async function(identifier) {
+      try {
+        const returnUrls = useConfigStore().returnUrls || {};
+        // prefer LDPJS if configured (upstream pattern), otherwise use util/getrecord
+        if (returnUrls.ldpjs && identifier) {
+          const url = `${returnUrls.ldpjs}ldp/${identifier}`;
+          console.log('[loadSavedRecord] Fetching LDPJS saved record from:', url);
+          const response = await fetch(url, { method: 'GET' });
+          if (!response.ok) { console.warn('[loadSavedRecord] non-OK LDPJS response', response.status); return false; }
+          const text = await response.text();
+          return text;
+        }
+
+        // fallback to util endpoint
+        const idPart = encodeURIComponent(identifier);
+        const url = `${returnUrls.util}getrecord/${returnUrls.env}/${idPart}`;
+        console.log('[loadSavedRecord] Fetching saved record from:', url);
+        const response = await fetch(url, { method: 'GET', headers: { 'Accept': 'application/json' } });
+        if (!response.ok) {
+          console.warn('[loadSavedRecord] Non-OK response:', response.status);
+          return false;
+        }
+        const data = await response.json();
+        // normalize common response shapes
+        if (data.record) return data.record;
+        if (data.results && Array.isArray(data.results)) return data.results;
+        return data;
+      } catch (err) {
+        console.error('[loadSavedRecord] Error loading saved record:', err);
+        return false;
+      }
+    },
+
+    // Replace/robustify the version check to handle different remote formats
+    checkVersionOutOfDate: async function() {
+      try {
+        const returnUrls = useConfigStore().returnUrls || {};
+        const versionPath = (returnUrls.env === 'production') ? 'version/editor' : 'version/editor/stage';
+        const url = `${returnUrls.util}${versionPath}?blastdacache=${Date.now()}`;
+
+        const rawResponse = await fetch(url, { method: 'GET', headers: { 'Accept': 'application/json' } });
+        if (!rawResponse.ok) {
+          console.warn('[checkVersionOutOfDate] version endpoint returned', rawResponse.status);
+          return false;
+        }
+
+        const remote = await rawResponse.json();
+        const cfg = useConfigStore();
+        const toNumber = (v) => {
+          const n = Number(v);
+          return Number.isFinite(n) ? n : 0;
+        };
+
+        const ourVer = toNumber(cfg.versionMajor) + toNumber(cfg.versionMinor) * 0.1 + toNumber(cfg.versionPatch) * 0.01;
+
+        let remoteVer = 0;
+        // remote may be {major,minor,patch} or {version: '1.2.3'} or a single numeric/string value
+        if (remote && typeof remote === 'object') {
+          if (remote.version !== undefined && remote.version !== null) {
+            if (typeof remote.version === 'string' && remote.version.includes('.')) {
+              const parts = remote.version.split('.');
+              remoteVer = toNumber(parts[0]) + toNumber(parts[1] || 0) * 0.1 + toNumber(parts[2] || 0) * 0.01;
+            } else {
+              remoteVer = toNumber(remote.version);
+            }
+          } else if (remote.major !== undefined) {
+            remoteVer = toNumber(remote.major) + toNumber(remote.minor) * 0.1 + toNumber(remote.patch) * 0.01;
+          } else {
+            // last resort, try to coerce
+            remoteVer = toNumber(remote);
+          }
+        } else {
+          remoteVer = toNumber(remote);
+        }
+
+        console.log('[checkVersionOutOfDate] ourVer:', ourVer, 'remoteVer:', remoteVer);
+        return ourVer < remoteVer;
+      } catch (err) {
+        console.error('[checkVersionOutOfDate] error:', err);
+        return false;
+      }
+    },
+
+    // Save a record to the backend (XML string and optional identifier)
+    saveRecord: async function(xmlString, identifier=null, options={}){
+      try {
+        const returnUrls = useConfigStore().returnUrls || {};
+        // If ldpjs configured and identifier provided, use PUT to LDPJS (upstream pattern)
+        if (returnUrls.ldpjs && identifier) {
+          const url = `${returnUrls.ldpjs}ldp/${identifier}`;
+          console.log('[saveRecord] PUT to LDPJS:', url);
+          const putMethod = {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/xml' },
+            body: xmlString
+          };
+          const r = await fetch(url, putMethod);
+          if (!r.ok) { console.warn('[saveRecord] LDPJS save non-OK', r.status); return false; }
+          const text = await r.text();
+          return { status: true, body: text };
+        }
+
+        // Otherwise use util/saverecord endpoint if configured
+        const idPart = identifier ? `/${encodeURIComponent(identifier)}` : '';
+        const url = `${returnUrls.util}saverecord/${returnUrls.env}${idPart}`;
+        console.log('[saveRecord] Posting to:', url);
+        const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json' };
+        const body = JSON.stringify({ xml: xmlString, options: options });
+        const resp = await fetch(url, { method: 'POST', headers, body });
+        if (!resp.ok) {
+          const txt = await resp.text().catch(()=>null);
+          console.warn('[saveRecord] non-OK response', resp.status, txt);
+          return false;
+        }
+        // server may respond with json or plain text
+        const ct = resp.headers.get('content-type') || '';
+        if (ct.includes('application/json')) {
+          return await resp.json();
+        }
+        return await resp.text();
+      } catch (err) {
+        console.error('[saveRecord] error saving record:', err);
+        return false;
+      }
+    },
+
 };
 
 export default utilsNetwork;
