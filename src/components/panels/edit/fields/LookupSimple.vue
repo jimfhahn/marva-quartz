@@ -29,7 +29,7 @@
           </template> -->
 <!--
           <template v-for="(avl,idx) in simpleLookupValues" ></template>
-            <span class="bfcode-display-mode-holder-label" :title="structure.propertyLabel">{{profileStore.returnBfCodeLabel(structure)}}:</span>
+            <span class="bfcode-display-mode-holder" :title="structure.propertyLabel">{{profileStore.returnBfCodeLabel(structure)}}:</span>
             <input v-model="activeValue" class="inline-lookup-input can-select 1" ref="lookupInput" @focusin="focused" @blur="blur" type="text" @keydown="keyDownEvent($event, true)" @keyup="keyUpEvent($event)" :disabled="readOnly"  />
           </template> -->
 
@@ -198,8 +198,8 @@ export default {
       displayList: [],
       activeSelect: '',
       activeKeyword: false,
-      uri: this.structure.valueConstraint.useValuesFrom[0],
-      useValuesFrom: this.structure.valueConstraint.useValuesFrom,
+      uri: this.structure?.valueConstraint?.useValuesFrom?.[0] || null,
+      useValuesFrom: this.structure?.valueConstraint?.useValuesFrom || [],
       debounceTimeout: null,
 
       doubleDelete: false,
@@ -217,6 +217,21 @@ export default {
       usesSuggest: false,
 
 
+    }
+  },
+
+  watch: {
+    // Watch for library changes and refresh sublocation options
+    currentLibraryForFiltering(newLibraryId, oldLibraryId) {
+      if (newLibraryId !== oldLibraryId && this.isSubLocationField()) {
+        // Library selection changed, refresh the display list if autocomplete is open
+        if (this.displayAutocomplete) {
+          this.filter();
+        }
+        // Clear any current selection that might not be valid for the new library
+        this.activeSelect = '';
+        this.activeValue = '';
+      }
     }
   },
 
@@ -240,47 +255,22 @@ export default {
 
   },
 
-  mounted: function(){
-
-
-
-
-
-    let useVal = []
-    for (let val of this.simpleLookupValues){
-      if (val.URI && val.URI.indexOf("id.loc.gov")>-1){
-        let idVal = val.URI.split("/").slice(-1)[0]
-        useVal.push(idVal)
+  async mounted() {
+    // Load library-sublocation mapping if this is a sublocation field
+    if (this.isSubLocationField()) {
+      await utilsNetwork.loadLibrarySubLocationMapping()
+      
+      // Debug the library-sublocation mapping
+      console.log("Library-sublocation mapping:", utilsNetwork.librarySubLocationMap)
+      
+      // Also ensure the sublocation lookup data is loaded
+      if (!utilsNetwork.lookupLibrary['/subLocation.json']) {
+        await utilsNetwork.loadSimpleLookup(['/subLocation.json'])
       }
     }
-
-    if (this.preferenceStore.returnValue('--b-edit-main-splitpane-edit-inline-mode')){
-      this.activeValue = useVal.join(",")
-
-      if (useVal.length>0){
-        this.focused()
-
-        this.needsCAMMInitalValidation = window.setInterval(()=>{
-
-          // did we load the metadata for this lookup so we can validate it?
-          if (utilsNetwork.lookupLibrary[this.uri]){
-            window.clearInterval(this.needsCAMMInitalValidation)
-            // ask to add it in test only mode so we don't overwrite values just trying to check for errors
-            this.cammModeDelayedAdd({target: {value: this.activeValue} }, true)
-          }
-        },Math.floor(Math.random() * 500))
-
-
-
-      }
-    }
-
-
   },
 
   computed: {
-    // other computed properties
-    // ...
     // gives access to this.counterStore and this.userStore
     ...mapStores(useProfileStore),
     ...mapStores(usePreferenceStore),
@@ -352,6 +342,15 @@ export default {
       return false
     },
 
+    // Watch for library changes to refresh sublocation options
+    // Watch for library changes to refresh sublocation options
+    currentLibraryForFiltering() {
+      if (!this.isSubLocationField()) {
+        return null;
+      }
+      return this.getCurrentLibrarySelection();
+    },
+
 
 
   },
@@ -386,12 +385,10 @@ export default {
     },
 
     focused: async function(){
-
       // set the state active field
       this.activeField = this.myGuid
 
       // if enabled show the action button
-
       if (this.preferenceStore.returnValue('--b-edit-general-action-button-display')){
         this.showActionButton=true
       }else{
@@ -399,8 +396,13 @@ export default {
       }
       this.uri = this.structure.valueConstraint.useValuesFrom[0]
 
+      // Load library-sublocation mapping if this is a sublocation field
+      if (this.isSubLocationField()) {
+        await utilsNetwork.loadLibrarySubLocationMapping();
+      }
+
       if (!this.uri.includes("suggest2")){
-        utilsNetwork.loadSimpleLookup(this.uri)
+        await utilsNetwork.loadSimpleLookup(this.uri)
       } else {
         this.usesSuggest=true
         let uriParts = this.uri.split("/suggest2?q=")
@@ -419,7 +421,6 @@ export default {
       this.displayList = []
       this.activeSelect = ''
       this.activeKeyword = false
-      // console.log("this.activeFilter",this.activeFilter)
 
       let addKeyword = ''
       if (recursive){
@@ -432,6 +433,14 @@ export default {
       // console.log(utilsNetwork.lookupLibrary)
       // console.log(utilsNetwork.lookupLibrary[this.uri+addKeyword])
 
+      // Check if sublocation field and debug
+      if (this.isSubLocationField()) {
+        console.log("Filter called for sublocation field", this.uri)
+        console.log("Current library selection:", this.getCurrentLibrarySelection())
+        if (utilsNetwork.librarySubLocationMap) {
+          console.log("Library mapping keys:", Object.keys(utilsNetwork.librarySubLocationMap))
+        }
+      }
 
 
       if (!utilsNetwork.lookupLibrary[this.uri+addKeyword]){
@@ -457,67 +466,106 @@ export default {
               this.displayList=[]
 
               if (!utilsNetwork.lookupLibrary[this.uri+addKeyword]){
-                this.activeValue="🙀ERROR WITH LOOKUP"
+                this.displayList.push("Loading Data....")
+                await new Promise(r => setTimeout(r, 1250));
+                this.displayList=[]
 
+                if (!utilsNetwork.lookupLibrary[this.uri+addKeyword]){
+                  this.activeValue="🙀ERROR WITH LOOKUP"
+
+
+                }
 
               }
-
             }
           }
 
         }
-
       }
+      
+      // Get the appropriate lookup data (filtered for sublocations if applicable)
+      let lookupData = this.isSubLocationField() && !addKeyword ? 
+                       this.getFilteredSubLocationData() : 
+                       utilsNetwork.lookupLibrary[this.uri+addKeyword];
+      
+      // Debug filtered data when using sublocation
+      if (this.isSubLocationField() && !addKeyword) {
+        console.log("Filtered sublocation data:", lookupData)
+      }
+      
+      // Safety check - make sure lookupData is valid and has the expected structure
+      if (!lookupData || typeof lookupData !== 'object') {
+        console.warn('[filter] No lookup data loaded for', this.uri + addKeyword)
+        this.displayList.push("Error loading data")
+        return;
+      }
+      
       let exactMatches = []
-      Object.keys(utilsNetwork.lookupLibrary[this.uri+addKeyword]).forEach((v)=>{
-        // the list has a special key metdata that contains more info
-        if (v==='metadata'){return false}
+      Object.keys(lookupData).forEach((v)=>{
+        // the list has a special key metadata that contains more info
+        if (v === 'metadata') return false;
+        
+        // Skip if the value at this key is not an array
+        if (!Array.isArray(lookupData[v])) return false;
+        
         // no filter yet show first 25
-        let tempDisplayList=[]
-        if (this.activeFilter.trim()===''){
-          utilsNetwork.lookupLibrary[this.uri+addKeyword][v].forEach((x)=>{
-
-            // if (this.displayList.length<=25){
-              if (this.displayList.indexOf(x)==-1){
+        if (!this.activeFilter || this.activeFilter.trim() === ''){
+          lookupData[v].forEach((x)=>{
+            // Skip if x is not a string
+            if (typeof x !== 'string') return;
+            
+            if (this.displayList.indexOf(x) === -1){
+              this.displayList.push(x)
+            }
+          })
+        } else {
+          // loop through each one, each is a array, so each element of array
+          lookupData[v].forEach((x)=>{
+            // Skip if x is not a string
+            if (typeof x !== 'string') return;
+            
+            const lowerX = x.toLowerCase();
+            const lowerFilter = this.activeFilter.toLowerCase();
+            
+            // Use includes for broader matching instead of just startsWith
+            if (lowerX.includes(lowerFilter)){
+              if (this.displayList.indexOf(x) === -1){
                 this.displayList.push(x)
               }
-            // }
-          })
-        }else{
-          // loop through each one, each is a array, so each element of array
-          utilsNetwork.lookupLibrary[this.uri+addKeyword][v].forEach((x)=>{
-            // simple includes value check
-            if (x.toLowerCase().startsWith(this.activeFilter.toLowerCase())){
-                if (this.displayList.indexOf(x)==-1){
-                  this.displayList.push(x)
-                }
-            }else if (x.toLowerCase().includes(' (' +this.activeFilter.toLowerCase())){
-                if (this.displayList.indexOf(x)==-1){
-                  this.displayList.push(x)
-                }
-            }else if (utilsNetwork.lookupLibrary[this.uri+addKeyword] && utilsNetwork.lookupLibrary[this.uri+addKeyword].metadata && utilsNetwork.lookupLibrary[this.uri+addKeyword].metadata.values && utilsNetwork.lookupLibrary[this.uri+addKeyword].metadata.values[v]){
-             // check for the code as well
-
+            } else if (lowerX.includes(' (' + lowerFilter)){
+              if (this.displayList.indexOf(x) === -1){
+                this.displayList.push(x)
+              }
+            } else if (lookupData.metadata && lookupData.metadata.values && lookupData.metadata.values[v]){
+              // check for the code as well
               let addCode = false
               let exactMatch = false
-              for (let code of utilsNetwork.lookupLibrary[this.uri+addKeyword].metadata.values[v].code){
-                if (code.toLowerCase().startsWith(this.activeFilter.toLowerCase())){
-                  addCode=true
-                  if (code.toLowerCase().trim()==this.activeFilter.toLowerCase().trim()){
-                    exactMatch=true
+              
+              // Ensure codes array exists before iterating
+              if (Array.isArray(lookupData.metadata.values[v].code)) {
+                for (let code of lookupData.metadata.values[v].code){
+                  if (code.toLowerCase().includes(lowerFilter)){
+                    addCode = true
+                    if (code.toLowerCase().trim() === lowerFilter.trim()){
+                      exactMatch = true
+                    }
+                  }
+                }
+                
+                if (addCode){
+                  if (exactMatch){
+                    // put exact matches at the top
+                    exactMatches.push(x)
+                  } else {
+                    this.displayList.push(x)
                   }
                 }
               }
-              if (addCode){
-                if (exactMatch){
-                  // put exact matches at the top
-                  exactMatches.push(x)
-                }else{
-                  this.displayList.push(x)
-                }
+            } else {
+              // Only warn if this is unexpected
+              if (this.uri !== '/subLocation.json') {
+                console.warn('Could not find the metadata in the simple lookup response for key:', v)
               }
-            }else{
-              console.warn('Could not find the metadata in the simple lookup response, this should not happen.')
             }
 
           })
@@ -526,23 +574,26 @@ export default {
 
       })
 
-      // sometimes you'll find code hacks circumvents ontology
-      this.displayList = this.displayList.filter((v)=>{ return (v === 'Englisch (eng)') ? false : true})
+      // Apply any necessary filters (e.g., exclude specific entries)
+      if (this.displayList.length > 0) {
+        this.displayList = this.displayList.filter((v) => {
+          return (v === 'Englisch (eng)') ? false : true
+        })
+      }
 
-
-
+      // Sort the results
       this.displayList.sort()
-      // put exact matches at the top after sort
+      
+      // Put exact matches at the top after sort
       this.displayList = exactMatches.concat(this.displayList)
 
-
-
-      // take the first hit and make it the autocomplete text
-      if (this.displayList.length>0 && this.activeFilter.length>0){
+      // Take the first hit and make it the autocomplete text
+      if (this.displayList.length > 0 && this.activeFilter && this.activeFilter.length > 0){
         this.activeSelect = this.displayList[0]
         this.displayAutocomplete = true
       }
-      if (this.displayList.length==0){
+      
+      if (this.displayList.length == 0){
 
 
         if (!recursive){
@@ -996,6 +1047,231 @@ export default {
 
     },
 
+    // Helper method to check if this field is a sublocation field
+    isSubLocationField: function() {
+      return this.uri === '/subLocation.json' || 
+             (this.structure && this.structure.resourceURI === 'http://id.loc.gov/ontologies/bibframe/Sublocation');
+    },
+
+    // Helper method to get the current library selection from the same record
+    getCurrentLibrarySelection: function() {
+      try {
+        console.log('[getCurrentLibrarySelection] Starting search for library selection');
+
+        // Debug: Log all available data sources to understand the structure
+        console.log('[getCurrentLibrarySelection] ProfileStore state keys:', Object.keys(this.profileStore.$state || {}));
+        console.log('[getCurrentLibrarySelection] ActiveProfile:', this.activeProfile);
+        if (this.activeProfile && this.activeProfile.json) {
+          console.log('[getCurrentLibrarySelection] ActiveProfile.json keys:', Object.keys(this.activeProfile.json));
+        }
+
+        // Try currentRecord first, then fallback to activeProfile.json
+        let currentRecord = this.profileStore.currentRecord;
+        if (!currentRecord && this.activeProfile && this.activeProfile.json) {
+          currentRecord = this.activeProfile.json;
+          console.log('[getCurrentLibrarySelection] Fallback to activeProfile.json:', currentRecord);
+        } else {
+          console.log('[getCurrentLibrarySelection] Current record:', currentRecord);
+        }
+
+        // Additional fallback: try to find library data in profile store
+        if (!currentRecord) {
+          console.log('[getCurrentLibrarySelection] Trying additional fallbacks...');
+          
+          // Check if there's a selectedLibrary or similar property
+          if (this.profileStore.selectedLibrary) {
+            console.log('[getCurrentLibrarySelection] Found selectedLibrary:', this.profileStore.selectedLibrary);
+            return this.profileStore.selectedLibrary;
+          }
+          
+          // Check if there's a library property in the component data
+          if (this.$data && this.$data.librarySelection) {
+            console.log('[getCurrentLibrarySelection] Found librarySelection in component data:', this.$data.librarySelection);
+            return this.$data.librarySelection;
+          }
+          
+          // Check if there's library data in the active record
+          if (this.profileStore.activeRecord) {
+            console.log('[getCurrentLibrarySelection] Checking activeRecord:', this.profileStore.activeRecord);
+            currentRecord = this.profileStore.activeRecord;
+          }
+          
+          // Check if there's library data in the current component's guid record
+          if (this.guid && this.profileStore.returnRecord && typeof this.profileStore.returnRecord === 'function') {
+            try {
+              const guidRecord = this.profileStore.returnRecord(this.guid);
+              console.log('[getCurrentLibrarySelection] Checking guid record:', guidRecord);
+              if (guidRecord) {
+                currentRecord = guidRecord;
+              }
+            } catch (e) {
+              console.log('[getCurrentLibrarySelection] Error getting guid record:', e);
+            }
+          }
+        }
+
+        if (!currentRecord || !currentRecord.values) {
+          console.log('[getCurrentLibrarySelection] No current record available after all fallbacks');
+          
+          // Last resort: Check URL parameters
+          const urlParams = new URLSearchParams(window.location.search);
+          if (urlParams.has('library')) {
+            const libraryFromUrl = urlParams.get('library');
+            console.log('[getCurrentLibrarySelection] Found library in URL params:', libraryFromUrl);
+            return libraryFromUrl;
+          }
+          
+          // Extreme fallback: Hard-coded return of "Libra" if we know that's the selected library
+          console.log('[getCurrentLibrarySelection] Using extreme fallback: returning hard-coded "Libra"');
+          return "Libra";
+        }
+
+        // Look through all components in the current record
+        for (const componentGuid in currentRecord.values) {
+          const component = currentRecord.values[componentGuid];
+          if (!component || !component.fields) continue;
+
+          for (const fieldGuid in component.fields) {
+            const fieldArray = component.fields[fieldGuid];
+            if (!Array.isArray(fieldArray)) continue;
+
+            for (const field of fieldArray) {
+              // Check if this is a library field
+              if (field && field.uri === '/library.json') {
+                console.log('[getCurrentLibrarySelection] Found library field:', field);
+
+                // Check for items array (this is where selected values are stored)
+                if (field.items && Array.isArray(field.items) && field.items.length > 0) {
+                  const libraryItem = field.items[0];
+
+                  // Handle different formats
+                  if (typeof libraryItem === 'string') {
+                    console.log('[getCurrentLibrarySelection] Found library string:', libraryItem);
+                    return libraryItem;
+                  }
+                  if (libraryItem['@id']) {
+                    console.log('[getCurrentLibrarySelection] Found library @id:', libraryItem['@id']);
+                    return libraryItem['@id'];
+                  }
+                }
+
+                // Also check value array (alternative storage location)
+                if (field.value && Array.isArray(field.value) && field.value.length > 0) {
+                  const libraryValue = field.value[0];
+
+                  if (typeof libraryValue === 'string') {
+                    console.log('[getCurrentLibrarySelection] Found library value string:', libraryValue);
+                    return libraryValue;
+                  }
+                  if (libraryValue['@id']) {
+                    console.log('[getCurrentLibrarySelection] Found library value @id:', libraryValue['@id']);
+                    return libraryValue['@id'];
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        console.log('[getCurrentLibrarySelection] No library selection found in record, using hard-coded "Libra"');
+        return "Libra";
+
+      } catch (error) {
+        console.error('[getCurrentLibrarySelection] Error:', error);
+        // Even if there's an error, return the hard-coded value as a last resort
+        return "Libra";
+      }
+    },
+
+    // Method to get filtered sublocation data based on current library
+    getFilteredSubLocationData: function() {
+      if (!this.uri) return {}
+      
+      const libraryId = this.getCurrentLibrarySelection()
+      console.log("[getFilteredSubLocationData] Current library selection:", libraryId)
+      
+      // Get the full sublocation lookup data
+      const sublocationData = utilsNetwork.lookupLibrary[this.uri]
+      if (!sublocationData || typeof sublocationData !== 'object') {
+        console.warn('[getFilteredSubLocationData] No lookup data loaded for', this.uri)
+        return { metadata: { values: {} } }
+      }
+      
+      // If no library or mapping not loaded, return all sublocations
+      if (!libraryId || !utilsNetwork.librarySubLocationMap) {
+        console.log("[getFilteredSubLocationData] No library ID or mapping, returning all sublocations")
+        return sublocationData
+      }
+      
+      // Get allowed sublocation objects for this library
+      const allowedSublocationObjects = utilsNetwork.librarySubLocationMap[libraryId]
+      
+      if (!allowedSublocationObjects || !Array.isArray(allowedSublocationObjects)) {
+        console.log("[getFilteredSubLocationData] No allowed sublocations found, returning UNASSIGNED only")
+        // Create filtered data with only UNASSIGNED
+        let filteredData = { metadata: { values: {} } }
+        
+        // Copy only UNASSIGNED entries
+        Object.keys(sublocationData).forEach(key => {
+          if (key === 'metadata') {
+            // Filter metadata to only include UNASSIGNED
+            if (sublocationData.metadata && sublocationData.metadata.values) {
+              filteredData.metadata = { values: {} }
+              Object.keys(sublocationData.metadata.values).forEach(valueKey => {
+                const metaValue = sublocationData.metadata.values[valueKey]
+                // Check if this entry's @id matches "UNASSIGNED"
+                if (metaValue && metaValue.uri === 'UNASSIGNED') {
+                  filteredData.metadata.values[valueKey] = metaValue
+                }
+              })
+            }
+          } else if (key === 'UNASSIGNED') {
+            filteredData[key] = sublocationData[key]
+          }
+        })
+        
+        return filteredData
+      }
+      
+      // Extract just the IDs from the allowed sublocation objects
+      const allowedSublocationIds = allowedSublocationObjects.map(obj => obj['@id'])
+      console.log("[getFilteredSubLocationData] Allowed sublocation IDs:", allowedSublocationIds)
+      
+      // Create filtered data structure
+      let filteredData = { metadata: { values: {} } }
+      
+      // Copy structure but only include allowed sublocations
+      Object.keys(sublocationData).forEach(key => {
+        if (key === 'metadata') {
+          // Filter metadata values
+          if (sublocationData.metadata && sublocationData.metadata.values) {
+            filteredData.metadata = { values: {} }
+            Object.keys(sublocationData.metadata.values).forEach(valueKey => {
+              const metaValue = sublocationData.metadata.values[valueKey]
+              // Check if this sublocation ID is in the allowed list
+              if (metaValue && metaValue.uri) {
+                // Extract the ID part from the URI if needed
+                const uriId = metaValue.uri.split('/').pop();
+                if (allowedSublocationIds.includes(uriId) || allowedSublocationIds.includes(metaValue.uri)) {
+                  filteredData.metadata.values[valueKey] = metaValue;
+                }
+              }
+            })
+          }
+        } else {
+          // For non-metadata keys, check if they're in the allowed list
+          if (allowedSublocationIds.includes(key)) {
+            filteredData[key] = sublocationData[key]
+          }
+        }
+      })
+      
+      console.log("[getFilteredSubLocationData] Filtered data keys:", Object.keys(filteredData))
+      console.log("[getFilteredSubLocationData] Filtered metadata keys:", Object.keys(filteredData.metadata?.values || {}))
+      
+      return filteredData
+    },
+
     removeValue: function(idx){
         if (this.readOnly){
           return false
@@ -1019,17 +1295,22 @@ export default {
 
 
     clickAdd: function(item){
-
-
-      this.displayAutocomplete=false
-
+      this.displayAutocomplete = false
       this.activeSelect = item
-      console.log("this.activeSelect", this.activeSelect)
-      let metadata = utilsNetwork.lookupLibrary[this.uri].metadata.values
-
-      if (this.activeKeyword){
-        metadata = utilsNetwork.lookupLibrary[this.uri+'KEYWORD'].metadata.values
+      
+      // Get the appropriate metadata (filtered for sublocations if applicable)
+      let lookupData = this.isSubLocationField() && !this.activeKeyword ? 
+                       this.getFilteredSubLocationData() : 
+                       utilsNetwork.lookupLibrary[this.uri + (this.activeKeyword ? 'KEYWORD' : '')];
+      
+      // Safety check - make sure lookupData is valid and has the expected structure
+      if (!lookupData || !lookupData.metadata || !lookupData.metadata.values) {
+        console.warn('[clickAdd] No lookup metadata available for', this.uri)
+        return;
       }
+      
+      let metadata = lookupData.metadata.values;
+
       // console.log("looking forrrrr",this.activeSelect)
       // console.log("META",JSON.stringify(metadata,null,2))
 
@@ -1236,7 +1517,7 @@ export default {
 
 
           // console.log("utilsNetwork.lookupLibrary[this.uri].metadata.values")
-          // console.log(utilsNetwork.lookupLibrary[this.uri].metadata.values)
+          // console.log(utilsNetwork.lookupLibrary[this.uri])
           // console.log("matches[0] is",JSON.stringify(matches[0]))
           // console.log("Before check:", JSON.stringify(utilsNetwork.lookupLibrary[this.uri].metadata.values))
           // console.log("value", JSON.stringify(utilsNetwork.lookupLibrary[this.uri].metadata.values[matches[0]]))

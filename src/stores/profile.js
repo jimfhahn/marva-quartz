@@ -3520,7 +3520,6 @@ export const useProfileStore = defineStore('profile', {
     /**
     * return the MARC transformation from the back end
     *
-
     * @return {string} - the MARC string of output
     */
     marcPreview: async function(){
@@ -3532,33 +3531,21 @@ export const useProfileStore = defineStore('profile', {
         preview = await utilsNetwork.marcPreview(xml.bf2Marc, true)
       }
 
-      // clean it up a bit for the component
-      let versions = preview.map((v)=>{ return v.version}).sort().reverse()
-
-      let results = []
-
+      // Handle the new array format returned by utilsNetwork.marcPreview
       let newResults = []
-      let selectedDefault = false
 
-
-      for (let v of versions){
-        let toAdd = preview.filter((p) => { return (p.version == v) })[0]
-        if (toAdd.results && toAdd.results.stdout && selectedDefault == false){
-          toAdd.default = true
-          selectedDefault = true
-        }else{
-          toAdd.default = false
+      // Create a version object with the data we need
+      if (preview && preview.length > 0) {
+        let marcItem = preview[0]
+        let versionObj = {
+          version: "current",
+          marcRecord: marcItem.preview,
+          results: { stdout: marcItem.marc },
+          default: true,
+          error: false
         }
-
-        if (toAdd.results && !toAdd.results.stdout){
-          toAdd.error = true
-        }else{
-          toAdd.error = false
-        }
-        newResults.push(toAdd)
+        newResults.push(versionObj)
       }
-
-
 
       let defaultVer = newResults.filter((p) => { return (p.default == true) })[0]
       if (defaultVer && defaultVer.default){
@@ -3570,8 +3557,6 @@ export const useProfileStore = defineStore('profile', {
         default: defaultVer,
         versions: newResults,
       })
-
-
     },
 
 

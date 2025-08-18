@@ -1,0 +1,362 @@
+{
+  "Libra": [
+    {
+      "@id": "storcrstxt",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "storcrstxt"}]
+    },
+    {
+      "@id": "stor",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "stor"}]
+    },
+    {
+      "@id": "sc1100c",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "sc1100c"}]
+    },
+    {
+      "@id": "scadams",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "scadams"}]
+    },
+    {
+      "@id": "athstor",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "athstor"}]
+    },
+    {
+      "@id": "athstorcir",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "athstorcir"}]
+    },
+    {
+      "@id": "scblank",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "scblank"}]
+    },
+    {
+      "@id": "scsmithst",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "scsmithst"}]
+    },
+    {
+      "@id": "newbrare",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "newbrare"}]
+    },
+    {
+      "@id": "scfast",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "scfast"}]
+    },
+    {
+      "@id": "storfine",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "storfine"}]
+    },
+    {
+      "@id": "scfurnst",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "scfurnst"}]
+    },
+    {
+      "@id": "storlimit",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "storlimit"}]
+    },
+    {
+      "@id": "scmst",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "scmst"}]
+    },
+    {
+      "@id": "storm",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "storm"}]
+    },
+    {
+      "@id": "scstor",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "scstor"}]
+    },
+    {
+      "@id": "storrare",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "storrare"}]
+    },
+    {
+      "@id": "sckatzstor",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "sckatzstor"}]
+    },
+    {
+      "@id": "screfestor",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "screfestor"}]
+    },
+    {
+      "@id": "scrunning",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "scrunning"}]
+    },
+    {
+      "@id": "storspec",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "storspec"}]
+    },
+    {
+      "@id": "stor3hr",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "stor3hr"}]
+    },
+    {
+      "@id": "storNoCirc",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "storNoCirc"}]
+    },
+    {
+      "@id": "UNASSIGNED",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "UNASSIGNED"}]
+    }
+  ],
+  "VanPeltLib": [
+    {
+      "@id": "UNASSIGNED",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "UNASSIGNED"}]
+    }
+  ],
+  "BiomLib": [
+    {
+      "@id": "UNASSIGNED",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "UNASSIGNED"}]
+    }
+  ],
+  "ChemLib": [
+    {
+      "@id": "UNASSIGNED",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "UNASSIGNED"}]
+    }
+  ],
+  "DentalLib": [
+    {
+      "@id": "UNASSIGNED",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "UNASSIGNED"}]
+    }
+  ],
+  "FisherFAL": [
+    {
+      "@id": "UNASSIGNED",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "UNASSIGNED"}]
+    }
+  ],
+  "MusicLib": [
+    {
+      "@id": "UNASSIGNED",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "UNASSIGNED"}]
+    }
+  ],
+  "VetNBLib": [
+    {
+      "@id": "UNASSIGNED",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "UNASSIGNED"}]
+    }
+  ],
+  "VetPennLib": [
+    {
+      "@id": "UNASSIGNED",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "UNASSIGNED"}]
+    }
+  ],
+  "AnnenLib": [
+    {
+      "@id": "UNASSIGNED",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "UNASSIGNED"}]
+    }
+  ],
+  "ArchArcLib": [
+    {
+      "@id": "UNASSIGNED",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "UNASSIGNED"}]
+    }
+  ],
+  "AreaStud": [
+    {
+      "@id": "UNASSIGNED",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "UNASSIGNED"}]
+    }
+  ],
+  "AthLib": [
+    {
+      "@id": "UNASSIGNED",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "UNASSIGNED"}]
+    }
+  ],
+  "BatesCntr": [
+    {
+      "@id": "UNASSIGNED",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "UNASSIGNED"}]
+    }
+  ],
+  "CHD": [
+    {
+      "@id": "UNASSIGNED",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "UNASSIGNED"}]
+    }
+  ],
+  "DENTLOCKER": [
+    {
+      "@id": "UNASSIGNED",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "UNASSIGNED"}]
+    }
+  ],
+  "EduCommons": [
+    {
+      "@id": "UNASSIGNED",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "UNASSIGNED"}]
+    }
+  ],
+  "EMPTY": [
+    {
+      "@id": "UNASSIGNED",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "UNASSIGNED"}]
+    }
+  ],
+  "HSPLib": [
+    {
+      "@id": "UNASSIGNED",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "UNASSIGNED"}]
+    }
+  ],
+  "PersonalCopy": [
+    {
+      "@id": "UNASSIGNED",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "UNASSIGNED"}]
+    }
+  ],
+  "ROTCLib": [
+    {
+      "@id": "UNASSIGNED",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "UNASSIGNED"}]
+    }
+  ],
+  "KislakCntr": [
+    {
+      "@id": "UNASSIGNED",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "UNASSIGNED"}]
+    }
+  ],
+  "KatzLib": [
+    {
+      "@id": "UNASSIGNED",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "UNASSIGNED"}]
+    }
+  ],
+  "LippLib": [
+    {
+      "@id": "UNASSIGNED",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "UNASSIGNED"}]
+    }
+  ],
+  "VPLOCKER": [
+    {
+      "@id": "UNASSIGNED",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "UNASSIGNED"}]
+    }
+  ],
+  "MPALib": [
+    {
+      "@id": "UNASSIGNED",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "UNASSIGNED"}]
+    }
+  ],
+  "ArborLib": [
+    {
+      "@id": "UNASSIGNED",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "UNASSIGNED"}]
+    }
+  ],
+  "MuseumLib": [
+    {
+      "@id": "UNASSIGNED",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "UNASSIGNED"}]
+    }
+  ],
+  "NonCircLib": [
+    {
+      "@id": "UNASSIGNED",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "UNASSIGNED"}]
+    }
+  ],
+  "PAHospLib": [
+    {
+      "@id": "UNASSIGNED",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "UNASSIGNED"}]
+    }
+  ],
+  "RES_SHARE": [
+    {
+      "@id": "UNASSIGNED",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "UNASSIGNED"}]
+    }
+  ],
+  "UnivArcLib": [
+    {
+      "@id": "UNASSIGNED",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "UNASSIGNED"}]
+    }
+  ],
+  "MuseArcLib": [
+    {
+      "@id": "UNASSIGNED",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "UNASSIGNED"}]
+    }
+  ],
+  "WeigleInfo": [
+    {
+      "@id": "UNASSIGNED",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "UNASSIGNED"}]
+    }
+  ],
+  "ZUnavailable": [
+    {
+      "@id": "UNASSIGNED",
+      "@type": ["http://www.loc.gov/mads/rdf/v1#Authority"],
+      "http://www.loc.gov/mads/rdf/v1#authoritativeLabel": [{"@value": "UNASSIGNED"}]
+    }
+  ]
+}
