@@ -84,6 +84,9 @@ export const useProfileStore = defineStore('profile', {
     activeProfilePosted: false,
     activeProfilePostedTimestamp: false,
 
+    // stores the currently selected library for sublocation filtering
+    selectedLibrary: null,
+
     showPostModal: false,
     showRecoveryModal: false,
     showValidateModal: false,

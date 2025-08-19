@@ -2489,7 +2489,7 @@ const utilsExport = {
                 componentXmlLookup[`${rt}-${pt}`] = formatXML(locationEl.outerHTML);
                 console.log(`Created physicalLocation with text: ${locationLabel}`);
             } else {
-                console.log('[physicalLocation] No valid ID or Label found in userValue.', userValue);
+                console.log('[physicalLocation] No valid ID or Label found in userValue - field may be empty.', userValue);
             }
         } else if (ptObj.propertyURI === 'http://id.loc.gov/ontologies/bibframe/sublocation') {
           console.log("--- Simplified sublocation handling ---")

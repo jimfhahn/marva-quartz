@@ -183,55 +183,135 @@ const utilsNetwork = {
     },
 
     /**
-    * Loads the library to sublocation mapping from the JSON file
+    * Loads the nested library structure that includes sublocations
     */
-    loadLibrarySubLocationMapping: async function() {
-      if (this.librarySubLocationMap) {
-        return this.librarySubLocationMap;
+    loadNestedLibraryData: async function() {
+      // If we already have a processed lookup, return it
+      if (this.lookupLibrary['/libraryWithSublocations.json'] && this.lookupLibrary['/libraryWithSublocations.json'].metadata) {
+        return this.lookupLibrary['/libraryWithSublocations.json'];
       }
-      
+
       try {
-        const response = await fetch('/librarySubLocationMapping.json')
+        const response = await fetch('/libraryWithSublocations.json')
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`)
         }
-        this.librarySubLocationMap = await response.json()
-        return this.librarySubLocationMap
+        const nestedLibraryData = await response.json()
+        // keep the raw array around in case something expects it
+        this.lookupLibrary['/libraryWithSublocations.json_raw'] = nestedLibraryData
+
+        // convert to the processed lookup format expected by LookupSimple
+        const processed = this._convertNestedToLookup(nestedLibraryData)
+        this.lookupLibrary['/libraryWithSublocations.json'] = processed
+
+        return processed
       } catch (error) {
-        console.error('Error loading library sublocation mapping:', error)
-        this.librarySubLocationMap = {}
-        return this.librarySubLocationMap;
+        console.error('Error loading nested library data:', error)
+        return { metadata: { values: {} } }
       }
     },
 
-  /**
-    * Gets filtered sublocations for a specific library
+    /**
+     * Convert an array of nested library objects into the lookup format used by the UI
+     */
+    _convertNestedToLookup: function(nestedLibraryData) {
+      if (!nestedLibraryData || !Array.isArray(nestedLibraryData)) {
+        return { metadata: { values: {} } }
+      }
+
+      const lookupData = { metadata: { values: {} } }
+      nestedLibraryData.forEach((library) => {
+        const libraryId = library['@id']
+        // attempt to find a label in the expected place, fall back to id
+        const labelVal = library['http://www.loc.gov/mads/rdf/v1#authoritativeLabel']?.[0]?.['@value'] || libraryId
+
+        // Create display label array - the filter logic expects an array of strings at lookupData[libraryId]
+        lookupData[libraryId] = [labelVal]
+
+        // Create metadata for this library
+        lookupData.metadata.values[libraryId] = {
+          uri: libraryId,
+          label: [labelVal],
+          displayLabel: [labelVal],
+          authLabel: labelVal,
+          code: [libraryId]
+        }
+
+        // Also expose the original library object for sublocation access
+        lookupData[libraryId + '_original'] = library
+      })
+
+      return lookupData
+    },
+
+    /**
+    * Gets sublocations for a specific library from nested structure
     */
     getSubLocationsForLibrary: function(libraryId) {
-      if (!this.librarySubLocationMap) {
-        return this.lookupLibrary['/subLocation'] || []
+      // Prefer processed lookup form if available
+      const processed = this.lookupLibrary['/libraryWithSublocations.json']
+      if (processed && processed[libraryId + '_original'] && processed[libraryId + '_original'].sublocations) {
+        return processed[libraryId + '_original'].sublocations
       }
-      
-      const sublocationIds = this.librarySubLocationMap[libraryId]
-      
-      if (!sublocationIds || sublocationIds.length === 0) {
-        // Return only UNASSIGNED if no mapping exists
-        if (this.lookupLibrary['/subLocation'] && Array.isArray(this.lookupLibrary['/subLocation'])) {
-          return this.lookupLibrary['/subLocation'].filter(sub => 
-            sub && sub['@id'] === 'UNASSIGNED'
-          )
-        }
-        return []
+
+      // Fallback to raw array
+      const nestedLibraryData = this.lookupLibrary['/libraryWithSublocations.json_raw'] || this.lookupLibrary['/libraryWithSublocations.json']
+      if (!nestedLibraryData) return []
+
+      if (Array.isArray(nestedLibraryData)){
+        const library = nestedLibraryData.find(lib => lib['@id'] === libraryId)
+        if (library && library.sublocations) return library.sublocations
       }
-      
-      // Filter the full sublocation list based on the mapping
-      if (this.lookupLibrary['/subLocation'] && Array.isArray(this.lookupLibrary['/subLocation'])) {
-        return this.lookupLibrary['/subLocation'].filter(sub => 
-          sub && sub['@id'] && sublocationIds.includes(sub['@id'])
-        )
-      }
-      
+
       return []
+    },
+
+    /**
+    * Gets the nested library data structure for lookup fields
+    */
+    getNestedLibraryLookupData: function() {
+      // Return the processed lookup data directly
+      return this.lookupLibrary['/libraryWithSublocations.json'] || { metadata: { values: {} } }
+    },
+
+    /**
+    * Gets sublocation lookup data for a specific library
+    */
+    getSublocationLookupDataForLibrary: function(libraryId) {
+      const sublocations = this.getSubLocationsForLibrary(libraryId)
+      if (!sublocations || sublocations.length === 0) {
+        return { metadata: { values: {} } }
+      }
+      
+      const lookupData = { metadata: { values: {} } }
+      
+      sublocations.forEach((sublocation, index) => {
+        const sublocationId = sublocation['@id']
+        const sublocationLabel = sublocation['http://www.loc.gov/mads/rdf/v1#authoritativeLabel']?.[0]?.['@value'] || sublocationId
+        
+        // Create display label array - the filter logic expects an array of strings at lookupData[sublocationId]
+        lookupData[sublocationId] = [sublocationLabel]
+        
+        // Create metadata for this sublocation
+        lookupData.metadata.values[sublocationId] = {
+          uri: sublocationId,
+          label: [sublocationLabel],
+          displayLabel: [sublocationLabel],
+          authLabel: sublocationLabel,
+          code: [sublocationId]
+        }
+      })
+      
+      return lookupData
+    },
+
+    /**
+    * Legacy method - now loads nested structure instead of separate mapping
+    * @deprecated Use loadNestedLibraryData instead
+    */
+    loadLibrarySubLocationMapping: async function() {
+      console.warn('loadLibrarySubLocationMapping is deprecated, use loadNestedLibraryData instead')
+      return await this.loadNestedLibraryData()
     },
 
 

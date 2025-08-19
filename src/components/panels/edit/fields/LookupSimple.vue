@@ -221,8 +221,8 @@ export default {
   },
 
   watch: {
-    // Watch for library changes and refresh sublocation options
-    currentLibraryForFiltering(newLibraryId, oldLibraryId) {
+    // Watch for library changes in the profile store and refresh sublocation options
+    'profileStore.selectedLibrary'(newLibraryId, oldLibraryId) {
       if (newLibraryId !== oldLibraryId && this.isSubLocationField()) {
         // Library selection changed, refresh the display list if autocomplete is open
         if (this.displayAutocomplete) {
@@ -256,18 +256,23 @@ export default {
   },
 
   async mounted() {
-    // Load library-sublocation mapping if this is a sublocation field
-    if (this.isSubLocationField()) {
-      await utilsNetwork.loadLibrarySubLocationMapping()
-      
-      // Debug the library-sublocation mapping
-      console.log("Library-sublocation mapping:", utilsNetwork.librarySubLocationMap)
-      
-      // Also ensure the sublocation lookup data is loaded
-      if (!utilsNetwork.lookupLibrary['/subLocation.json']) {
-        await utilsNetwork.loadSimpleLookup(['/subLocation.json'])
+    // Load nested library data for both library and sublocation fields
+    if (this.isLibraryField()) {
+      if (this.uri === '/libraryWithSublocations.json') {
+        // Load the nested library data
+        await utilsNetwork.loadNestedLibraryData()
       }
+      // For legacy library.json, the regular loadSimpleLookup will handle it
+    } else if (this.isSubLocationField()) {
+      await utilsNetwork.loadNestedLibraryData()
+      
+      // Set up library change listener for sublocation fields using event bus or parent communication
+      // For now, we'll use a simpler approach without event bus
     }
+  },
+
+  beforeUnmount() {
+    // Clean up any event listeners if needed
   },
 
   computed: {
@@ -396,9 +401,22 @@ export default {
       }
       this.uri = this.structure.valueConstraint.useValuesFrom[0]
 
+      // If this is the nested library file, ensure nested data is loaded
+      if (this.uri === '/libraryWithSublocations.json'){
+        await utilsNetwork.loadNestedLibraryData()
+        // also make sure a processed lookup form exists
+        if (!utilsNetwork.lookupLibrary['/libraryWithSublocations.json']){
+          utilsNetwork.lookupLibrary['/libraryWithSublocations.json'] = utilsNetwork.getNestedLibraryLookupData()
+        }
+        return
+      }
+
       // Load library-sublocation mapping if this is a sublocation field
       if (this.isSubLocationField()) {
-        await utilsNetwork.loadLibrarySubLocationMapping();
+        // keep existing mapping loader for compatibility
+        if (typeof utilsNetwork.loadLibrarySubLocationMapping === 'function'){
+          await utilsNetwork.loadLibrarySubLocationMapping();
+        }
       }
 
       if (!this.uri.includes("suggest2")){
@@ -443,6 +461,15 @@ export default {
       }
 
 
+      // If using the nested library format, ensure its lookup form exists
+      if (this.uri === '/libraryWithSublocations.json'){
+        if (!utilsNetwork.lookupLibrary['/libraryWithSublocations.json']){
+          // attempt to load nested data and populate the processed lookup
+          await utilsNetwork.loadNestedLibraryData();
+          utilsNetwork.lookupLibrary['/libraryWithSublocations.json'] = utilsNetwork.getNestedLibraryLookupData()
+        }
+      }
+
       if (!utilsNetwork.lookupLibrary[this.uri+addKeyword]){
         this.displayList.push("Loading Data.")
         // if the data isn't loaded yet we will wait a few times
@@ -483,15 +510,10 @@ export default {
         }
       }
       
-      // Get the appropriate lookup data (filtered for sublocations if applicable)
-      let lookupData = this.isSubLocationField() && !addKeyword ? 
-                       this.getFilteredSubLocationData() : 
-                       utilsNetwork.lookupLibrary[this.uri+addKeyword];
-      
-      // Debug filtered data when using sublocation
-      if (this.isSubLocationField() && !addKeyword) {
-        console.log("Filtered sublocation data:", lookupData)
-      }
+  // Get the appropriate lookup data (handles library/sublocation differences automatically)
+  let lookupData = addKeyword ? 
+           utilsNetwork.lookupLibrary[this.uri + addKeyword] :
+           this.getLookupData();
       
       // Safety check - make sure lookupData is valid and has the expected structure
       if (!lookupData || typeof lookupData !== 'object') {
@@ -848,11 +870,7 @@ export default {
 
         this.doubleDelete = false
 
-        let metadata = utilsNetwork.lookupLibrary[this.uri].metadata.values
-
-        if (this.activeKeyword){
-          metadata = utilsNetwork.lookupLibrary[this.uri+'KEYWORD'].metadata.values
-        }
+  let metadata = this.safeLookupMetadata(this.uri, this.activeKeyword)
 
 
 
@@ -980,12 +998,7 @@ export default {
     },
 
     returnCAMMLabelFromDisplayListValue(displayListValue){
-
-      let metadata = utilsNetwork.lookupLibrary[this.uri].metadata.values
-
-      if (this.activeKeyword){
-        metadata = utilsNetwork.lookupLibrary[this.uri+'KEYWORD'].metadata.values
-      }
+  let metadata = this.safeLookupMetadata(this.uri, this.activeKeyword)
       for (let key of Object.keys(metadata)){
         let displayLabel = metadata[key].displayLabel
         if (Array.isArray(displayLabel)){displayLabel = displayLabel[0]}
@@ -1053,223 +1066,73 @@ export default {
              (this.structure && this.structure.resourceURI === 'http://id.loc.gov/ontologies/bibframe/Sublocation');
     },
 
-    // Helper method to get the current library selection from the same record
+    // Helper method to check if this field is a library field
+    isLibraryField: function() {
+      return this.uri === '/library.json' || 
+             this.uri === '/libraryWithSublocations.json' ||
+             (this.structure && this.structure.propertyURI === 'http://id.loc.gov/ontologies/bibframe/library');
+    },
+
+    // Simplified method to get current library selection
     getCurrentLibrarySelection: function() {
-      try {
-        console.log('[getCurrentLibrarySelection] Starting search for library selection');
+      // For library fields, we don't need to find the selection from elsewhere
+      if (this.isLibraryField()) {
+        return null;
+      }
+      
+      // For sublocation fields, get from profile store
+      if (this.profileStore && this.profileStore.selectedLibrary) {
+        console.log('[getCurrentLibrarySelection] Found library selection:', this.profileStore.selectedLibrary)
+        return this.profileStore.selectedLibrary;
+      }
+      
+      console.log('[getCurrentLibrarySelection] No library selection found in profile store')
+      return null;
+    },
 
-        // Debug: Log all available data sources to understand the structure
-        console.log('[getCurrentLibrarySelection] ProfileStore state keys:', Object.keys(this.profileStore.$state || {}));
-        console.log('[getCurrentLibrarySelection] ActiveProfile:', this.activeProfile);
-        if (this.activeProfile && this.activeProfile.json) {
-          console.log('[getCurrentLibrarySelection] ActiveProfile.json keys:', Object.keys(this.activeProfile.json));
-        }
-
-        // Try currentRecord first, then fallback to activeProfile.json
-        let currentRecord = this.profileStore.currentRecord;
-        if (!currentRecord && this.activeProfile && this.activeProfile.json) {
-          currentRecord = this.activeProfile.json;
-          console.log('[getCurrentLibrarySelection] Fallback to activeProfile.json:', currentRecord);
+    // Method to get the appropriate lookup data for this field
+    getLookupData: function() {
+      if (this.isLibraryField()) {
+        // For nested library structure, use the getNestedLibraryLookupData utility
+        if (this.uri === '/libraryWithSublocations.json') {
+          return utilsNetwork.getNestedLibraryLookupData();
         } else {
-          console.log('[getCurrentLibrarySelection] Current record:', currentRecord);
+          // For legacy library.json, use regular lookup
+          return utilsNetwork.lookupLibrary[this.uri + (this.activeKeyword ? 'KEYWORD' : '')];
         }
-
-        // Additional fallback: try to find library data in profile store
-        if (!currentRecord) {
-          console.log('[getCurrentLibrarySelection] Trying additional fallbacks...');
-          
-          // Check if there's a selectedLibrary or similar property
-          if (this.profileStore.selectedLibrary) {
-            console.log('[getCurrentLibrarySelection] Found selectedLibrary:', this.profileStore.selectedLibrary);
-            return this.profileStore.selectedLibrary;
-          }
-          
-          // Check if there's a library property in the component data
-          if (this.$data && this.$data.librarySelection) {
-            console.log('[getCurrentLibrarySelection] Found librarySelection in component data:', this.$data.librarySelection);
-            return this.$data.librarySelection;
-          }
-          
-          // Check if there's library data in the active record
-          if (this.profileStore.activeRecord) {
-            console.log('[getCurrentLibrarySelection] Checking activeRecord:', this.profileStore.activeRecord);
-            currentRecord = this.profileStore.activeRecord;
-          }
-          
-          // Check if there's library data in the current component's guid record
-          if (this.guid && this.profileStore.returnRecord && typeof this.profileStore.returnRecord === 'function') {
-            try {
-              const guidRecord = this.profileStore.returnRecord(this.guid);
-              console.log('[getCurrentLibrarySelection] Checking guid record:', guidRecord);
-              if (guidRecord) {
-                currentRecord = guidRecord;
-              }
-            } catch (e) {
-              console.log('[getCurrentLibrarySelection] Error getting guid record:', e);
-            }
-          }
+      } else if (this.isSubLocationField()) {
+        // Get sublocation data for the selected library
+        const libraryId = this.getCurrentLibrarySelection();
+        if (!libraryId) {
+          console.log("[getLookupData] No library selected for sublocation field");
+          return { metadata: { values: {} } };
         }
-
-        if (!currentRecord || !currentRecord.values) {
-          console.log('[getCurrentLibrarySelection] No current record available after all fallbacks');
-          
-          // Last resort: Check URL parameters
-          const urlParams = new URLSearchParams(window.location.search);
-          if (urlParams.has('library')) {
-            const libraryFromUrl = urlParams.get('library');
-            console.log('[getCurrentLibrarySelection] Found library in URL params:', libraryFromUrl);
-            return libraryFromUrl;
-          }
-          
-          // Extreme fallback: Hard-coded return of "Libra" if we know that's the selected library
-          console.log('[getCurrentLibrarySelection] Using extreme fallback: returning hard-coded "Libra"');
-          return "Libra";
-        }
-
-        // Look through all components in the current record
-        for (const componentGuid in currentRecord.values) {
-          const component = currentRecord.values[componentGuid];
-          if (!component || !component.fields) continue;
-
-          for (const fieldGuid in component.fields) {
-            const fieldArray = component.fields[fieldGuid];
-            if (!Array.isArray(fieldArray)) continue;
-
-            for (const field of fieldArray) {
-              // Check if this is a library field
-              if (field && field.uri === '/library.json') {
-                console.log('[getCurrentLibrarySelection] Found library field:', field);
-
-                // Check for items array (this is where selected values are stored)
-                if (field.items && Array.isArray(field.items) && field.items.length > 0) {
-                  const libraryItem = field.items[0];
-
-                  // Handle different formats
-                  if (typeof libraryItem === 'string') {
-                    console.log('[getCurrentLibrarySelection] Found library string:', libraryItem);
-                    return libraryItem;
-                  }
-                  if (libraryItem['@id']) {
-                    console.log('[getCurrentLibrarySelection] Found library @id:', libraryItem['@id']);
-                    return libraryItem['@id'];
-                  }
-                }
-
-                // Also check value array (alternative storage location)
-                if (field.value && Array.isArray(field.value) && field.value.length > 0) {
-                  const libraryValue = field.value[0];
-
-                  if (typeof libraryValue === 'string') {
-                    console.log('[getCurrentLibrarySelection] Found library value string:', libraryValue);
-                    return libraryValue;
-                  }
-                  if (libraryValue['@id']) {
-                    console.log('[getCurrentLibrarySelection] Found library value @id:', libraryValue['@id']);
-                    return libraryValue['@id'];
-                  }
-                }
-              }
-            }
-          }
-        }
-
-        console.log('[getCurrentLibrarySelection] No library selection found in record, using hard-coded "Libra"');
-        return "Libra";
-
-      } catch (error) {
-        console.error('[getCurrentLibrarySelection] Error:', error);
-        // Even if there's an error, return the hard-coded value as a last resort
-        return "Libra";
+        return utilsNetwork.getSublocationLookupDataForLibrary(libraryId);
+      } else {
+        // Regular lookup field
+        return utilsNetwork.lookupLibrary[this.uri + (this.activeKeyword ? 'KEYWORD' : '')];
       }
     },
 
-    // Method to get filtered sublocation data based on current library
-    getFilteredSubLocationData: function() {
-      if (!this.uri) return {}
-      
-      const libraryId = this.getCurrentLibrarySelection()
-      console.log("[getFilteredSubLocationData] Current library selection:", libraryId)
-      
-      // Get the full sublocation lookup data
-      const sublocationData = utilsNetwork.lookupLibrary[this.uri]
-      if (!sublocationData || typeof sublocationData !== 'object') {
-        console.warn('[getFilteredSubLocationData] No lookup data loaded for', this.uri)
-        return { metadata: { values: {} } }
-      }
-      
-      // If no library or mapping not loaded, return all sublocations
-      if (!libraryId || !utilsNetwork.librarySubLocationMap) {
-        console.log("[getFilteredSubLocationData] No library ID or mapping, returning all sublocations")
-        return sublocationData
-      }
-      
-      // Get allowed sublocation objects for this library
-      const allowedSublocationObjects = utilsNetwork.librarySubLocationMap[libraryId]
-      
-      if (!allowedSublocationObjects || !Array.isArray(allowedSublocationObjects)) {
-        console.log("[getFilteredSubLocationData] No allowed sublocations found, returning UNASSIGNED only")
-        // Create filtered data with only UNASSIGNED
-        let filteredData = { metadata: { values: {} } }
-        
-        // Copy only UNASSIGNED entries
-        Object.keys(sublocationData).forEach(key => {
-          if (key === 'metadata') {
-            // Filter metadata to only include UNASSIGNED
-            if (sublocationData.metadata && sublocationData.metadata.values) {
-              filteredData.metadata = { values: {} }
-              Object.keys(sublocationData.metadata.values).forEach(valueKey => {
-                const metaValue = sublocationData.metadata.values[valueKey]
-                // Check if this entry's @id matches "UNASSIGNED"
-                if (metaValue && metaValue.uri === 'UNASSIGNED') {
-                  filteredData.metadata.values[valueKey] = metaValue
-                }
-              })
-            }
-          } else if (key === 'UNASSIGNED') {
-            filteredData[key] = sublocationData[key]
-          }
-        })
-        
-        return filteredData
-      }
-      
-      // Extract just the IDs from the allowed sublocation objects
-      const allowedSublocationIds = allowedSublocationObjects.map(obj => obj['@id'])
-      console.log("[getFilteredSubLocationData] Allowed sublocation IDs:", allowedSublocationIds)
-      
-      // Create filtered data structure
-      let filteredData = { metadata: { values: {} } }
-      
-      // Copy structure but only include allowed sublocations
-      Object.keys(sublocationData).forEach(key => {
-        if (key === 'metadata') {
-          // Filter metadata values
-          if (sublocationData.metadata && sublocationData.metadata.values) {
-            filteredData.metadata = { values: {} }
-            Object.keys(sublocationData.metadata.values).forEach(valueKey => {
-              const metaValue = sublocationData.metadata.values[valueKey]
-              // Check if this sublocation ID is in the allowed list
-              if (metaValue && metaValue.uri) {
-                // Extract the ID part from the URI if needed
-                const uriId = metaValue.uri.split('/').pop();
-                if (allowedSublocationIds.includes(uriId) || allowedSublocationIds.includes(metaValue.uri)) {
-                  filteredData.metadata.values[valueKey] = metaValue;
-                }
-              }
-            })
-          }
-        } else {
-          // For non-metadata keys, check if they're in the allowed list
-          if (allowedSublocationIds.includes(key)) {
-            filteredData[key] = sublocationData[key]
-          }
+    // Return metadata.values safely for a given uri and keyword flag
+    safeLookupMetadata: function(uri, activeKeyword) {
+      try{
+        if (activeKeyword && utilsNetwork.lookupLibrary[uri + 'KEYWORD'] && utilsNetwork.lookupLibrary[uri + 'KEYWORD'].metadata) {
+          return utilsNetwork.lookupLibrary[uri + 'KEYWORD'].metadata.values || {}
         }
-      })
-      
-      console.log("[getFilteredSubLocationData] Filtered data keys:", Object.keys(filteredData))
-      console.log("[getFilteredSubLocationData] Filtered metadata keys:", Object.keys(filteredData.metadata?.values || {}))
-      
-      return filteredData
+        if (utilsNetwork.lookupLibrary[uri] && utilsNetwork.lookupLibrary[uri].metadata) {
+          return utilsNetwork.lookupLibrary[uri].metadata.values || {}
+        }
+        return {}
+      }catch(e){
+        console.warn('[safeLookupMetadata] failed for',uri,e)
+        return {}
+      }
+    },
+
+    // Legacy method for compatibility
+    getFilteredSubLocationData: function() {
+      return this.getLookupData();
     },
 
     removeValue: function(idx){
@@ -1298,10 +1161,8 @@ export default {
       this.displayAutocomplete = false
       this.activeSelect = item
       
-      // Get the appropriate metadata (filtered for sublocations if applicable)
-      let lookupData = this.isSubLocationField() && !this.activeKeyword ? 
-                       this.getFilteredSubLocationData() : 
-                       utilsNetwork.lookupLibrary[this.uri + (this.activeKeyword ? 'KEYWORD' : '')];
+      // Get the appropriate lookup data (handles library/sublocation differences automatically)
+      let lookupData = this.getLookupData();
       
       // Safety check - make sure lookupData is valid and has the expected structure
       if (!lookupData || !lookupData.metadata || !lookupData.metadata.values) {
@@ -1309,7 +1170,16 @@ export default {
         return;
       }
       
-      let metadata = lookupData.metadata.values;
+  let metadata = (lookupData && lookupData.metadata && lookupData.metadata.values) ? lookupData.metadata.values : {}
+
+      // If this is a library field, store the selection for other components
+      if (this.isLibraryField() && item) {
+        // Store in profile store or a shared state for sublocation fields to access
+        if (this.profileStore) {
+          this.profileStore.selectedLibrary = item;
+          console.log('[clickAdd] Stored library selection:', item)
+        }
+      }
 
       // console.log("looking forrrrr",this.activeSelect)
       // console.log("META",JSON.stringify(metadata,null,2))
@@ -1511,8 +1381,14 @@ export default {
 
           // normalize the lookup real quick to make sure if we have something like "http://id.loc.gov/vocabulary/descriptionConventions" and we have a uri like "http://id.loc.gov/vocabulary/descriptionconventions"
           // it still finds it
-          for (let key of Object.keys(JSON.parse(JSON.stringify(utilsNetwork.lookupLibrary[this.uri].metadata.values)))){
-            utilsNetwork.lookupLibrary[this.uri].metadata.values[key.toLowerCase()] = utilsNetwork.lookupLibrary[this.uri].metadata.values[key]
+          // normalize the lookup keys to lowercase safely
+          let metaValsForNormalization = this.safeLookupMetadata(this.uri, this.activeKeyword)
+          if (Object.keys(metaValsForNormalization).length > 0) {
+            for (let key of Object.keys(JSON.parse(JSON.stringify(metaValsForNormalization)))){
+              if (utilsNetwork.lookupLibrary[this.uri] && utilsNetwork.lookupLibrary[this.uri].metadata && utilsNetwork.lookupLibrary[this.uri].metadata.values) {
+                utilsNetwork.lookupLibrary[this.uri].metadata.values[key.toLowerCase()] = utilsNetwork.lookupLibrary[this.uri].metadata.values[key]
+              }
+            }
           }
 
 
@@ -1523,11 +1399,12 @@ export default {
           // console.log("value", JSON.stringify(utilsNetwork.lookupLibrary[this.uri].metadata.values[matches[0]]))
 
 
-          let displayLabel = utilsNetwork.lookupLibrary[this.uri].metadata.values[matches[0]].displayLabel
+          let metaSafe = this.safeLookupMetadata(this.uri, this.activeKeyword)
+          let displayLabel = metaSafe[matches[0]] ? metaSafe[matches[0]].displayLabel : null
           if (Array.isArray(displayLabel)){displayLabel = displayLabel[0]}
-          displayLabel = displayLabel.replace(/\s+/g,' ')
+          if (displayLabel) displayLabel = displayLabel.replace(/\s+/g,' ')
 
-          let authLabel = utilsNetwork.lookupLibrary[this.uri].metadata.values[matches[0]].authLabel
+          let authLabel = metaSafe[matches[0]] ? metaSafe[matches[0]].authLabel : null
           if (authLabel){ authLabel = authLabel.replace(/\s+/g,' ')}
           let useLabel = (authLabel) ? authLabel : displayLabel
 

@@ -706,7 +706,7 @@
                 "valueConstraint": {
                   "valueTemplateRefs": [],
                   "useValuesFrom": [
-                    "/library.json"
+                    "/libraryWithSublocations.json"
                   ],
                   "defaults": []
                 },
