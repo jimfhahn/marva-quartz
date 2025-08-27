@@ -1601,6 +1601,187 @@ const utilsNetwork = {
     },
 
     /**
+     * Publishes a record to Alma/backend publishing service
+     * @async
+     * @param {string} xmlString - The XML content to publish
+     * @param {object} profile - The profile object containing record metadata  
+     * @param {string} publishUrl - The URL to publish to
+     * @return {Promise<object>} - Response from publishing service
+     */
+    publishRecord: async function(xmlString, profile, publishUrl) {
+      try {
+        console.log('[publishRecord] Publishing to:', publishUrl);
+        
+        if (!xmlString) {
+          throw new Error('No XML content provided for publishing');
+        }
+        
+        if (!publishUrl) {
+          throw new Error('No publish URL provided');
+        }
+
+        const headers = { 
+          'Accept': 'application/json', 
+          'Content-Type': 'application/json' 
+        };
+        
+        // Format the request body to match the expected server format
+        const requestBody = {
+          name: profile?.neweId || profile?.eId || crypto.randomUUID(),
+          rdfxml: xmlString,
+          eid: profile?.eId || profile?.neweId
+        };
+        
+        console.log('[publishRecord] Request body structure:', {
+          hasName: !!requestBody.name,
+          hasRdfxml: !!requestBody.rdfxml,
+          hasEid: !!requestBody.eid,
+          xmlLength: requestBody.rdfxml ? requestBody.rdfxml.length : 0
+        });
+        
+        const body = JSON.stringify(requestBody);
+        
+        const response = await fetch(publishUrl, { 
+          method: 'POST', 
+          headers, 
+          body 
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text().catch(() => null);
+          console.warn('[publishRecord] non-OK response', response.status, errorText);
+          
+          // Try to get more details about the server error
+          console.error('[publishRecord] Response headers:', Object.fromEntries(response.headers.entries()));
+          console.error('[publishRecord] Response status text:', response.statusText);
+          console.error('[publishRecord] Response URL:', response.url);
+          
+          // Try to parse error text as JSON to get more details
+          let serverError = null;
+          if (errorText) {
+            try {
+              serverError = JSON.parse(errorText);
+              console.error('[publishRecord] Parsed server error:', serverError);
+            } catch (e) {
+              console.error('[publishRecord] Raw server error text:', errorText);
+            }
+          }
+          
+          throw new Error(`Publishing failed with status ${response.status}: ${errorText}`);
+        }
+        
+        // Parse response based on content type
+        const contentType = response.headers.get('content-type') || '';
+        let result;
+        
+        if (contentType.includes('application/json')) {
+          result = await response.json();
+        } else {
+          const textResult = await response.text();
+          // Try to parse as JSON in case content-type header is wrong
+          try {
+            result = JSON.parse(textResult);
+          } catch {
+            result = { status: true, message: textResult };
+          }
+        }
+        
+        console.log('[publishRecord] Success:', result);
+        return result;
+        
+      } catch (error) {
+        console.error('[publishRecord] Error during publish:', error);
+        throw error;
+      }
+    },
+
+    /**
+     * Posts instance data to the server
+     * @async
+     * @param {Object} requestData - Object containing name, rdfxml, and eid
+     * @return {Object} - Server response
+     */
+    postInstanceToServer: async function(requestData) {
+      try {
+        console.log('[postInstanceToServer] Posting instance data:', {
+          hasName: !!requestData.name,
+          hasRdfxml: !!requestData.rdfxml,
+          hasEid: !!requestData.eid,
+          xmlLength: requestData.rdfxml ? requestData.rdfxml.length : 0
+        });
+        
+        const { useConfigStore } = await import('@/stores/config');
+        const config = useConfigStore();
+        const instanceUrl = config.returnUrls.instancepublish;
+        
+        if (!instanceUrl) {
+          throw new Error('Instance publish URL not configured');
+        }
+        
+        const headers = { 
+          'Accept': 'application/json', 
+          'Content-Type': 'application/json' 
+        };
+        
+        const body = JSON.stringify(requestData);
+        
+        console.log('[postInstanceToServer] Posting to:', instanceUrl);
+        
+        const response = await fetch(instanceUrl, { 
+          method: 'POST', 
+          headers, 
+          body 
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text().catch(() => null);
+          console.error('[postInstanceToServer] non-OK response', response.status, errorText);
+          
+          // Try to get more details about the server error
+          console.error('[postInstanceToServer] Response headers:', Object.fromEntries(response.headers.entries()));
+          console.error('[postInstanceToServer] Response status text:', response.statusText);
+          console.error('[postInstanceToServer] Response URL:', response.url);
+          
+          // Try to parse error text as JSON to get more details
+          let serverError = null;
+          if (errorText) {
+            try {
+              serverError = JSON.parse(errorText);
+              console.error('[postInstanceToServer] Parsed server error:', serverError);
+            } catch (e) {
+              console.error('[postInstanceToServer] Raw server error text:', errorText);
+            }
+          }
+          
+          throw new Error(`Instance posting failed with status ${response.status}: ${errorText}`);
+        }
+        
+        // Parse response based on content type
+        const contentType = response.headers.get('content-type') || '';
+        let result;
+        
+        if (contentType.includes('application/json')) {
+          result = await response.json();
+        } else {
+          const textResult = await response.text();
+          // Try to parse as JSON in case content-type header is wrong
+          try {
+            result = JSON.parse(textResult);
+          } catch {
+            result = { status: true, message: textResult };
+          }
+        }
+        
+        console.log('[postInstanceToServer] Success:', result);
+        return result;
+        
+      } catch (error) {
+        console.error('[postInstanceToServer] Error during instance post:', error);
+        throw error;
+      }
+    },
+
+    /**
      * Fetches BFDB XML content from a URL with environment-specific URL handling
      * @async
      * @param {string} url - the BFDB URL to fetch XML from
@@ -1660,6 +1841,142 @@ const utilsNetwork = {
     },
 
     /**
+     * Search for instances by LCCN
+     * @async
+     * @param {string} lccn - The LCCN to search for
+     * @return {Promise<Array>} Array of search results
+     */
+    searchInstanceByLCCN: async function(lccn) {
+      try {
+        const { useConfigStore } = await import('@/stores/config')
+        const returnUrls = useConfigStore().returnUrls || {};
+        
+        // Use the search API with specific LCCN query
+        // This returns an Atom feed format, not standard JSON
+        const searchUrl = `https://id.loc.gov/search/?q=${encodeURIComponent(lccn)}&format=json&count=25`;
+        console.log("LCCN search URL:", searchUrl);
+        
+        const response = await this.fetchSimpleLookup(searchUrl, true);
+        
+        if (!response || !Array.isArray(response)) {
+          console.log("No search results found for LCCN:", lccn);
+          return [];
+        }
+        
+        // Parse the Atom feed format response
+        const results = [];
+        
+        // Look for atom:entry elements in the response array
+        for (let i = 0; i < response.length; i++) {
+          const item = response[i];
+          
+          // Check if this is an atom:entry
+          if (Array.isArray(item) && item[0] === "atom:entry") {
+            let title = "";
+            let instanceUri = "";
+            let rdfUri = "";
+            
+            // Parse the entry content (starts from index 2, after tag name and attributes)
+            for (let j = 2; j < item.length; j++) {
+              const element = item[j];
+              
+              if (Array.isArray(element)) {
+                // Extract title
+                if (element[0] === "atom:title" && element.length > 2) {
+                  title = element[2];
+                }
+                
+                // Extract links
+                if (element[0] === "atom:link" && element[1]) {
+                  const attrs = element[1];
+                  if (attrs.href && attrs.href.includes('/instances/')) {
+                    if (attrs.type === "application/rdf+xml") {
+                      rdfUri = attrs.href;
+                    } else if (attrs.rel === "alternate" && !attrs.type) {
+                      instanceUri = attrs.href;
+                    }
+                  }
+                }
+              }
+            }
+            
+            // If we found an instance, add it to results
+            if (instanceUri && rdfUri) {
+              const instanceId = instanceUri.split('/').pop();
+              
+              results.push({
+                label: title || `Instance: ${instanceId}`,
+                bfdbURL: instanceUri,
+                bfdbPackageURL: rdfUri, // The RDF/XML link from the Atom feed
+                idURL: instanceUri
+              });
+            }
+          }
+        }
+        
+        // If no results from the general search, try with "lccn:" prefix
+        if (results.length === 0) {
+          console.log("No instance results found, trying LCCN-specific search");
+          
+          const lccnSearchUrl = `https://id.loc.gov/search/?q=lccn:${encodeURIComponent(lccn)}&format=json&count=25`;
+          const lccnResponse = await this.fetchSimpleLookup(lccnSearchUrl, true);
+          
+          if (lccnResponse && Array.isArray(lccnResponse)) {
+            // Parse the same Atom feed format for the lccn: prefixed search
+            for (let i = 0; i < lccnResponse.length; i++) {
+              const item = lccnResponse[i];
+              
+              if (Array.isArray(item) && item[0] === "atom:entry") {
+                let title = "";
+                let instanceUri = "";
+                let rdfUri = "";
+                
+                for (let j = 2; j < item.length; j++) {
+                  const element = item[j];
+                  
+                  if (Array.isArray(element)) {
+                    if (element[0] === "atom:title" && element.length > 2) {
+                      title = element[2];
+                    }
+                    
+                    if (element[0] === "atom:link" && element[1]) {
+                      const attrs = element[1];
+                      if (attrs.href && attrs.href.includes('/instances/')) {
+                        if (attrs.type === "application/rdf+xml") {
+                          rdfUri = attrs.href;
+                        } else if (attrs.rel === "alternate" && !attrs.type) {
+                          instanceUri = attrs.href;
+                        }
+                      }
+                    }
+                  }
+                }
+                
+                if (instanceUri && rdfUri) {
+                  const instanceId = instanceUri.split('/').pop();
+                  
+                  results.push({
+                    label: title || `Instance: ${instanceId}`,
+                    bfdbURL: instanceUri,
+                    bfdbPackageURL: rdfUri,
+                    idURL: instanceUri
+                  });
+                }
+              }
+            }
+          }
+        }
+        
+        console.log("LCCN search results:", results);
+        return results;
+        
+      } catch (error) {
+        console.error('Error searching by LCCN:', error);
+        return [];
+      }
+    },
+
+    /**
      * Validates RDF/XML against SHACL shapes
      * @async
      * @param {string} rdfXml - the RDF/XML to validate
@@ -1715,6 +2032,286 @@ const utilsNetwork = {
           violations: [`Validation error: ${error.message}`]
         };
       }
+    },
+
+    /**
+     * Search for subjects using various search modes
+     * @param {string} searchString - The search term
+     * @param {string} searchStringFull - The full search string
+     * @param {string} searchMode - The search mode
+     * @returns {Promise<Object>} Search results
+     */
+    subjectSearch: async function(searchString, searchStringFull, searchMode) {
+      let nafResults = {
+        names: [],
+        subjectsComplex: [],
+        subjectsSimple: [],
+        subjectsChildren: [],
+        subjectsChildrenComplex: [],
+        hierarchicalGeographic: [],
+        exact: []
+      };
+
+      searchString = searchString.normalize();
+      searchStringFull = searchStringFull.normalize();
+
+      let searchStringUse = searchString;
+      let isComplex = false;
+
+      if (searchString.includes(' -- ')) {
+        isComplex = true;
+        searchStringUse = searchString.split(' -- ')[0];
+      }
+
+      // Different search modes
+      if (searchMode === 'LCSHNAF') {
+        let url = 'https://id.loc.gov/authorities/subjects/suggest2/?q=' + searchStringUse;
+        if (isComplex) {
+          url = 'https://id.loc.gov/authorities/subjects/suggest2/?q=' + searchString.replaceAll(' -- ', '--');
+        }
+
+        console.log("🔍 Calling LCSH API:", url);
+        // Get LCSH results
+        const lcshData = await this.fetchSimpleLookup(url, true);
+        console.log("🔍 LCSH API response:", lcshData);
+        if (lcshData && lcshData.hits) {
+          console.log("🔍 Processing", lcshData.hits.length, "LCSH hits");
+          for (let h of lcshData.hits) {
+            console.log("🔍 LCSH hit:", h.suggestLabel, "URI:", h.uri);
+            // Check for complex subjects (with subdivisions)
+            if (h.suggestLabel.includes(' -- ') || h.suggestLabel.includes('--')) {
+              h.heading = { subdivision: false };
+              h.literal = false;
+              nafResults.subjectsComplex.push(h);
+              console.log("🔍 Added to subjectsComplex:", h.suggestLabel);
+            } else {
+              h.heading = { subdivision: false };
+              h.literal = false;
+              nafResults.subjectsSimple.push(h);
+              console.log("🔍 Added to subjectsSimple:", h.suggestLabel);
+            }
+          }
+        }
+
+        // Get NAF results
+        url = 'https://id.loc.gov/authorities/names/suggest2/?q=' + searchStringUse;
+        console.log("🔍 Calling NAF API:", url);
+        const nafData = await this.fetchSimpleLookup(url, true);
+        console.log("🔍 NAF API response:", nafData);
+        if (nafData && nafData.hits) {
+          console.log("🔍 Processing", nafData.hits.length, "NAF hits");
+          for (let h of nafData.hits) {
+            console.log("🔍 NAF hit:", h.suggestLabel, "URI:", h.uri);
+            h.rdfType = 'Topic';
+            h.heading = {
+              rdfType: h.rdfType,
+              subdivision: false
+            };
+            h.literal = false;
+            nafResults.names.push(h);
+            console.log("🔍 Added to names:", h.suggestLabel);
+          }
+        }
+      } else if (searchMode === 'CHILD') {
+        let url = 'https://id.loc.gov/authorities/childrensSubjects/suggest2/?q=' + searchStringUse;
+        if (isComplex) {
+          url = 'https://id.loc.gov/authorities/childrensSubjects/suggest2/?q=' + searchString.replaceAll(' -- ', '--');
+        }
+
+        const childData = await this.fetchSimpleLookup(url, true);
+        if (childData && childData.hits) {
+          for (let h of childData.hits) {
+            if (h.suggestLabel.includes(' -- ') || h.suggestLabel.includes('--')) {
+              h.heading = { subdivision: false };
+              h.literal = false;
+              nafResults.subjectsChildrenComplex.push(h);
+            } else {
+              h.heading = { subdivision: false };
+              h.literal = false;
+              nafResults.subjectsChildren.push(h);
+            }
+          }
+        }
+      } else if (searchMode === 'GEO') {
+        const url = 'https://id.loc.gov/authorities/subjects/suggest2/?q=' + searchStringUse + '&filter=scheme:http://id.loc.gov/authorities/subjects/collection_GeographicSubdivisions';
+        const geoData = await this.fetchSimpleLookup(url, true);
+        if (geoData && geoData.hits) {
+          for (let h of geoData.hits) {
+            h.heading = { subdivision: true };
+            h.literal = false;
+            nafResults.hierarchicalGeographic.push(h);
+          }
+        }
+      } else if (searchMode === 'WORKS') {
+        const { useConfigStore } = await import('@/stores/config')
+        const returnUrls = useConfigStore().returnUrls || {};
+        const endpoint = returnUrls.works || 'https://id.loc.gov/resources/works/';
+        const url = `${endpoint}suggest2/?q=${searchString}&count=25`;
+        
+        const worksData = await this.fetchSimpleLookup(url, true);
+        if (worksData && worksData.hits) {
+          for (let h of worksData.hits) {
+            h.rdfType = 'Work';
+            h.heading = {
+              rdfType: h.rdfType,
+              subdivision: false
+            };
+            h.literal = false;
+            nafResults.names.push(h);
+          }
+        }
+      } else if (searchMode === 'HUBS') {
+        const { useConfigStore } = await import('@/stores/config')
+        const returnUrls = useConfigStore().returnUrls || {};
+        const endpoint = returnUrls.hubs || 'https://id.loc.gov/resources/hubs/';
+        const url = `${endpoint}suggest2/?q=${searchString}&count=25`;
+        
+        const hubsData = await this.fetchSimpleLookup(url, true);
+        if (hubsData && hubsData.hits) {
+          for (let h of hubsData.hits) {
+            h.rdfType = 'Hub';
+            h.heading = {
+              rdfType: h.rdfType,
+              subdivision: false
+            };
+            h.literal = false;
+            nafResults.names.push(h);
+          }
+        }
+      }
+
+      console.log("🔍 Final nafResults:", {
+        subjectsSimple: nafResults.subjectsSimple.length,
+        subjectsComplex: nafResults.subjectsComplex.length,
+        names: nafResults.names.length,
+        subjectsChildren: nafResults.subjectsChildren.length,
+        subjectsChildrenComplex: nafResults.subjectsChildrenComplex.length,
+        hierarchicalGeographic: nafResults.hierarchicalGeographic.length
+      });
+      console.log("🔍 Sample data:", nafResults);
+
+      return nafResults;
+    },
+
+    /**
+     * Resolve LCSH from MARC string
+     * @param {string} marcString - MARC-encoded subject string
+     * @returns {Promise<Object>} Resolved subject data
+     */
+    subjectLinkModeResolveLCSH: async function(marcString) {
+      if (!marcString) {
+        return {
+          resultType: 'ERROR',
+          msg: 'Please enter a MARC formatted subject string, starting with the subfield delimiter $ followed by the subfield code.'
+        };
+      }
+
+      let mainHeading = null;
+      let subdivisions = [];
+      const components = [];
+
+      // Parse the MARC string
+      const parts = marcString.split('$').filter(p => p.trim());
+      
+      for (const part of parts) {
+        if (!part) continue;
+        
+        const code = part.substring(0, 1);
+        const value = part.substring(1).trim();
+        
+        if (!value) continue;
+
+        const component = {
+          type: code,
+          label: value,
+          subdivision: code !== 'a',
+          primary: code === 'a'
+        };
+
+        // Assign RDF type based on subfield code
+        switch (code) {
+          case 'a':
+            component.rdfType = 'http://www.loc.gov/mads/rdf/v1#Topic';
+            break;
+          case 'v':
+            component.rdfType = 'http://www.loc.gov/mads/rdf/v1#GenreForm';
+            break;
+          case 'x':
+            component.rdfType = 'http://www.loc.gov/mads/rdf/v1#Topic';
+            break;
+          case 'y':
+            component.rdfType = 'http://www.loc.gov/mads/rdf/v1#Temporal';
+            break;
+          case 'z':
+            component.rdfType = 'http://www.loc.gov/mads/rdf/v1#Geographic';
+            break;
+          default:
+            component.rdfType = 'http://www.loc.gov/mads/rdf/v1#Topic';
+        }
+
+        if (code === 'a') {
+          mainHeading = component;
+        } else {
+          subdivisions.push(component);
+        }
+        
+        components.push(component);
+      }
+
+      if (!mainHeading) {
+        return {
+          resultType: 'ERROR',
+          msg: 'No main heading found. Subject must include a $a subfield.'
+        };
+      }
+
+      // Try to find the complete heading
+      const fullHeading = components.map(c => c.label).join('--');
+      const complexSearch = await this.fetchSimpleLookup(
+        `https://id.loc.gov/authorities/subjects/label/${encodeURIComponent(fullHeading)}.json`,
+        true
+      );
+
+      if (complexSearch && complexSearch['@id']) {
+        // Found as complex heading
+        return {
+          resultType: 'COMPLEX',
+          hit: {
+            uri: complexSearch['@id'],
+            label: fullHeading,
+            heading: {
+              subdivision: false,
+              rdfType: mainHeading.rdfType
+            }
+          }
+        };
+      }
+
+      // Try components individually
+      const results = [];
+      for (const comp of components) {
+        const searchUrl = `https://id.loc.gov/authorities/subjects/label/${encodeURIComponent(comp.label)}.json`;
+        const compSearch = await this.fetchSimpleLookup(searchUrl, true);
+        
+        const result = {
+          label: comp.label,
+          uri: compSearch && compSearch['@id'] ? compSearch['@id'] : null,
+          literal: !compSearch || !compSearch['@id'],
+          heading: {
+            primary: comp.primary,
+            subdivision: comp.subdivision,
+            type: comp.type,
+            rdfType: comp.rdfType
+          }
+        };
+        
+        results.push(result);
+      }
+
+      return {
+        resultType: 'SIMPLE',
+        hit: results
+      };
     },
 
 };

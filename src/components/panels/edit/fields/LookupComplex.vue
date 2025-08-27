@@ -217,6 +217,7 @@ export default {
       profileData: null,
       searchValue: null,
       authorityLookup: null,
+      authorityLookupTimeout: null,
       isLiteral: null,
 
       // when they are just using strings in the itnerface not building a heading don't show the heading as a entity
@@ -518,7 +519,13 @@ export default {
             this.marcDeliminatedLCSHModeTimeout = null
             this.marcDeliminatedLCSHModeResults = []
 
-            this.authorityLookup = this.searchValue.trim()
+            // Debounce the authorityLookup setting to prevent partial values
+            clearTimeout(this.authorityLookupTimeout)
+            this.authorityLookupTimeout = setTimeout(() => {
+              this.authorityLookup = this.searchValue.trim()
+              console.log("🔍 LookupComplex setting authorityLookup:", this.authorityLookup, "from searchValue:", this.searchValue)
+            }, 100)
+            
             this.searchValue = this.searchValue.trim()
 
             try{
@@ -561,10 +568,15 @@ export default {
 
 
     subjectAdded: function(components){
+      console.log('🎯 LookupComplex subjectAdded called with components:', components)
+      console.log('🎯 About to call setValueSubject with:', {
+        guid: this.guid,
+        components: components,
+        propertyPath: this.propertyPath
+      })
       this.profileStore.setValueSubject(this.guid,components,this.propertyPath)
+      console.log('✅ setValueSubject completed')
       this.hideSubjectModal()
-
-
     },
 
     // Open the authority `panel` for an given authority

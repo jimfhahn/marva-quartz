@@ -576,6 +576,35 @@ const utilsParse = {
         xml = this.returnOneWhereParentIs(xml, "rdf:RDF")
 
       }
+      
+      // Special handling for Works when loading from an Instance
+      if (xml === false && tle == 'bf:Work'){
+        console.warn('No top-level bf:Work found, checking if this is an Instance-based load')
+        
+        // Check if we have an Instance with instanceOf
+        let instances = this.activeDom.getElementsByTagName('bf:Instance')
+        for (let instance of instances) {
+          let instanceOfs = instance.getElementsByTagName('bf:instanceOf')
+          if (instanceOfs.length > 0) {
+            // Found instanceOf, check if it contains a Work
+            for (let instanceOf of instanceOfs) {
+              let works = instanceOf.getElementsByTagName('bf:Work')
+              if (works.length > 0) {
+                xml = works[0]
+                console.log('Found Work nested in instanceOf:', xml)
+                break
+              }
+            }
+          }
+          if (xml) break
+        }
+        
+        // If still no Work found, this might be a reference-only situation
+        if (!xml || xml === false) {
+          console.warn('No embedded Work found in instanceOf - Work may be external reference only')
+        }
+      }
+      
       if (xml===false){
         console.warn(tle,'was not processed because it failed the top level test, must be a nested resource?')
         toDeleteNoData.push(pkey)

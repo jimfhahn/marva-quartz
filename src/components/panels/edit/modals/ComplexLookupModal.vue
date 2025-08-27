@@ -178,6 +178,7 @@
 
       // watching the search input, when it changes kick off a search
       doSearch: async function(){
+        console.log("🔍 doSearch called with searchValueLocal:", this.searchValueLocal)
         // Abort any ongoing search
         if (this.activeComplexSearchInProgress){
           this.controller.abort();
@@ -719,6 +720,23 @@
         console.log("Final toLoad:", toLoad)
 
         if (!toLoad){ return false }
+        
+        // Check if this is a subject selection and handle it specially
+        if (this.structure && this.structure.propertyURI && 
+            this.structure.propertyURI.includes('subject')) {
+          console.log('Subject selection detected, emitting to parent');
+          
+          // For subjects, emit a special event that SubjectEditor can handle
+          this.$emit('selectSubject', {
+            label: Array.isArray(toLoad.label) ? toLoad.label[0] : toLoad.label,
+            uri: toLoad.uri,
+            type: toLoad.type,
+            literal: toLoad.literal || false,
+            context: toLoad
+          });
+          
+          return; // Don't continue with normal processing for subjects
+        }
 
         // Always use fullText for literals
         const titleValue = (toLoad.literal && toLoad.fullText) ? 
@@ -1119,10 +1137,12 @@
             this.$refs.inputLookup.focus()
           }
           this.authorityLookupLocal = this.authorityLookup
+          console.log("🔍 Setting authorityLookupLocal from authorityLookup:", this.authorityLookup, "->", this.authorityLookupLocal)
 
           // We're loading existing data
           if (this.authorityLookupLocal != null){
             this.searchValueLocal = this.authorityLookupLocal
+            console.log("🔍 Setting searchValueLocal:", this.searchValueLocal)
             this.doSearch()
 
             // search needs to complete, so selectChange has something to loop through

@@ -3042,8 +3042,16 @@ export const useProfileStore = defineStore('profile', {
     * @return {void} -
     */
     setValueSubject: async function(componentGuid,subjectComponents,propertyPath){
+        console.log('🎯 setValueSubject called with:', {
+            componentGuid,
+            subjectComponents,
+            propertyPath
+        })
+        
         // we're just going to overwrite the whole userValue with the constructed headings
         let pt = utilsProfile.returnPt(this.activeProfile,componentGuid)
+
+        console.log('🎯 Found pt:', pt ? 'Found' : 'NOT FOUND')
 
         // console.log('-----')
         // console.log(pt)
@@ -3354,6 +3362,9 @@ export const useProfileStore = defineStore('profile', {
 
             // console.log("USERVALUE IS",userValue)
             pt.userValue = userValue
+            console.log('✅ setValueSubject completed successfully, userValue set')
+        } else {
+            console.error('❌ setValueSubject failed: pt not found for componentGuid:', componentGuid)
         }
     },
 
@@ -3718,6 +3729,13 @@ export const useProfileStore = defineStore('profile', {
           const xmlObj = await utilsExport.buildXML(this.activeProfile);
           xml = xmlObj.xmlStringFormatted;
           console.log("DEBUG: Generated XML length:", xml ? xml.length : 0);
+          
+          // Log first 500 characters of XML for debugging
+          if (xml) {
+            console.log("DEBUG: XML Preview (first 500 chars):", xml.substring(0, 500));
+            console.log("DEBUG: XML contains rdf:RDF tag:", xml.includes('<rdf:RDF'));
+            console.log("DEBUG: XML contains closing tag:", xml.includes('</rdf:RDF>'));
+          }
         }
         
         // Make sure XML is valid
@@ -3730,6 +3748,37 @@ export const useProfileStore = defineStore('profile', {
               message: 'Failed to generate valid XML'
             }
           };
+        }
+        
+        // Debug: Check for common XML issues
+        console.log("DEBUG: Checking XML structure...");
+        if (xml.includes('undefined') || xml.includes('null')) {
+          console.warn("DEBUG: XML contains 'undefined' or 'null' strings");
+        }
+        
+        // Log the full XML to console for debugging (be careful with large documents)
+        if (xml.length < 10000) {
+          console.log("DEBUG: Full XML being sent:", xml);
+        } else {
+          console.log("DEBUG: XML too large to log fully. Length:", xml.length);
+          // For large XML, log first and last parts to see structure
+          console.log("DEBUG: XML Start (first 2000 chars):", xml.substring(0, 2000));
+          console.log("DEBUG: XML End (last 1000 chars):", xml.substring(xml.length - 1000));
+          
+          // Also try to validate the XML structure
+          try {
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(xml, "text/xml");
+            const parseError = xmlDoc.getElementsByTagName("parsererror");
+            
+            if (parseError.length > 0) {
+              console.error("DEBUG: XML Parse Error in large document:", parseError[0].textContent);
+            } else {
+              console.log("DEBUG: Large XML appears to be well-formed");
+            }
+          } catch (e) {
+            console.error("DEBUG: Failed to validate large XML:", e);
+          }
         }
     
         // Determine if we need to filter content based on type
@@ -3748,12 +3797,59 @@ export const useProfileStore = defineStore('profile', {
         }
         
         console.log("DEBUG: Using publish URL:", publishUrl);
+        console.log("DEBUG: XML length being sent:", finalXml.length);
+        console.log("DEBUG: Profile being sent:", profile ? Object.keys(profile) : 'no profile');
+        
+        // Debug the profile object
+        if (profile) {
+          console.log("DEBUG: Profile details:", {
+            eId: profile.eId,
+            hub: profile.hub,
+            hasTitle: !!profile.title,
+            title: profile.title || 'No title'
+          });
+          
+          // Check if profile has any problematic properties
+          console.log("DEBUG: Profile size (stringified):", JSON.stringify(profile).length);
+          
+          // Check for circular references or problematic data
+          try {
+            JSON.stringify(profile);
+            console.log("DEBUG: Profile serializes correctly");
+          } catch (e) {
+            console.error("DEBUG: Profile serialization error:", e);
+          }
+        }
         
         // Send publication request to backend
         console.log("DEBUG: Sending publish request to backend");
         const response = await utilsNetwork.publishRecord(finalXml, profile, publishUrl);
         
         console.log("Raw server response:", response);
+        
+        // Check if response indicates an XML parsing error
+        if (response && response.publish && response.publish.status === 'error') {
+          console.error("DEBUG: Server reported error:", response.publish.message);
+          
+          // If it's an XML parsing error, try to identify the issue
+          if (response.publish.message && response.publish.message.includes('XML')) {
+            console.error("DEBUG: XML parsing error detected");
+            
+            // Try to validate XML structure
+            try {
+              // Basic XML validation
+              const parser = new DOMParser();
+              const xmlDoc = parser.parseFromString(finalXml, "text/xml");
+              const parseError = xmlDoc.getElementsByTagName("parsererror");
+              
+              if (parseError.length > 0) {
+                console.error("DEBUG: XML Parse Error:", parseError[0].textContent);
+              }
+            } catch (e) {
+              console.error("DEBUG: Failed to parse XML locally:", e);
+            }
+          }
+        }
         
         // Ensure work_mms_id is populated from the nested structure if available
         if (response.name && response.name.work && response.name.work.mms_id) {
@@ -3773,6 +3869,15 @@ export const useProfileStore = defineStore('profile', {
         return response;
       } catch (error) {
         console.error("DEBUG: Error during publish:", error);
+        console.error("DEBUG: Error stack:", error.stack);
+        
+        // Log more details about the error
+        if (error.response) {
+          console.error("DEBUG: Error response:", error.response);
+          console.error("DEBUG: Error response data:", error.response.data);
+          console.error("DEBUG: Error response status:", error.response.status);
+        }
+        
         return {
           status: false,
           publish: {

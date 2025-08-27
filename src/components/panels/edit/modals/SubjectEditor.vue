@@ -815,6 +815,21 @@ watch: {
   searchValue: function(){
     this.subjectString = this.searchValue
     this.linkModeString = this.searchValue
+  },
+
+  // Watch for changes to searchResults and build pickLookup when it changes
+  searchResults: {
+    handler: function(newSearchResults) {
+      console.log("🔍 watcher: searchResults changed, calling buildPickLookup")
+      if (newSearchResults && Object.keys(newSearchResults).length > 0) {
+        // Use nextTick to ensure the data is fully set before building pickLookup
+        this.$nextTick(() => {
+          this.buildPickLookup()
+        })
+      }
+    },
+    deep: true,
+    immediate: false
   }
 
 },
@@ -1475,6 +1490,8 @@ methods: {
 
     that.searchResults = await utilsNetwork.subjectSearch(searchString,searchStringFull,that.searchMode)
 
+    console.log("🔍 searchApis: got searchResults from utilsNetwork.subjectSearch:", that.searchResults)
+
     // if they clicked around while it was doing this lookup bail out
     // if (that.activeSearchInterrupted){
 
@@ -1494,17 +1511,20 @@ methods: {
 
 
     // replace the true keyboard hypen with the werid hypen to prevent spliting on open lifedates
+    console.log("🔍 searchApis: processing names, searchResults.names.length:", that.searchResults.names?.length || 0)
     for (let s of that.searchResults.names){
       s.labelOrginal = s.label
       s.label = s.label.replaceAll('-','‑')
     }
 
-
+    console.log("🔍 searchApis: processing subjectsComplex, length:", that.searchResults.subjectsComplex?.length || 0)
     for (let s of that.searchResults.subjectsComplex){
       s.labelOrginal = s.label
       s.complex=true
       s.label = s.label.replaceAll('-','‑')
     }
+
+    console.log("🔍 searchApis: processing subjectsSimple, length:", that.searchResults.subjectsSimple?.length || 0)
 
     for (let s of that.searchResults.subjectsSimple){
       if (s.suggestLabel && s.suggestLabel.includes('(DEPRECATED')){
@@ -1544,32 +1564,15 @@ methods: {
 
     that.pickPostion = that.searchResults.subjectsSimple.length + that.searchResults.subjectsComplex.length -1
 
-    for (let x in that.searchResults.subjectsComplex){
-      that.pickLookup[x] = that.searchResults.subjectsComplex[x]
-    }
+    // Build the pick lookup for hover functionality
+    console.log("🚀 About to call buildPickLookup from searchApis")
+    console.log("🚀 that.searchResults before buildPickLookup:", that.searchResults)
+    that.buildPickLookup()
+    console.log("🚀 buildPickLookup call completed")
+    console.log("🚀 that.pickLookup after buildPickLookup:", that.pickLookup)
 
-    for (let x in that.searchResults.subjectsChildrenComplex){
-      that.pickLookup[x] = that.searchResults.subjectsChildrenComplex[x]
-    }
-
-    for (let x in that.searchResults.subjectsSimple){
-      that.pickLookup[parseInt(x)+parseInt(that.searchResults.subjectsComplex.length)] = that.searchResults.subjectsSimple[x]
-    }
-
-    for (let x in that.searchResults.subjectsChildren){
-      that.pickLookup[parseInt(x)+parseInt(that.searchResults.subjectsChildrenComplex.length)] = that.searchResults.subjectsChildren[x]
-    }
-
-    for (let x in that.searchResults.names){
-      that.pickLookup[(that.searchResults.names.length - x)*-1] = that.searchResults.names[x]
-    }
-
-    for (let x in that.searchResults.exact){
-      that.pickLookup[(that.searchResults.names.length - x)*-1-2] = that.searchResults.exact[x]
-    }
-
+    // Check if we have any matches to auto-select
     for (let k in that.pickLookup){
-      that.pickLookup[k].picked = false
       if (searchString.toLowerCase() == that.pickLookup[k].label.toLowerCase() && !that.pickLookup[k].literal ){
         // if the labels are the same for the current one selected don't overide it
         if (that.activeComponent && that.pickLookup[k].label.replaceAll('‑','-') == that.activeComponent.label.replaceAll('‑','-') && that.activeComponent.uri){
@@ -1584,7 +1587,7 @@ methods: {
             break
           }
           // do they even have the same label currently, they might be clicking around in the interface
-          // so at this point with the async lookup this is not even the right componen
+          // so at this point with the async lookup this is not even the right component
           if (that.pickLookup[k].label !=  that.activeComponent.label){
             break
           }
@@ -1593,7 +1596,10 @@ methods: {
     }
 
     // that.contextData.dispatch("clearContext", { self: that})
+    console.log("🔍 searchApis: checking if pickLookup[pickPosition] exists, pickPostion:", that.pickPostion)
+    console.log("🔍 searchApis: pickLookup[pickPostion]:", that.pickLookup[that.pickPostion])
     if (that.pickLookup[that.pickPostion] && !that.pickLookup[that.pickPostion].literal){
+      console.log("🔍 searchApis: calling getContext for initial context load")
       that.contextRequestInProgress = true
       // that.contextData = await utilsNetwork.returnContext(that.pickLookup[that.pickPostion].uri)
       that.contextData = that.getContext()
@@ -1604,9 +1610,12 @@ methods: {
       }
     }
 
+    console.log("🔍 searchApis: cleaning up timers and finishing")
     window.clearInterval(ti)
     window.clearTimeout(tiBackup)
     that.activeSearch = false
+
+    console.log("🔍 searchApis: calling nextTick for toolbar height check")
 
     that.$nextTick(() => {
       that.checkToolBarHeight()
@@ -1699,30 +1708,147 @@ methods: {
 
   },
 
+  /**
+   * Build the pick lookup which is an object that maps the position in the results to the actual data object
+   * Based on the main repository structure for hover functionality
+   */
+  buildPickLookup: function() {
+    console.log("🔧 buildPickLookup called")
+    console.log("🔧 searchResults:", this.searchResults)
+    
+    if (!this.searchResults) {
+      console.log("❌ No search results, clearing pickLookup")
+      this.pickLookup = {}
+      return
+    }
+
+    console.log("🔧 searchResults structure:")
+    console.log("  - subjectsComplex:", this.searchResults.subjectsComplex?.length || 0)
+    console.log("  - subjectsSimple:", this.searchResults.subjectsSimple?.length || 0) 
+    console.log("  - subjectsChildrenComplex:", this.searchResults.subjectsChildrenComplex?.length || 0)
+    console.log("  - subjectsChildren:", this.searchResults.subjectsChildren?.length || 0)
+    console.log("  - names:", this.searchResults.names?.length || 0)
+    console.log("  - exact:", this.searchResults.exact?.length || 0)
+
+    this.pickLookup = {}
+
+    // Complex subjects start at 0
+    if (this.searchResults.subjectsComplex) {
+      for (let x in this.searchResults.subjectsComplex) {
+        console.log(`📝 Adding subjectsComplex[${x}] to pickLookup[${x}]:`, this.searchResults.subjectsComplex[x].label)
+        this.pickLookup[x] = this.searchResults.subjectsComplex[x]
+      }
+    }
+
+    // Simple subjects continue from complex subjects
+    if (this.searchResults.subjectsSimple) {
+      for (let x in this.searchResults.subjectsSimple) {
+        const position = parseInt(x) + parseInt(this.searchResults.subjectsComplex?.length || 0)
+        console.log(`📝 Adding subjectsSimple[${x}] to pickLookup[${position}]:`, this.searchResults.subjectsSimple[x].label)
+        this.pickLookup[position] = this.searchResults.subjectsSimple[x]
+      }
+    }
+
+    // Children complex subjects start at 0 (note: this might conflict with the above)
+    if (this.searchResults.subjectsChildrenComplex) {
+      for (let x in this.searchResults.subjectsChildrenComplex) {
+        console.log(`📝 Adding subjectsChildrenComplex[${x}] to pickLookup[${x}]:`, this.searchResults.subjectsChildrenComplex[x].label)
+        this.pickLookup[x] = this.searchResults.subjectsChildrenComplex[x]
+      }
+    }
+
+    // Children simple subjects continue from children complex
+    if (this.searchResults.subjectsChildren) {
+      for (let x in this.searchResults.subjectsChildren) {
+        const position = parseInt(x) + parseInt(this.searchResults.subjectsChildrenComplex?.length || 0)
+        console.log(`📝 Adding subjectsChildren[${x}] to pickLookup[${position}]:`, this.searchResults.subjectsChildren[x].label)
+        this.pickLookup[position] = this.searchResults.subjectsChildren[x]
+      }
+    }
+
+    // Names get negative indices
+    if (this.searchResults.names) {
+      for (let x in this.searchResults.names) {
+        const position = (this.searchResults.names.length - x) * -1
+        console.log(`📝 Adding names[${x}] to pickLookup[${position}]:`, this.searchResults.names[x].label)
+        this.pickLookup[position] = this.searchResults.names[x]
+      }
+    }
+
+    // Exact matches get negative indices with offset
+    if (this.searchResults.exact) {
+      for (let x in this.searchResults.exact) {
+        const position = (this.searchResults.names?.length || 0 - x) * -1 - 2
+        console.log(`📝 Adding exact[${x}] to pickLookup[${position}]:`, this.searchResults.exact[x].label)
+        this.pickLookup[position] = this.searchResults.exact[x]
+      }
+    }
+
+    // Initialize picked status
+    for (let k in this.pickLookup) {
+      this.pickLookup[k].picked = false
+    }
+
+    console.log("✅ buildPickLookup completed")
+    console.log("🔧 Final pickLookup keys:", Object.keys(this.pickLookup))
+    console.log("🔧 Final pickLookup:", this.pickLookup)
+  },
+
   getContext: async function(){
-    if (this.pickLookup[this.pickPostion].literal){
+    console.log("getContext called, pickPosition:", this.pickPostion)
+    console.log("pickLookup:", this.pickLookup)
+    console.log("pickLookup[pickPostion]:", this.pickLookup[this.pickPostion])
+    
+    if (!this.pickLookup[this.pickPostion]) {
+      console.log("No entry in pickLookup for position:", this.pickPostion)
+      return false
+    }
+    
+    if (this.pickLookup[this.pickPostion].literal) {
+      console.log("Entry is literal, setting contextData directly")
       this.contextData = this.pickLookup[this.pickPostion]
       return false
     }
-    // let temp = await utilsNetwork.returnContext(this.pickLookup[this.pickPostion].uri)
-    this.contextData = this.pickLookup[this.pickPostion].extra
-    if (this.pickLookup[this.pickPostion].uri){
-      this.contextData.literal = false
-      this.contextData.title = this.pickLookup[this.pickPostion].label
-      this.contextData.uri = this.pickLookup[this.pickPostion].uri
-      if (Object.keys(this.contextData).includes("marcKey")){
-        this.pickLookup[this.pickPostion].marcKey = this.contextData.marcKey
+    
+    // Set contextData from the extra field if available
+    if (this.pickLookup[this.pickPostion].extra) {
+      console.log("Using extra data for context")
+      this.contextData = this.pickLookup[this.pickPostion].extra
+      
+      if (this.pickLookup[this.pickPostion].uri) {
+        this.contextData.literal = false
+        this.contextData.title = this.pickLookup[this.pickPostion].label
+        this.contextData.uri = this.pickLookup[this.pickPostion].uri
+        
+        if (Object.keys(this.contextData).includes("marcKey")) {
+          this.pickLookup[this.pickPostion].marcKey = this.contextData.marcKey
+        }
+        
+        let types = this.pickLookup[this.pickPostion].extra['rdftypes'] || []
+        if (types.includes("Hub")) {
+          this.contextData.type = "bf:Hub"
+        } else if (types.includes("Work")) {
+          this.contextData.type = "bf:Work"
+        } else if (types.length > 0) {
+          this.contextData.type = "madsrdf:" + types[0]
+        }
+        
+        this.contextData.typeFull = this.contextData.type ? this.contextData.type.replace('madsrdf:', 'http://www.loc.gov/mads/rdf/v1#') : ""
+        this.contextData.gacs = this.pickLookup[this.pickPostion].extra.gacs
+      } else {
+        this.contextData.literal = true
       }
-      let types = this.pickLookup[this.pickPostion].extra['rdftypes']
-      this.contextData.type = types.includes("Hub") ? "bf:Hub" :  types.includes("Work") ? "bf:Work" : "madsrdf:" +  types[0]
-      this.contextData.typeFull = this.contextData.type.replace('madsrdf:', 'http://www.loc.gov/mads/rdf/v1#')
-      this.contextData.gacs = this.pickLookup[this.pickPostion].extra.gacs
-
     } else {
-      this.contextData.literal = true
+      console.log("No extra data available, creating basic contextData")
+      this.contextData = {
+        title: this.pickLookup[this.pickPostion].label,
+        uri: this.pickLookup[this.pickPostion].uri,
+        literal: !this.pickLookup[this.pickPostion].uri
+      }
     }
 
     this.contextRequestInProgress = false
+    console.log("getContext completed, contextData:", this.contextData)
   },
 
   _getContext: async function(){
@@ -1952,32 +2078,41 @@ methods: {
 
 
 
-  loadContext: async function(pickPostion){
+  loadContext: async function(pickPosition){
+    console.log("loadContext called with position:", pickPosition)
+    console.log("Current pickLookup:", this.pickLookup)
+    
+    // Don't proceed if pickLookup is empty or not ready
+    if (!this.pickLookup || Object.keys(this.pickLookup).length === 0) {
+      console.log("❌ pickLookup is empty, skipping loadContext")
+      return false
+    }
+    
     if (this.pickCurrent == null) {
-      this.pickPostion = pickPostion
+      this.pickPostion = pickPosition
     } else {
       return null
     }
 
-    if (this.pickLookup[this.pickPostion].literal){
+    if (!this.pickLookup[this.pickPostion]) {
+      console.log("No entry in pickLookup for position:", this.pickPostion)
       return false
     }
 
+    if (this.pickLookup[this.pickPostion].literal) {
+      console.log("Entry is literal, skipping context load")
+      return false
+    }
+
+    // Load the context data
     this.getContext()
 
-    if (this.contextData){
+    // Cache the context data if available
+    if (this.contextData && this.contextData.uri) {
       this.localContextCache[this.contextData.uri] = JSON.parse(JSON.stringify(this.contextData))
     }
 
-    // this.$store.dispatch("fetchContext", { self: this, searchPayload: this.pickLookup[this.pickPostion].uri }).then(() => {
-
-    //   // keep a local copy of it for looking up subject type
-
-
-    // })
-
-
-
+    console.log("loadContext completed")
   },
 
   selectContext: async function(pickPostion, update=true){
