@@ -1,6 +1,4 @@
 <template>
-
-
   <VueFinalModal
     :hide-overlay="false"
     :overlay-transition="'vfm-fade'"
@@ -8,406 +6,167 @@
     :click-to-close="true"
     :esc-to-close="true"
     @closed="closeEditor()"
-
     :background="'non-interactive'"
     :lock-scroll="true"
     class="complex-lookup-modal"
     content-class="complex-lookup-modal-content"
-    >
-
+  >
     <div ref="complexLookupModalContainer" class="complex-lookup-modal-container">
       <div :style="`position: relative; ${this.preferenceStore.styleModalBackgroundColor()}; ${this.preferenceStore.styleModalTextColor()}`" class="subject-container-outer">
-          <div style="position:absolute; right:2em; top:  0.25em; z-index: 100;">
-			      <div class="menu-buttons">
-				    <button @click="closeEditor()">Close</button>
-			    </div>
-            <button @click="editorModeSwitch('build')" data-tooltip="Build LCSH headings using a lookup list" class="subjectEditorModeButtons simptip-position-left" style="margin-right: 1em; background-color: black; height: 2em; display: inline-flex;">
-      <!--         <svg fill="#F2F2F2" width="20px" height="20px" version="1.1" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-               <g>
-                <path d="m30 86.664c0 1.8359-1.5 3.3359-3.332 3.3359h-13.332c-1.8359 0-3.3359-1.5-3.3359-3.3359v-13.332c0-1.832 1.5-3.332 3.3359-3.332h13.332c1.832 0 3.332 1.5 3.332 3.332z"/>
-                <path d="m56.664 86.664c0 1.832-1.5 3.3359-3.332 3.3359h-13.332c-1.832 0-3.3359-1.5-3.3359-3.3359v-13.332c0-1.832 1.5039-3.332 3.3359-3.332h13.332c1.832 0 3.332 1.5 3.332 3.332z"/>
-                <path d="m83.332 86.664c0 1.832-1.5 3.3359-3.332 3.3359h-13.336c-1.832 0-3.3359-1.5-3.3359-3.3359l0.003906-13.332c0-1.832 1.5-3.332 3.3359-3.332h13.332c1.832 0 3.332 1.5 3.332 3.332z"/>
-                <path d="m30 60c0 1.832-1.5 3.332-3.332 3.332h-13.332c-1.8359 0-3.3359-1.5-3.3359-3.332v-13.332c0-1.832 1.5-3.332 3.3359-3.332h13.332c1.832 0 3.332 1.5 3.332 3.332z"/>
-                <path d="m56.664 60c0 1.832-1.5 3.332-3.332 3.332h-13.332c-1.832 0-3.3359-1.5-3.3359-3.332v-13.332c0-1.832 1.5-3.332 3.3359-3.332h13.332c1.832 0 3.332 1.5 3.332 3.332z"/>
-                <path d="m74.336 65.125c-1.6953 0.69922-3.6562-0.10938-4.3555-1.8047l-5.1055-12.316c-0.69922-1.6914 0.10938-3.6523 1.8047-4.3555l12.32-5.1055c1.6914-0.70312 3.6523 0.10938 4.3516 1.8047l5.1055 12.32c0.69922 1.6914-0.10938 3.6523-1.8047 4.3516z"/>
-                <path d="m30 33.336c0 1.832-1.5 3.332-3.332 3.332h-13.332c-1.832 0-3.3359-1.5-3.3359-3.332v-13.336c0-1.832 1.5-3.332 3.3359-3.332h13.332c1.832 0 3.332 1.5 3.332 3.332z"/>
-                <path d="m53.352 36.652c-0.69922 1.6914-2.6641 2.5078-4.3555 1.8047l-12.316-5.1016c-1.6914-0.69922-2.5078-2.6641-1.8047-4.3555l5.1016-12.316c0.70313-1.6914 2.6641-2.5078 4.3555-1.8047l12.32 5.1055c1.6914 0.69922 2.5039 2.6641 1.8047 4.3555z"/>
-                <path d="m89.027 20.402c1.2969 1.2969 1.2969 3.418 0 4.7148l-9.4258 9.4297c-1.2969 1.2969-3.418 1.2969-4.7148 0l-9.4297-9.4297c-1.2969-1.2969-1.2969-3.418 0-4.7148l9.4297-9.4297c1.2969-1.2969 3.418-1.2969 4.7148 0z"/>
-               </g>
-              </svg> -->
-
-              <svg fill="#F2F2F2" width="20px" height="20px" version="1.1" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-               <g>
-                <path d="m45.898 79.102h-38c-0.80078 0-1.5 0.69922-1.5 1.5v15.398c0 0.80078 0.69922 1.5 1.5 1.5h38c0.80078 0 1.5-0.69922 1.5-1.5v-15.398c-0.097657-0.80078-0.69922-1.5-1.5-1.5z"/>
-                <path d="m92.199 79.102h-38c-0.80078 0-1.5 0.69922-1.5 1.5v15.398c0 0.80078 0.69922 1.5 1.5 1.5h38c0.80078 0 1.5-0.69922 1.5-1.5v-15.398c0-0.80078-0.69922-1.5-1.5-1.5z"/>
-                <path d="m92.199 31.602h-38c-0.80078 0-1.5 0.69922-1.5 1.5v15.5c0 0.80078 0.69922 1.5 1.5 1.5h38c0.80078 0 1.5-0.69922 1.5-1.5v-15.5c0-0.90234-0.69922-1.5-1.5-1.5z"/>
-                <path d="m7.8008 73.699h14.398c0.80078 0 1.5-0.69922 1.5-1.5v-15.398c0-0.80078-0.69922-1.5-1.5-1.5h-14.398c-0.80078 0-1.5 0.69922-1.5 1.5v15.5c0 0.80078 0.69922 1.3984 1.5 1.3984z"/>
-                <path d="m30.5 73.699h39.102c0.80078 0 1.5-0.69922 1.5-1.5v-15.398c0-0.80078-0.69922-1.5-1.5-1.5h-39.102c-0.80078 0-1.5 0.69922-1.5 1.5v15.5c0 0.80078 0.69922 1.3984 1.5 1.3984z"/>
-                <path d="m92.199 55.301h-14.398c-0.80078 0-1.5 0.69922-1.5 1.5v15.5c0 0.80078 0.69922 1.5 1.5 1.5h14.398c0.80078 0 1.5-0.69922 1.5-1.5v-15.5c0-0.80078-0.69922-1.5-1.5-1.5z"/>
-                <path d="m24.199 26.199v15.199l-2.1016-2.1016c-0.80078-0.80078-2.1016-0.80078-3 0-0.80078 0.80078-0.80078 2.1016 0 3l5.6016 5.6016c0.39844 0.39844 0.89844 0.60156 1.5 0.60156 0.5 0 1.1016-0.19922 1.5-0.60156l5.6016-5.6016c0.80078-0.80078 0.80078-2.1016 0-3-0.80078-0.80078-2.1016-0.80078-3 0l-2.1016 2.1016v-15.199z"/>
-                <path d="m7.8008 20.898h38c0.80078 0 1.5-0.69922 1.5-1.5v-15.398c0-0.80078-0.69922-1.5-1.5-1.5h-38c-0.80078 0-1.5 0.69922-1.5 1.5v15.5c0 0.69922 0.69922 1.3984 1.5 1.3984z"/>
-               </g>
-              </svg>
-
-              <span :class="[{ 'subjectEditorModeTextEnabled': (subjectEditorMode==='build') }]">Build Mode</span>
-            </button>
-            <button @click="editorModeSwitch('link')" data-tooltip="Build LCSH headings by entering a MARC encoded string" class="subjectEditorModeButtons simptip-position-left" style="background-color: black; height: 2em; display: inline-flex;">
-
-              <svg fill="#F2F2F2" width="20px" height="20px" version="1.1" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-               <g fill-rule="evenodd">
-                <path d="m45.867 41.266-4.6016 4.6016c-4.6211-2.6719-10.633-2.0312-14.586 1.9219l-16.891 16.891c-4.7188 4.7188-4.7188 12.367 0 17.086l8.4453 8.4453c4.7188 4.7188 12.367 4.7188 17.086 0l16.891-16.891c3.9531-3.9531 4.5938-9.9648 1.9219-14.586l4.6016-4.6016c4.6211 2.6719 10.633 2.0312 14.586-1.9219l16.891-16.891c4.7188-4.7188 4.7188-12.367 0-17.086l-8.4453-8.4453c-4.7188-4.7188-12.367-4.7188-17.086 0l-16.891 16.891c-3.9531 3.9531-4.5938 9.9648-1.9219 14.586zm-6.6211 23.512-12.469 12.473-4.0273-4.0273 12.473-12.469zm6.7305-14.777 4.0234 4.0234 4.0234-4.0234-4.0234-4.0234zm31.273-23.223-12.473 12.469-4.0234-4.0234 12.469-12.473z"/>
-                <path d="m23.484 27.902 4.418 4.418c1.2227 1.2227 3.1992 1.2227 4.4219 0 1.2188-1.2188 1.2188-3.1992 0-4.418l-4.4219-4.418c-1.2188-1.2227-3.1992-1.2227-4.418 0-1.2188 1.2188-1.2188 3.1992 0 4.418z"/>
-                <path d="m76.516 72.098-4.418-4.418c-1.2188-1.2227-3.1992-1.2227-4.418 0-1.2227 1.2188-1.2227 3.1992 0 4.418l4.418 4.418c1.2188 1.2227 3.1992 1.2227 4.418 0 1.2227-1.2188 1.2227-3.1992 0-4.418z"/>
-                <path d="m38.086 17.605 1.6172 6.0352c0.44531 1.668 2.1602 2.6562 3.8281 2.2109 1.6641-0.44531 2.6562-2.1602 2.207-3.8281l-1.6172-6.0352c-0.44531-1.668-2.1602-2.6562-3.8281-2.2109-1.6641 0.44531-2.6562 2.1602-2.207 3.8281z"/>
-                <path d="m61.914 82.395-1.6172-6.0352c-0.44531-1.668-2.1602-2.6562-3.8281-2.2109-1.6641 0.44531-2.6562 2.1602-2.207 3.8281l1.6172 6.0352c0.44531 1.668 2.1602 2.6562 3.8242 2.2109 1.668-0.44531 2.6562-2.1602 2.2109-3.8281z"/>
-                <path d="m15.988 44.121 6.0352 1.6172c1.668 0.44531 3.3828-0.54297 3.8281-2.2109 0.44531-1.6641-0.54297-3.3789-2.2109-3.8242l-6.0352-1.6172c-1.668-0.44922-3.3828 0.54297-3.8281 2.207-0.44531 1.668 0.54297 3.3828 2.2109 3.8281z"/>
-                <path d="m84.012 55.879-6.0352-1.6172c-1.668-0.44531-3.3828 0.54297-3.8281 2.2109-0.44922 1.6641 0.54297 3.3789 2.207 3.8242l6.0391 1.6172c1.6641 0.44922 3.3789-0.54297 3.8281-2.207 0.44531-1.668-0.54297-3.3828-2.2109-3.8281z"/>
-               </g>
-              </svg>
-
-              <span :class="[{ 'subjectEditorModeTextEnabled': (subjectEditorMode==='link') }]">Link Mode</span>
-
-
-            </button>
-
-
+        <div style="position:absolute; right:2em; top:  0.25em; z-index: 100;">
+          <div class="menu-buttons">
+            <button @click="closeEditor()">Close</button>
           </div>
+        </div>
 
+        <div style="padding: 0.5em;">
+          <button @click="editorModeSwitch('build')" data-tooltip="Build LCSH headings using a lookup list" class="subjectEditorModeButtons simptip-position-left" style="margin-right: 1em; background-color: black; height: 2em; display: inline-flex;">
+            <span :class="[{ 'subjectEditorModeTextEnabled': (subjectEditorMode==='build') }]">Build Mode</span>
+          </button>
+          <button @click="editorModeSwitch('link')" data-tooltip="Build LCSH headings by entering a MARC encoded string" class="subjectEditorModeButtons simptip-position-left" style="background-color: black; height: 2em; display: inline-flex;">
+            <span :class="[{ 'subjectEditorModeTextEnabled': (subjectEditorMode==='link') }]">Link Mode</span>
+          </button>
+        </div>
 
-          <template v-if="subjectEditorMode=='build'">
+        <template v-if="subjectEditorMode=='build'">
+          <div :class="['subject-editor-container', {'subject-editor-container-lowres':lowResMode}]" :style="`${this.preferenceStore.styleModalBackgroundColor()}`">
+            <div :style="`${this.preferenceStore.styleModalBackgroundColor()};`" :class="['subject-editor-container-left', {'subject-editor-container-left-lowres':lowResMode}]">
+              <div id="search-in-holder" style="position: absolute; top:0">
+                <span>Search In:</span>
+                <button @click="searchModeSwitch('LCSHNAF')" :data-tooltip="'Shortcut: CTRL+ALT+1'" :class="['simptip-position-bottom',{'active':(searchMode==='LCSHNAF')}]">LCSH/NAF</button>
+                <button @click="searchModeSwitch('CHILD')" :data-tooltip="'Shortcut: CTRL+ALT+2'" :class="['simptip-position-bottom',{'active':(searchMode==='CHILD')}]">Children's Subjects</button>
+                <button @click="searchModeSwitch('GEO')" :data-tooltip="'Shortcut: CTRL+ALT+3'" :class="['simptip-position-bottom',{'active':(searchMode==='GEO')}]">Indirect Geo</button>
+                <button @click="searchModeSwitch('WORKS')" :data-tooltip="'Shortcut: CTRL+ALT+4'" :class="['simptip-position-bottom',{'active':(searchMode==='WORKS')}]">Works</button>
+                <button @click="searchModeSwitch('HUBS')" :data-tooltip="'Shortcut: CTRL+ALT+5'" :class="['simptip-position-bottom',{'active':(searchMode==='HUBS')}]">Hubs</button>
+              </div>
 
-
-            <div :class="['subject-editor-container', {'subject-editor-container-lowres':lowResMode}]" :style="`${this.preferenceStore.styleModalBackgroundColor()}`" >
-
-
-              <div :style="`${this.preferenceStore.styleModalBackgroundColor()};`" :class="['subject-editor-container-left', {'subject-editor-container-left-lowres':lowResMode}]">
-
-                <div id="search-in-holder" style="position: absolute; top:0">
-                  <span>Search In:</span>
-
-
-                  <button @click="searchModeSwitch('LCSHNAF')" :data-tooltip="'Shortcut: CTRL+ALT+1'" :class="['simptip-position-bottom',{'active':(searchMode==='LCSHNAF')}]">LCSH/NAF</button>
-                  <button @click="searchModeSwitch('CHILD')" :data-tooltip="'Shortcut: CTRL+ALT+2'" :class="['simptip-position-bottom',{'active':(searchMode==='CHILD')}]">Children's Subjects</button>
-                  <button @click="searchModeSwitch('GEO')" :data-tooltip="'Shortcut: CTRL+ALT+3'" :class="['simptip-position-bottom',{'active':(searchMode==='GEO')}]">Indirect Geo</button>
-                  <button @click="searchModeSwitch('WORKS')" :data-tooltip="'Shortcut: CTRL+ALT+4'" :class="['simptip-position-bottom',{'active':(searchMode==='WORKS')}]">Works</button>
-                  <button @click="searchModeSwitch('HUBS')" :data-tooltip="'Shortcut: CTRL+ALT+5'" :class="['simptip-position-bottom',{'active':(searchMode==='HUBS')}]">Hubs</button>
-
-                </div>
-
-
-
-                <div :style="`flex:1; align-self: flex-end; height: 95%; ${this.preferenceStore.styleModalBackgroundColor()}`" :class="{'scroll-all':  preferenceStore.returnValue('--b-edit-complex-scroll-all') && !preferenceStore.returnValue('--b-edit-complex-scroll-independently')}">
-                  <div v-if="activeSearch!==false">{{activeSearch}}</div>
-                  <div v-if="searchResults !== null" style="height: 95%">
-
-                    <div v-if="searchResults && searchResults.exact.length>0" class="subject-section" :class="{'scrollable-subjects': preferenceStore.returnValue('--b-edit-complex-scroll-independently')}">
-                      <span class="subject-results-heading">Known Label</span>
-                      <div v-for="(subject,idx) in searchResults.exact" @click="selectContext((searchResults.names.length - idx)*-1-2)" @mouseover="loadContext((searchResults.names.length - idx)*-1-2)" :data-id="((searchResults.names.length - idx)*-1-2)" :key="subject.uri" :class="['fake-option', {'unselected':(pickPostion != (searchResults.names.length - idx)*-1-2 ), 'selected':(pickPostion == (searchResults.names.length - idx)*-1-2 ), 'picked': (pickLookup[(searchResults.names.length - idx)*-1-2] && pickLookup[(searchResults.names.length - idx)*-1-2].picked) }]" >
-                        <template v-if="subject.label == activeComponent.label.replace('‑', '-')">
-                          {{subject.label}}
-                        </template>
-                        <template v-else>
-                            {{subject.label}}
-                            <span class="subject-variant">
-                              ((VARIANT))
-                            </span>
-                        </template>
-                        <span v-if="subject.collections && subject.collections.includes('LCNAF')"> [LCNAF]</span>
-                        <span v-if="subject.collections"> {{ this.buildAddtionalInfo(subject.collections) }}</span>
-                        <div class="may-sub-container" style="display: inline;">
-                          <AuthTypeIcon v-if="subject.collections && subject.collections.includes('http://id.loc.gov/authorities/subjects/collection_SubdivideGeographically')" :type="'may subd geog'"></AuthTypeIcon>
-                        </div>
-                      </div>
+              <div :style="`flex:1; align-self: flex-end; height: 95%; ${this.preferenceStore.styleModalBackgroundColor()}`" :class="{'scroll-all':  preferenceStore.returnValue('--b-edit-complex-scroll-all') && !preferenceStore.returnValue('--b-edit-complex-scroll-independently')}">
+                <div v-if="activeSearch!==false">{{activeSearch}}</div>
+                <div v-if="searchResults !== null" style="height: 95%">
+                  <!-- Complex subjects -->
+                  <div v-if="searchResults && searchResults.subjectsComplex && searchResults.subjectsComplex.length>0" class="subject-section">
+                    <span class="subject-results-heading">Complex</span>
+                    <div v-for="(subjectC,idx) in searchResults.subjectsComplex" @click="selectContext(idx)" @mouseover="loadContext(idx)" :data-id="idx" :key="subjectC.uri" :class="['fake-option', {'unselected':(pickPostion != idx), 'selected':(pickPostion == idx), 'picked': (pickLookup[idx] && pickLookup[idx].picked)}]">
+                      {{subjectC.suggestLabel}}
                     </div>
+                  </div>
 
-                    <div v-if="searchResults && searchResults.names.length>0 && !this.searching" class="subject-section" :class="{'scrollable-subjects': preferenceStore.returnValue('--b-edit-complex-scroll-independently'), 'small-container': this.numPopulatedResults()==3 && preferenceStore.returnValue('--b-edit-complex-scroll-independently'), 'medium-container': this.numPopulatedResults()==2 && preferenceStore.returnValue('--b-edit-complex-scroll-independently'), 'large-container': this.numPopulatedResults()==1&&preferenceStore.returnValue('--b-edit-complex-scroll-independently')}">
-                      <span class="subject-results-heading">LCNAF</span>
-                      <div v-for="(name,idx) in searchResults.names" @click="selectContext((searchResults.names.length - idx)*-1)" @mouseover="loadContext((searchResults.names.length - idx)*-1)" :data-id="(searchResults.names.length - idx)*-1" :key="name.uri" :class="['fake-option', {'unselected':(pickPostion != (searchResults.names.length - idx)*-1 ), 'selected':(pickPostion == (searchResults.names.length - idx)*-1 ),'picked': (pickLookup[(searchResults.names.length - idx)*-1] && pickLookup[(searchResults.names.length - idx)*-1].picked)}]">
-                        <span v-if="name.suggestLabel && name.suggestLabel.length>41">{{name.suggestLabel.substring(0,41)}}...</span>
-                          <span v-else>{{name.suggestLabel}}</span>
-                          <span> [LCNAF]</span>
-                          <span v-if="name.collections"> {{ this.buildAddtionalInfo(name.collections) }}</span>
-                          <div class="may-sub-container" style="display: inline;">
-                            <AuthTypeIcon v-if="name.collections && name.collections.includes('http://id.loc.gov/authorities/subjects/collection_SubdivideGeographically')" :type="'may subd geog'"></AuthTypeIcon>
-                          </div>
-                        </div>
-                    </div>
-
-                    <!-- LCSH -->
-                    <div v-if="searchResults && searchResults.subjectsComplex.length>0" class="subject-section" :class="{'scrollable-subjects': preferenceStore.returnValue('--b-edit-complex-scroll-independently'), 'small-container': this.numPopulatedResults()>=3 && preferenceStore.returnValue('--b-edit-complex-scroll-independently'), 'medium-container': this.numPopulatedResults()==2 && preferenceStore.returnValue('--b-edit-complex-scroll-independently'), 'large-container': this.numPopulatedResults()==1&&preferenceStore.returnValue('--b-edit-complex-scroll-independently')}">
-                      <span class="subject-results-heading">Complex</span>
-                      <div v-for="(subjectC,idx) in searchResults.subjectsComplex" @click="selectContext(idx)" @mouseover="loadContext(idx)" :data-id="idx" :key="subjectC.uri" :class="['fake-option', {'unselected':(pickPostion != idx), 'selected':(pickPostion == idx), 'picked': (pickLookup[idx] && pickLookup[idx].picked)}]">
-                        {{subjectC.suggestLabel}}<span></span>
-                        <span v-if="subjectC.collections"> {{ this.buildAddtionalInfo(subjectC.collections) }}</span>
-                        <div class="may-sub-container" style="display: inline;">
-                          <AuthTypeIcon v-if="subjectC.collections && subjectC.collections.includes('http://id.loc.gov/authorities/subjects/collection_SubdivideGeographically')" :type="'may subd geog'"></AuthTypeIcon>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div v-if="searchResults && searchResults.subjectsSimple.length>0" class="subject-section" :class="{'scrollable-subjects': preferenceStore.returnValue('--b-edit-complex-scroll-independently'), 'small-container': this.numPopulatedResults()==3 && preferenceStore.returnValue('--b-edit-complex-scroll-independently'), 'medium-container': this.numPopulatedResults()==2 && preferenceStore.returnValue('--b-edit-complex-scroll-independently'), 'large-container': this.numPopulatedResults()==1&&preferenceStore.returnValue('--b-edit-complex-scroll-independently')}">
-                      <span class="subject-results-heading">Simple</span>
-                      <div v-for="(subject,idx) in searchResults.subjectsSimple" @click="selectContext(searchResults.subjectsComplex.length + idx)" @mouseover="loadContext(searchResults.subjectsComplex.length + idx)" :data-id="searchResults.subjectsComplex.length + idx" :key="subject.uri" :class="['fake-option', {'unselected':(pickPostion != searchResults.subjectsComplex.length + idx ), 'selected':(pickPostion == searchResults.subjectsComplex.length + idx ), 'picked': (pickLookup[searchResults.subjectsComplex.length + idx] && pickLookup[searchResults.subjectsComplex.length + idx].picked), 'literal-option':(subject.literal)}]" >
+                  <!-- Simple subjects -->
+                  <div v-if="searchResults && searchResults.subjectsSimple && searchResults.subjectsSimple.length>0" class="subject-section">
+                    <span class="subject-results-heading">Simple</span>
+                    <div v-for="(subject,idx) in searchResults.subjectsSimple" @click="selectContext(searchResults.subjectsComplex.length + idx)" @mouseover="loadContext(searchResults.subjectsComplex.length + idx)" :data-id="searchResults.subjectsComplex.length + idx" :key="subject.uri" :class="['fake-option', {'unselected':(pickPostion != searchResults.subjectsComplex.length + idx ), 'selected':(pickPostion == searchResults.subjectsComplex.length + idx ), 'picked': (pickLookup[searchResults.subjectsComplex.length + idx] && pickLookup[searchResults.subjectsComplex.length + idx].picked), 'literal-option':(subject.literal)}]">
                       {{subject.suggestLabel}}
-                        <span  v-if="subject.literal">
-                          {{subject.label}}
-                        </span>
-                        <span  v-if="subject.literal">[Literal]</span>
-                        <span v-if="!subject.literal"> {{ this.buildAddtionalInfo(subject.collections) }}</span>
-                        <div class="may-sub-container" style="display: inline;">
-                          <AuthTypeIcon v-if="subject.collections && subject.collections.includes('http://id.loc.gov/authorities/subjects/collection_SubdivideGeographically')" :type="'may subd geog'"></AuthTypeIcon>
-                        </div>
-                      </div>
+                      <span v-if="subject.literal">[Literal]</span>
                     </div>
+                  </div>
 
-
-                    <!-- ChildrenSubjects -->
-                    <div v-if="searchResults && searchResults.subjectsChildrenComplex.length>0" class="subject-section" :class="{'scrollable-subjects': preferenceStore.returnValue('--b-edit-complex-scroll-independently'), 'small-container': this.numPopulatedResults()==3 && preferenceStore.returnValue('--b-edit-complex-scroll-independently'), 'medium-container': this.numPopulatedResults()==2 && preferenceStore.returnValue('--b-edit-complex-scroll-independently'), 'large-container': this.numPopulatedResults()==1&&preferenceStore.returnValue('--b-edit-complex-scroll-independently')}">
-                      <span class="subject-results-heading">CYAC Complex</span>
-                      <div v-for="(subjectC,idx) in searchResults.subjectsChildrenComplex" @click="selectContext(idx)" @mouseover="loadContext(idx)" :data-id="idx" :key="subjectC.uri" :class="['fake-option', {'unselected':(pickPostion != idx), 'selected':(pickPostion == idx), 'picked': (pickLookup[idx] && pickLookup[idx].picked)}]">
-                        {{subjectC.suggestLabel}}<span></span>
-                        <span v-if="subjectC.collections"> {{ this.buildAddtionalInfo(subjectC.collections) }}</span>
-                        <div class="may-sub-container" style="display: inline;">
-                          <AuthTypeIcon v-if="subjectC.collections && subjectC.collections.includes('http://id.loc.gov/authorities/subjects/collection_SubdivideGeographically')" :type="'may subd geog'"></AuthTypeIcon>
-                        </div>
-                      </div>
+                  <!-- Names -->
+                  <div v-if="searchResults && searchResults.names && searchResults.names.length>0" class="subject-section">
+                    <span class="subject-results-heading">LCNAF</span>
+                    <div v-for="(name,idx) in searchResults.names" @click="selectContext((searchResults.names.length - idx)*-1)" @mouseover="loadContext((searchResults.names.length - idx)*-1)" :data-id="(searchResults.names.length - idx)*-1" :key="name.uri" :class="['fake-option', {'unselected':(pickPostion != (searchResults.names.length - idx)*-1 ), 'selected':(pickPostion == (searchResults.names.length - idx)*-1 ),'picked': (pickLookup[(searchResults.names.length - idx)*-1] && pickLookup[(searchResults.names.length - idx)*-1].picked)}]">
+                      {{name.suggestLabel}} [LCNAF]
                     </div>
-
-                  <div v-if="searchResults && searchResults.subjectsChildren.length>0" class="subject-section" :class="{'scrollable-subjects': preferenceStore.returnValue('--b-edit-complex-scroll-independently'), 'small-container': this.numPopulatedResults()==3 && preferenceStore.returnValue('--b-edit-complex-scroll-independently'), 'medium-container': this.numPopulatedResults()==2 && preferenceStore.returnValue('--b-edit-complex-scroll-independently'), 'large-container': this.numPopulatedResults()==1&&preferenceStore.returnValue('--b-edit-complex-scroll-independently')}">
-                    <span class="subject-results-heading">CYAC Simple</span>
-                      <div v-for="(subject,idx) in searchResults.subjectsChildren" @click="selectContext(searchResults.subjectsChildrenComplex.length + idx)" @mouseover="loadContext(searchResults.subjectsChildrenComplex.length + idx)" :data-id="searchResults.subjectsChildrenComplex.length + idx" :key="subject.uri" :class="['fake-option', {'unselected':(pickPostion != searchResults.subjectsChildrenComplex.length + idx ), 'selected':(pickPostion == searchResults.subjectsChildrenComplex.length + idx ), 'picked': (pickLookup[searchResults.subjectsChildrenComplex.length + idx] && pickLookup[searchResults.subjectsChildrenComplex.length + idx].picked), 'literal-option':(subject.literal)}]" >{{subject.suggestLabel}}<span  v-if="subject.literal">
-                        {{subject.label}}</span> <span  v-if="subject.literal">[Literal]</span>
-                        <span v-if="!subject.literal"> {{ this.buildAddtionalInfo(subject.collections) }}</span>
-                        <div class="may-sub-container" style="display: inline;">
-                          <AuthTypeIcon v-if="subject.collections && subject.collections.includes('http://id.loc.gov/authorities/subjects/collection_SubdivideGeographically')" :type="'may subd geog'"></AuthTypeIcon>
-                        </div>
-                      </div>
-                    </div>
-
-
-
-
                   </div>
                 </div>
+              </div>
 
-                <!-- Results Panel -->
-                <!-- !!{{ contextData }} -->
-                <div :style="`${this.preferenceStore.styleModalBackgroundColor()}; ${this.preferenceStore.styleModalTextColor()};`"  :class="['subject-editor-container-right', {'subject-editor-container-right-lowres':lowResMode}]">
-                  <div v-if="contextRequestInProgress" style="font-weight: bold;">Retrieving data...</div>
-                  <div class="modal-context" :style="{ }" v-if="Object.keys(contextData).length>0">
-                    <h3 v-if="contextData.title">
-                        <span class="modal-context-icon simptip-position-top" v-if="contextData.rdftypes" :data-tooltip="'Type: ' + contextData.rdftypes.includes('Hub') ? 'Hub' : contextData.rdftypes[0]">
-                            <AuthTypeIcon :type="contextData.rdftypes.includes('Hub') ? 'Hub' : contextData.rdftypes[0]"></AuthTypeIcon>
-                        </span>
-                        {{ Array.isArray(contextData.title) ? contextData.title[0]["@value"] : contextData.title }}
-                        <!-- <AuthTypeIcon v-if="contextData.collections && contextData.collections.includes('http://id.loc.gov/authorities/subjects/collection_SubdivideGeographically')" :type="'may subd geog'"></AuthTypeIcon> -->
-                        <sup style="font-size: .5em;" v-if="contextData.collections && contextData.collections.includes('http://id.loc.gov/authorities/subjects/collection_SubdivideGeographically')">(may subd geog)</sup>
-                    </h3>
-                    <h3 v-if="contextData.literal">
-                      {{ contextData.label }} [Literal]
-                    </h3>
+              <!-- Results Panel (Right Side) -->
+              <div :style="`${this.preferenceStore.styleModalBackgroundColor()}; ${this.preferenceStore.styleModalTextColor()};`" :class="['subject-editor-container-right', {'subject-editor-container-right-lowres':lowResMode}]">
+                <div v-if="contextRequestInProgress" style="font-weight: bold;">Retrieving data...</div>
+                <div class="modal-context" v-if="Object.keys(contextData).length>0">
+                  <h3 v-if="contextData.title">
+                    <span class="modal-context-icon" v-if="contextData.rdftypes">
+                      <AuthTypeIcon :type="contextData.rdftypes.includes('Hub') ? 'Hub' : contextData.rdftypes[0]"></AuthTypeIcon>
+                    </span>
+                    {{ Array.isArray(contextData.title) ? contextData.title[0]["@value"] : contextData.title }}
+                  </h3>
 
-                    <div class="modal-context-data-title" v-if="contextData.rdftypes">{{contextData.rdftypes.includes('Hub') ? 'Hub' : contextData.rdftypes[0]}}</div>
-                    <a style="color:#2c3e50" :href="contextData.uri" target="_blank" v-if="contextData.literal != true">view on id.loc.gov</a>
+                  <div class="modal-context-data-title" v-if="contextData.rdftypes">
+                    {{contextData.rdftypes.includes('Hub') ? 'Hub' : contextData.rdftypes[0]}}
+                  </div>
+                  <a style="color:#2c3e50" :href="contextData.uri" target="_blank" v-if="contextData.literal != true">view on id.loc.gov</a>
 
-                    <br><br>
+                  <br><br>
 
-                    <template v-for="key in panelDetailOrder">
+                  <template v-for="key in panelDetailOrder">
                     <div v-if="contextData[key] && contextData[key].length>0">
-                      <div class="modal-context-data-title modal-context-data-title-add-gap">{{ this.labelMap[key] }}:</div>
+                      <div class="modal-context-data-title">{{ this.labelMap[key] }}:</div>
                       <ul>
-                        <li class="modal-context-data-li" v-if="Array.isArray(contextData[key])" v-for="(v, idx) in contextData[key] " v-bind:key="'var' + idx">
-                          <template v-if="v.startsWith('http')">
-                            <a target="_blank" :href="v">{{ v.split("/").at(-1).split("_").at(-1) }}</a>
-                          </template>
-                          <template v-else-if="key == 'lcclasss'">
-                            <a :href="'https://classweb.org/min/minaret?app=Class&mod=Search&table=schedules&table=tables&tid=1&menu=/Menu/&iname=span&ilabel=Class%20number&iterm='+v" target="_blank">{{v}}</a>
-                            <!-- <a :href="'https://id.loc.gov/authorities/classification/'+v" target="_blank">{{v}}</a> -->
-                          </template>
-                          <template v-else-if="key == 'broaders'">
-                            <a target="_blank" :href="'https://id.loc.gov/authorities/label/'+v">{{v}}</a>
-                          </template>
-                          <template v-else>
-                            {{v}}
-                          </template>
+                        <li class="modal-context-data-li" v-for="(v, idx) in contextData[key]" v-bind:key="'var' + idx">
+                          {{v}}
                         </li>
-                        <li class="modal-context-data-li" v-else v-bind:key="'var' + key">{{ contextData[key] }}</li>
                       </ul>
                     </div>
                   </template>
-
-
-                    <div v-if="this.pickCurrent != null">
-                      <div class="clear-selected">
-                        <button class="clear-selected-button" @click="clearSelected()" title="Clear selection & re-enable update on hover">Remove selected</button>
-                      </div>
-                    </div>
-
-
-
-
-
-
-                  </div>
-
-
-
-
-
-
-
-
                 </div>
-
-
               </div>
-
-              <div class="">
-
-
-
-                  <div class="component-container-fake-input">
-                    <div  style="display: flex;">
-                      <div  style="flex:1; position: relative;">
-                        <form autocomplete="off" style="height: 3em;">
-                          <input v-on:keydown.enter.prevent="navInput"  placeholder="Enter Subject Headings Here" ref="subjectInput"  autocomplete="off" type="text" v-model="subjectString" @input="subjectStringChanged" @keydown="navInput" @keyup="navString" @click="navStringClick" class="input-single-subject subject-input" id="subject-input">
-                        </form>
-                        <div v-for="(c, idx) in components" :ref="'cBackground' + idx" :class="['color-holder',{'color-holder-okay':(c.uri !== null || c.literal)},{'color-holder-type-okay':(c.type !== null || showTypes===false)}]" v-bind:key="idx">
-                          {{c.label}}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div ref="toolbar" style="display: flex;">
-                    <div style="flex:2">
-                      <ol v-if="showTypes" :class="['type-list-ol',{'type-list-ol-lowres':lowResMode}]">
-                        <li :class="['type-item', {'type-item-selected':(type.selected)}]" v-for="type in activeTypes" :key="type.value" @click="setTypeClick($event,type.value)" :style="`${this.preferenceStore.styleModalTextColor()}`">{{type.label}}</li>
-                      </ol>
-                    </div>
-                    <div style="flex:1">
-
-                      <button v-if="lowResMode" @click="closeEditor" style="float: right;margin: 0.6em; background-color: white; border: solid 1px rgb(42,42,42); color: rgb(42,42,42);" :class="[{'add-button-lowres':lowResMode}]">Close</button>
-                      <button v-if="okayToAdd==true" style="float: right;margin: 0.6em;" @click="add" :class="[{'add-button-lowres':lowResMode}]">Add [SHIFT+Enter]</button>
-                      <button v-else-if="okayToAdd==false && subjectString.length==0" disabled style="float: right;margin: 0.6em; display: none;" :class="[{'add-button-lowres':lowResMode}]">Can't Add</button>
-                      <button v-else-if="okayToAdd==false" disabled style="float: right;margin: 0.6em;" :class="[{'add-button-lowres':lowResMode}]">Can't Add</button>
-
-
-
-                    </div>
-                  </div>
-
-
-
-
-              </div>
-
-
-
             </div>
-          </template>
-          <template v-else>
 
-              <div style="padding: 5px;">
-
-
-
-                  <div class="component-container-fake-input" style="margin-top:2em">
-                    <div  style="display: flex;">
-                      <div  style="flex:1; position: relative;">
-                        <form autocomplete="off" style="height: 3em;">
-                          <input v-on:keydown.enter.prevent="linkModeTextChange" placeholder="Enter MARC encoded LCSH value"   autocomplete="off" type="text" v-model="linkModeString" ref="subjectInput" class="input-single-subject subject-input">
-                        </form>
-                      </div>
+            <div class="">
+              <div class="component-container-fake-input">
+                <div style="display: flex;">
+                  <div style="flex:1; position: relative;">
+                    <form autocomplete="off" style="height: 3em;">
+                      <input v-on:keydown.enter.prevent="navInput" placeholder="Enter Subject Headings Here" ref="subjectInput" autocomplete="off" type="text" v-model="subjectString" @input="subjectStringChanged" @keydown="navInput" @keyup="navString" @click="navStringClick" class="input-single-subject subject-input" id="subject-input">
+                    </form>
+                    <div v-for="(c, idx) in components" :ref="'cBackground' + idx" :class="['color-holder',{'color-holder-okay':(c.uri !== null || c.literal)},{'color-holder-type-okay':(c.type !== null || showTypes===false)}]" v-bind:key="idx">
+                      {{c.label}}
                     </div>
                   </div>
-
-                  <ul v-if="!linkModeSearching">
-                    <li v-if="linkModeResults===false">Enter MARC subject string above (with $ signs for subdivdion seperation) and press enter key</li>
-                  </ul>
-
-
-
-                  <ol v-if="!linkModeSearching">
-                    <template v-if="linkModeResults!==false">
-
-                      <template v-if="linkModeResults.resultType && linkModeResults.resultType == 'COMPLEX'">
-
-                        <li>
-
-                          <span :class="{ 'link-mode-good-heading': (linkModeResults.hit.uri), 'link-mode-bad-heading': (!linkModeResults.hit.uri) }">
-                            {{linkModeResults.hit.label}}
-                          </span>
-                          <span v-if="linkModeResults.hit.heading && linkModeResults.hit.heading.subdivision" class="link-mode-subdivision">(subdivision)</span>
-                          <a class="link-mode-good-heading-alink" target="_blank" v-if="linkModeResults.hit.uri" :href="linkModeResults.hit.uri">{{linkModeResults.hit.uri.split('/')[linkModeResults.hit.uri.split('/').length-1]}}</a>
-
-
-                        </li>
-
-                      </template>
-
-                      <template v-else>
-
-                        <li v-for="(hit,idx) in linkModeResults.hit" v-bind:key="idx">
-                          <span :class="{ 'link-mode-good-heading': (hit.uri), 'link-mode-bad-heading': (!hit.uri) }">
-                            {{hit.label}}
-                          </span>
-                          <span v-if="hit.heading && hit.heading.subdivision" class="link-mode-subdivision">(subdivision)</span>
-                          <a class="link-mode-good-heading-alink" target="_blank" v-if="hit.uri" :href="hit.uri">{{hit.uri.split('/')[hit.uri.split('/').length-1]}}</a>
-                        </li>
-                      </template>
-
-                    </template>
-                  </ol>
-
-                  <span style="color:darkred;" v-if="linkModeResults && linkModeResults.resultType && linkModeResults.resultType == 'ERROR'">{{linkModeResults.msg}}</span>
-
-                  <div style="display: flex;">
-                    <div style="flex:2">
-
-                      <h1 v-if="linkModeSearching"> <span id="loading-icon">⟳</span> Working...</h1>
-
-                      <button v-if="linkModeSearching===false" style="margin-right: 1em; margin-left: 2em" @click="linkModeTextChange({key:'Enter',shiftKey:false})">Link Components [Enter]</button>
-                      <button v-if="linkModeResults!==false" style="" @click="addLinkMode">Add Heading [SHIFT+Enter]</button>
-
-
-
-                    </div>
-                    <div style="flex:1">
-                        <button style="float:right; margin-right:1em" @click="closeEditor">Close</button>
-
-                    </div>
-                  </div>
-
+                </div>
               </div>
 
-          </template>
+              <div ref="toolbar" style="display: flex;">
+                <div style="flex:2">
+                  <ol v-if="showTypes" :class="['type-list-ol',{'type-list-ol-lowres':lowResMode}]">
+                    <li :class="['type-item', {'type-item-selected':(type.selected)}]" v-for="type in activeTypes" :key="type.value" @click="setTypeClick($event,type.value)" :style="`${this.preferenceStore.styleModalTextColor()}`">{{type.label}}</li>
+                  </ol>
+                </div>
+                <div style="flex:1">
+                  <button v-if="okayToAdd==true" style="float: right;margin: 0.6em;" @click="add" :class="[{'add-button-lowres':lowResMode}]">Add [SHIFT+Enter]</button>
+                  <button v-else-if="okayToAdd==false && subjectString.length==0" disabled style="float: right;margin: 0.6em; display: none;" :class="[{'add-button-lowres':lowResMode}]">Can't Add</button>
+                  <button v-else-if="okayToAdd==false" disabled style="float: right;margin: 0.6em;" :class="[{'add-button-lowres':lowResMode}]">Can't Add</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
 
-        </div>
+        <template v-else>
+          <!-- Link mode template content -->
+          <div style="padding: 5px;">
+            <div class="component-container-fake-input" style="margin-top:2em">
+              <div style="display: flex;">
+                <div style="flex:1; position: relative;">
+                  <form autocomplete="off" style="height: 3em;">
+                    <input v-on:keydown.enter.prevent="linkModeTextChange" placeholder="Enter MARC encoded LCSH value" autocomplete="off" type="text" v-model="linkModeString" ref="subjectInput" class="input-single-subject subject-input">
+                  </form>
+                </div>
+              </div>
+            </div>
 
+            <ul v-if="!linkModeSearching">
+              <li v-if="linkModeResults===false">Enter MARC subject string above (with $ signs for subdivdion seperation) and press enter key</li>
+            </ul>
 
+            <div style="display: flex;">
+              <div style="flex:2">
+                <h1 v-if="linkModeSearching"><span id="loading-icon">⟳</span> Working...</h1>
+                <button v-if="linkModeSearching===false" style="margin-right: 1em; margin-left: 2em" @click="linkModeTextChange({key:'Enter',shiftKey:false})">Link Components [Enter]</button>
+                <button v-if="linkModeResults!==false" style="" @click="addLinkMode">Add Heading [SHIFT+Enter]</button>
+              </div>
+              <div style="flex:1">
+                <button style="float:right; margin-right:1em" @click="closeEditor">Close</button>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
     </div>
-
-
-
   </VueFinalModal>
-
-
-
-
-
-
-
-
-
-
-
-
-
 </template>
 
-
 <style type="text/css" scoped>
-
   .subject-lookup-modal-container{
     margin-left: auto;
     margin-right: auto;
@@ -415,8 +174,6 @@
     width: 85vw;
     height: 95vh;
   }
-
-
 
   body #app{
     background-color: white !important;
@@ -817,21 +574,6 @@ watch: {
     this.linkModeString = this.searchValue
   },
 
-  // Watch for changes to searchResults and build pickLookup when it changes
-  searchResults: {
-    handler: function(newSearchResults) {
-      console.log("🔍 watcher: searchResults changed, calling buildPickLookup")
-      if (newSearchResults && Object.keys(newSearchResults).length > 0) {
-        // Use nextTick to ensure the data is fully set before building pickLookup
-        this.$nextTick(() => {
-          this.buildPickLookup()
-        })
-      }
-    },
-    deep: true,
-    immediate: false
-  }
-
 },
 
 data: function() {
@@ -851,7 +593,7 @@ data: function() {
     activeSearch: false,
 
     pickPostion: 0,
-    pickLookup: {},
+  pickLookup: Object.create(null),
     pickCurrent: null,
     activeComponent: null,
     oldActiveComponent: null,
@@ -861,6 +603,8 @@ data: function() {
     componetLookup: {},
     localContextCache: {},
     nextInputIsTypeSelection:false,
+  // prevent pickLookup rebuilds while fetching context on hover
+  skipPickBuild: false,
     typeLookup:{},
     okayToAdd: false,
     lowResMode: false,
@@ -1467,9 +1211,9 @@ methods: {
   searchApis: debounce(async (searchString, searchStringFull, that) => {
     that.pickCurrent = null //reset the current selection when the search changes
 
-    that.searchResults=null
+    that.searchResults = null
     that.x = 'Seaching...'
-    that.pickPostion=0
+    that.pickPostion = 0
 
     searchString = searchString.trim().normalize()
     searchStringFull = searchStringFull.trim().normalize()
@@ -1481,128 +1225,129 @@ methods: {
     let tiBackup = window.setTimeout(()=>{
       window.clearInterval(ti)
       that.activeSearch = false
-
     }, 10000)
-
 
     searchString=searchString.replaceAll('‑','-')
     searchStringFull=searchStringFull.replaceAll('‑','-')
 
-    that.searchResults = await utilsNetwork.subjectSearch(searchString,searchStringFull,that.searchMode)
+  that.searchResults = await utilsNetwork.subjectSearch(searchString,searchStringFull,that.searchMode)
 
     console.log("🔍 searchApis: got searchResults from utilsNetwork.subjectSearch:", that.searchResults)
 
-    // if they clicked around while it was doing this lookup bail out
-    // if (that.activeSearchInterrupted){
-
-
-
-    //   window.clearInterval(ti)
-    //   window.clearTimeout(tiBackup)
-    //   that.activeSearch = false
-    //   that.activeSearchInterrupted = false
-
-    //   console.log("that.activeSearchInterrupted",that.activeSearchInterrupted)
-
-    //   return false
-
-    // }
-
-
-
-    // replace the true keyboard hypen with the werid hypen to prevent spliting on open lifedates
-    console.log("🔍 searchApis: processing names, searchResults.names.length:", that.searchResults.names?.length || 0)
-    for (let s of that.searchResults.names){
-      s.labelOrginal = s.label
-      s.label = s.label.replaceAll('-','‑')
-    }
-
-    console.log("🔍 searchApis: processing subjectsComplex, length:", that.searchResults.subjectsComplex?.length || 0)
-    for (let s of that.searchResults.subjectsComplex){
-      s.labelOrginal = s.label
-      s.complex=true
-      s.label = s.label.replaceAll('-','‑')
-    }
-
-    console.log("🔍 searchApis: processing subjectsSimple, length:", that.searchResults.subjectsSimple?.length || 0)
-
-    for (let s of that.searchResults.subjectsSimple){
-      if (s.suggestLabel && s.suggestLabel.includes('(DEPRECATED')){
-        s.suggestLabel = s.suggestLabel.split('(DEPRECATED')[0] + "(DEPRECATED)"
-      }
-    }
-
-    for (let s of that.searchResults.hierarchicalGeographic){
-      if (s.suggestLabel && s.suggestLabel.includes(' (USE ')){
-        s.suggestLabel = s.label
-      }
-    }
-    if (that.searchMode == 'WORKS' || that.searchMode == 'HUBS'){
-      for (let s of that.searchResults.subjectsSimple){
-        if (s.suggestLabel && s.suggestLabel.includes(' (USE ')){
-          s.suggestLabel = s.label
+    // Add null checks before processing arrays
+    if (that.searchResults) {
+      // replace the true keyboard hypen with the werid hypen to prevent spliting on open lifedates
+      console.log("🔍 searchApis: processing names, searchResults.names.length:", that.searchResults.names?.length || 0)
+      if (that.searchResults.names && that.searchResults.names.length > 0) {
+        for (let s of that.searchResults.names){
+          s.labelOrginal = s.label
+          s.label = s.label.replaceAll('-','‑')
         }
       }
-      for (let s of that.searchResults.subjectsComplex){
-        if (s.suggestLabel && s.suggestLabel.includes(' (USE ')){
-          s.suggestLabel = s.label
+
+      console.log("🔍 searchApis: processing subjectsComplex, length:", that.searchResults.subjectsComplex?.length || 0)
+      if (that.searchResults.subjectsComplex && that.searchResults.subjectsComplex.length > 0) {
+        for (let s of that.searchResults.subjectsComplex){
+          s.labelOrginal = s.label
+          s.complex=true
+          s.label = s.label.replaceAll('-','‑')
         }
       }
-    }
 
-    for (let s of that.searchResults.hierarchicalGeographic){
-      s.labelOrginal = s.label
-      s.hierarchicalGeographic=true
-      s.label = s.label.replaceAll('-','‑')
-    }
-
-    if (that.searchResults.hierarchicalGeographic.length>0 && that.searchResults.subjectsComplex.length==0){
-      that.searchResults.subjectsComplex = that.searchResults.hierarchicalGeographic
-    }
-
-    that.pickLookup = {}
-
-    that.pickPostion = that.searchResults.subjectsSimple.length + that.searchResults.subjectsComplex.length -1
-
-    // Build the pick lookup for hover functionality
-    console.log("🚀 About to call buildPickLookup from searchApis")
-    console.log("🚀 that.searchResults before buildPickLookup:", that.searchResults)
-    that.buildPickLookup()
-    console.log("🚀 buildPickLookup call completed")
-    console.log("🚀 that.pickLookup after buildPickLookup:", that.pickLookup)
-
-    // Check if we have any matches to auto-select
-    for (let k in that.pickLookup){
-      if (searchString.toLowerCase() == that.pickLookup[k].label.toLowerCase() && !that.pickLookup[k].literal ){
-        // if the labels are the same for the current one selected don't overide it
-        if (that.activeComponent && that.pickLookup[k].label.replaceAll('‑','-') == that.activeComponent.label.replaceAll('‑','-') && that.activeComponent.uri){
-          if (that.activeComponent.uri == that.pickLookup[k].uri){
-            that.pickPostion=k
-            that.pickLookup[k].picked=true
-            that.selectContext()
-          }
-        }else{
-          // if they started typing the next word already then stop this
-          if (that.subjectString.replaceAll('‑','-')!=searchStringFull.replaceAll('‑','-')){
-            break
-          }
-          // do they even have the same label currently, they might be clicking around in the interface
-          // so at this point with the async lookup this is not even the right component
-          if (that.pickLookup[k].label !=  that.activeComponent.label){
-            break
+      console.log("🔍 searchApis: processing subjectsSimple, length:", that.searchResults.subjectsSimple?.length || 0)
+      if (that.searchResults.subjectsSimple && that.searchResults.subjectsSimple.length > 0) {
+        for (let s of that.searchResults.subjectsSimple){
+          if (s.suggestLabel && s.suggestLabel.includes('(DEPRECATED')){
+            s.suggestLabel = s.suggestLabel.split('(DEPRECATED')[0] + "(DEPRECATED)"
           }
         }
       }
+
+      if (that.searchResults.hierarchicalGeographic && that.searchResults.hierarchicalGeographic.length > 0) {
+        for (let s of that.searchResults.hierarchicalGeographic){
+          if (s.suggestLabel && s.suggestLabel.includes(' (USE ')){
+            s.suggestLabel = s.label
+          }
+        }
+      }
+      
+      if (that.searchMode == 'WORKS' || that.searchMode == 'HUBS'){
+        if (that.searchResults.subjectsSimple && that.searchResults.subjectsSimple.length > 0) {
+          for (let s of that.searchResults.subjectsSimple){
+            if (s.suggestLabel && s.suggestLabel.includes(' (USE ')){
+              s.suggestLabel = s.label
+            }
+          }
+        }
+        if (that.searchResults.subjectsComplex && that.searchResults.subjectsComplex.length > 0) {
+          for (let s of that.searchResults.subjectsComplex){
+            if (s.suggestLabel && s.suggestLabel.includes(' (USE ')){
+              s.suggestLabel = s.label
+            }
+          }
+        }
+      }
+
+      if (that.searchResults.hierarchicalGeographic && that.searchResults.hierarchicalGeographic.length > 0) {
+        for (let s of that.searchResults.hierarchicalGeographic){
+          s.labelOrginal = s.label
+          s.hierarchicalGeographic=true
+          s.label = s.label.replaceAll('-','‑')
+        }
+
+        if (that.searchResults.hierarchicalGeographic.length>0 && (!that.searchResults.subjectsComplex || that.searchResults.subjectsComplex.length==0)){
+          that.searchResults.subjectsComplex = that.searchResults.hierarchicalGeographic
+        }
+      }
+
+      // Clear pickLookup before rebuilding
+      that.pickLookup = {}
+
+      if (that.searchResults && Array.isArray(that.searchResults.subjectsSimple) && Array.isArray(that.searchResults.subjectsComplex)) {
+        const tot = that.searchResults.subjectsSimple.length + that.searchResults.subjectsComplex.length
+        that.pickPostion = tot > 0 ? tot - 1 : 0
+      }
+
+  // Build the pick lookup for hover functionality (explicit call instead of watcher)
+  console.log("🚀 About to call buildPickLookup from searchApis")
+  console.log("🚀 that.searchResults before buildPickLookup:", that.searchResults)
+  that.buildPickLookup()
+      console.log("🚀 buildPickLookup call completed")
+      console.log("🚀 that.pickLookup after buildPickLookup:", that.pickLookup)
+
+      // Check if we have any matches to auto-select
+      for (let k in that.pickLookup){
+        if (searchString.toLowerCase() == that.pickLookup[k].label.toLowerCase() && !that.pickLookup[k].literal ){
+          // if the labels are the same for the current one selected don't overide it
+          if (that.activeComponent && that.pickLookup[k].label.replaceAll('‑','-') == that.activeComponent.label.replaceAll('‑','-') && that.activeComponent.uri){
+            if (that.activeComponent.uri == that.pickLookup[k].uri){
+              that.pickPostion=k
+              that.pickLookup[k].picked=true
+              that.selectContext()
+            }
+          }else{
+            // if they started typing the next word already then stop this
+            if (that.subjectString.replaceAll('‑','-')!=searchStringFull.replaceAll('‑','-')){
+              break
+            }
+            // do they even have the same label currently, they might be clicking around in the interface
+            // so at this point with the async lookup this is not even the right component
+            if (that.pickLookup[k].label !=  that.activeComponent.label){
+              break
+            }
+          }
+        }
+      }
+
+      // close if (that.searchResults) block
     }
 
-    // that.contextData.dispatch("clearContext", { self: that})
-    console.log("🔍 searchApis: checking if pickLookup[pickPosition] exists, pickPostion:", that.pickPostion)
+  console.log("🔍 searchApis: checking if pickLookup[pickPosition] exists, pickPostion:", that.pickPostion)
     console.log("🔍 searchApis: pickLookup[pickPostion]:", that.pickLookup[that.pickPostion])
     if (that.pickLookup[that.pickPostion] && !that.pickLookup[that.pickPostion].literal){
       console.log("🔍 searchApis: calling getContext for initial context load")
       that.contextRequestInProgress = true
-      // that.contextData = await utilsNetwork.returnContext(that.pickLookup[that.pickPostion].uri)
-      that.contextData = that.getContext()
+      that.getContext()
 
       // keep a local copy of it for looking up subject type
       if (that.contextData){
@@ -1617,37 +1362,39 @@ methods: {
 
     console.log("🔍 searchApis: calling nextTick for toolbar height check")
 
+    // microtask to ensure pickLookup is built before user hovers
+    setTimeout(() => {
+      if (!that.pickLookup || Object.keys(that.pickLookup).length === 0) {
+        console.log("⏱️ Prebuilding pickLookup after search ready")
+        that.buildPickLookup()
+      }
+    }, 0)
+
     that.$nextTick(() => {
       that.checkToolBarHeight()
 
-
-
-      // window.setTimeout(()=> {
-
-        // find out how small the smallest one is and then loop through and try to make all of them
-        // that size so they fit on one line of the display
-        let smallest_size = 1000;
-        for (let el of document.getElementsByClassName("fake-option")){
-
-          if (el.offsetHeight < smallest_size && el.offsetHeight!=0){
-            smallest_size=el.offsetHeight
-          }
+      // find out how small the smallest one is and then loop through and try to make all of them
+      // that size so they fit on one line of the display
+      let smallest_size = 1000;
+      for (let el of document.getElementsByClassName("fake-option")){
+        if (el.offsetHeight < smallest_size && el.offsetHeight!=0){
+          smallest_size=el.offsetHeight
         }
-        // alert(smallest_size)
-        for (let el of document.getElementsByClassName("fake-option")){
-          if (el.offsetHeight > smallest_size){
-            let startFontSize = 1.25
-            while (el.offsetHeight >smallest_size){
-              startFontSize=startFontSize-0.01
-              el.style.fontSize = startFontSize + 'em';
-              if (startFontSize<=0.01){
-                el.style.fontSize = "1.25em"
-                break
-              }
+      }
+      
+      for (let el of document.getElementsByClassName("fake-option")){
+        if (el.offsetHeight > smallest_size){
+          let startFontSize = 1.25
+          while (el.offsetHeight >smallest_size){
+            startFontSize=startFontSize-0.01
+            el.style.fontSize = startFontSize + 'em';
+            if (startFontSize<=0.01){
+              el.style.fontSize = "1.25em"
+              break
             }
           }
         }
-      // },100)
+      }
     })
   }, 500),
 
@@ -1723,64 +1470,84 @@ methods: {
     }
 
     console.log("🔧 searchResults structure:")
-    console.log("  - subjectsComplex:", this.searchResults.subjectsComplex?.length || 0)
-    console.log("  - subjectsSimple:", this.searchResults.subjectsSimple?.length || 0) 
-    console.log("  - subjectsChildrenComplex:", this.searchResults.subjectsChildrenComplex?.length || 0)
-    console.log("  - subjectsChildren:", this.searchResults.subjectsChildren?.length || 0)
-    console.log("  - names:", this.searchResults.names?.length || 0)
-    console.log("  - exact:", this.searchResults.exact?.length || 0)
+  console.log("  - subjectsComplex:", (this.searchResults.subjectsComplex && this.searchResults.subjectsComplex.length) ? this.searchResults.subjectsComplex.length : 0)
+  console.log("  - subjectsSimple:", (this.searchResults.subjectsSimple && this.searchResults.subjectsSimple.length) ? this.searchResults.subjectsSimple.length : 0)
+  console.log("  - subjectsChildrenComplex:", (this.searchResults.subjectsChildrenComplex && this.searchResults.subjectsChildrenComplex.length) ? this.searchResults.subjectsChildrenComplex.length : 0)
+  console.log("  - subjectsChildren:", (this.searchResults.subjectsChildren && this.searchResults.subjectsChildren.length) ? this.searchResults.subjectsChildren.length : 0)
+  console.log("  - names:", (this.searchResults.names && this.searchResults.names.length) ? this.searchResults.names.length : 0)
+  console.log("  - exact:", (this.searchResults.exact && this.searchResults.exact.length) ? this.searchResults.exact.length : 0)
 
     this.pickLookup = {}
 
-    // Complex subjects start at 0
-    if (this.searchResults.subjectsComplex) {
-      for (let x in this.searchResults.subjectsComplex) {
-        console.log(`📝 Adding subjectsComplex[${x}] to pickLookup[${x}]:`, this.searchResults.subjectsComplex[x].label)
-        this.pickLookup[x] = this.searchResults.subjectsComplex[x]
+    const normalizeItem = (item) => {
+      if (!item) return item
+      if (!item.label) {
+        // prefer suggestLabel, fallback to aLabel or other common fields
+        const display = Array.isArray(item.displayLabel) ? item.displayLabel[0] : item.displayLabel
+        item.label = item.suggestLabel || item.aLabel || item.authLabel || display || item.title || ''
+      }
+      if (!item.uri && item['@id']) item.uri = item['@id']
+      return item
+    }
+
+    const haveMain = ((this.searchResults.subjectsComplex?.length || 0) + (this.searchResults.subjectsSimple?.length || 0)) > 0
+    const haveChildren = ((this.searchResults.subjectsChildrenComplex?.length || 0) + (this.searchResults.subjectsChildren?.length || 0)) > 0
+
+    // Prefer main arrays; use children arrays when main are absent (mirrors how the template renders per mode)
+    if (haveMain) {
+      // Complex subjects start at 0
+      if (this.searchResults.subjectsComplex && this.searchResults.subjectsComplex.length > 0) {
+        for (let i = 0; i < this.searchResults.subjectsComplex.length; i++) {
+          const item = normalizeItem(this.searchResults.subjectsComplex[i])
+          this.pickLookup[i] = JSON.parse(JSON.stringify(item))
+        }
+      }
+
+      // Simple subjects continue from complex subjects
+      if (this.searchResults.subjectsSimple && this.searchResults.subjectsSimple.length > 0) {
+        const offset = this.searchResults.subjectsComplex?.length || 0
+        for (let i = 0; i < this.searchResults.subjectsSimple.length; i++) {
+          const pos = offset + i
+          const item = normalizeItem(this.searchResults.subjectsSimple[i])
+          this.pickLookup[pos] = JSON.parse(JSON.stringify(item))
+        }
+      }
+    } else if (haveChildren) {
+      // Children complex
+      if (this.searchResults.subjectsChildrenComplex && this.searchResults.subjectsChildrenComplex.length > 0) {
+        for (let i = 0; i < this.searchResults.subjectsChildrenComplex.length; i++) {
+          const item = normalizeItem(this.searchResults.subjectsChildrenComplex[i])
+          this.pickLookup[i] = JSON.parse(JSON.stringify(item))
+        }
+      }
+      // Children simple continue from children complex
+      if (this.searchResults.subjectsChildren && this.searchResults.subjectsChildren.length > 0) {
+        const offset = this.searchResults.subjectsChildrenComplex?.length || 0
+        for (let i = 0; i < this.searchResults.subjectsChildren.length; i++) {
+          const pos = offset + i
+          const item = normalizeItem(this.searchResults.subjectsChildren[i])
+          this.pickLookup[pos] = JSON.parse(JSON.stringify(item))
+        }
       }
     }
 
-    // Simple subjects continue from complex subjects
-    if (this.searchResults.subjectsSimple) {
-      for (let x in this.searchResults.subjectsSimple) {
-        const position = parseInt(x) + parseInt(this.searchResults.subjectsComplex?.length || 0)
-        console.log(`📝 Adding subjectsSimple[${x}] to pickLookup[${position}]:`, this.searchResults.subjectsSimple[x].label)
-        this.pickLookup[position] = this.searchResults.subjectsSimple[x]
+    // Names get negative indices as (len - idx) * -1, so last entry is -1
+    if (this.searchResults.names && this.searchResults.names.length > 0) {
+      const n = this.searchResults.names.length
+      for (let i = 0; i < n; i++) {
+        const pos = (n - i) * -1
+  const item = normalizeItem(this.searchResults.names[i])
+  this.pickLookup[pos] = JSON.parse(JSON.stringify(item))
       }
     }
 
-    // Children complex subjects start at 0 (note: this might conflict with the above)
-    if (this.searchResults.subjectsChildrenComplex) {
-      for (let x in this.searchResults.subjectsChildrenComplex) {
-        console.log(`📝 Adding subjectsChildrenComplex[${x}] to pickLookup[${x}]:`, this.searchResults.subjectsChildrenComplex[x].label)
-        this.pickLookup[x] = this.searchResults.subjectsChildrenComplex[x]
-      }
-    }
-
-    // Children simple subjects continue from children complex
-    if (this.searchResults.subjectsChildren) {
-      for (let x in this.searchResults.subjectsChildren) {
-        const position = parseInt(x) + parseInt(this.searchResults.subjectsChildrenComplex?.length || 0)
-        console.log(`📝 Adding subjectsChildren[${x}] to pickLookup[${position}]:`, this.searchResults.subjectsChildren[x].label)
-        this.pickLookup[position] = this.searchResults.subjectsChildren[x]
-      }
-    }
-
-    // Names get negative indices
-    if (this.searchResults.names) {
-      for (let x in this.searchResults.names) {
-        const position = (this.searchResults.names.length - x) * -1
-        console.log(`📝 Adding names[${x}] to pickLookup[${position}]:`, this.searchResults.names[x].label)
-        this.pickLookup[position] = this.searchResults.names[x]
-      }
-    }
-
-    // Exact matches get negative indices with offset
-    if (this.searchResults.exact) {
-      for (let x in this.searchResults.exact) {
-        const position = (this.searchResults.names?.length || 0 - x) * -1 - 2
-        console.log(`📝 Adding exact[${x}] to pickLookup[${position}]:`, this.searchResults.exact[x].label)
-        this.pickLookup[position] = this.searchResults.exact[x]
+    // Exact matches get negative indices offset by -2 from the names positions
+    if (this.searchResults.exact && this.searchResults.exact.length > 0) {
+      const n = this.searchResults.names?.length || 0
+      for (let i = 0; i < this.searchResults.exact.length; i++) {
+        const pos = (n - i) * -1 - 2
+  const item = normalizeItem(this.searchResults.exact[i])
+  this.pickLookup[pos] = JSON.parse(JSON.stringify(item))
       }
     }
 
@@ -1800,8 +1567,64 @@ methods: {
     console.log("pickLookup[pickPostion]:", this.pickLookup[this.pickPostion])
     
     if (!this.pickLookup[this.pickPostion]) {
-      console.log("No entry in pickLookup for position:", this.pickPostion)
-      return false
+      // Try to derive the entry directly from searchResults using the same index mapping
+      const deriveFromResults = (pos) => {
+        if (!this.searchResults) return null
+        const normalize = (item) => {
+          if (!item) return item
+          if (!item.label) {
+            const display = Array.isArray(item.displayLabel) ? item.displayLabel[0] : item.displayLabel
+            item.label = item.suggestLabel || item.aLabel || item.authLabel || display || item.title || ''
+          }
+          if (!item.uri && item['@id']) item.uri = item['@id']
+          return item
+        }
+        // Positive indices cover subjectsComplex then subjectsSimple
+        if (pos >= 0) {
+          const cx = this.searchResults.subjectsComplex || []
+          const sm = this.searchResults.subjectsSimple || []
+          if (pos < cx.length) return normalize(cx[pos])
+          const offset = pos - cx.length
+          if (offset >= 0 && offset < sm.length) return normalize(sm[offset])
+          // children fallback
+          const ccx = this.searchResults.subjectsChildrenComplex || []
+          const csm = this.searchResults.subjectsChildren || []
+          if (pos < ccx.length) return normalize(ccx[pos])
+          const coff = pos - ccx.length
+          if (coff >= 0 && coff < csm.length) return normalize(csm[coff])
+          return null
+        } else {
+          // Negative indices map names: (n - i) * -1, and exact offset -2
+          const names = this.searchResults.names || []
+          const exact = this.searchResults.exact || []
+          const n = names.length
+          // If pos in [-n..-1]
+          if (pos <= -1 && pos >= -n) {
+            const i = n - Math.abs(pos)
+            return normalize(names[i])
+          }
+          // exact: positions shift further negative by 2
+          const eIndex = n - Math.abs(pos + 2)
+          if (eIndex >= 0 && eIndex < exact.length) return normalize(exact[eIndex])
+          return null
+        }
+      }
+      const derived = deriveFromResults(this.pickPostion)
+      if (derived) {
+        this.pickLookup[this.pickPostion] = JSON.parse(JSON.stringify(derived))
+      } else {
+        console.log("No entry in pickLookup for position:", this.pickPostion)
+        return false
+      }
+    }
+
+    // If we have cached context for this URI, use it immediately
+    const current = this.pickLookup[this.pickPostion]
+    if (current && current.uri && this.localContextCache[current.uri]) {
+      this.contextData = JSON.parse(JSON.stringify(this.localContextCache[current.uri]))
+      this.contextRequestInProgress = false
+      console.log("Using cached contextData for", current.uri)
+      return true
     }
     
     if (this.pickLookup[this.pickPostion].literal) {
@@ -1839,12 +1662,11 @@ methods: {
         this.contextData.literal = true
       }
     } else {
-      console.log("No extra data available, creating basic contextData")
-      this.contextData = {
-        title: this.pickLookup[this.pickPostion].label,
-        uri: this.pickLookup[this.pickPostion].uri,
-        literal: !this.pickLookup[this.pickPostion].uri
-      }
+  console.log("No extra data available, fetching full context via _getContext()")
+      // Delegate to network-backed context loader for full details
+      await this._getContext()
+      console.log("getContext completed (via _getContext), contextData:", this.contextData)
+      return
     }
 
     this.contextRequestInProgress = false
@@ -2084,15 +1906,19 @@ methods: {
     
     // Don't proceed if pickLookup is empty or not ready
     if (!this.pickLookup || Object.keys(this.pickLookup).length === 0) {
-      console.log("❌ pickLookup is empty, skipping loadContext")
-      return false
+      // Attempt to build from existing searchResults to support early hover
+      if (this.searchResults) {
+        console.log("ℹ️ pickLookup empty on hover; building from searchResults now")
+        this.buildPickLookup()
+      }
+      if (!this.pickLookup || Object.keys(this.pickLookup).length === 0) {
+        console.log("❌ pickLookup is empty, skipping loadContext")
+        return false
+      }
     }
     
-    if (this.pickCurrent == null) {
-      this.pickPostion = pickPosition
-    } else {
-      return null
-    }
+  // Always allow hover to preview context; do not change pickCurrent here
+  this.pickPostion = pickPosition
 
     if (!this.pickLookup[this.pickPostion]) {
       console.log("No entry in pickLookup for position:", this.pickPostion)
@@ -2104,8 +1930,12 @@ methods: {
       return false
     }
 
-    // Load the context data
-    this.getContext()
+  // Load the context data and avoid pickLookup rebuild while we fetch
+  this.skipPickBuild = true
+  this.contextRequestInProgress = true
+  await this.getContext()
+  this.contextRequestInProgress = false
+  this.skipPickBuild = false
 
     // Cache the context data if available
     if (this.contextData && this.contextData.uri) {
@@ -2125,13 +1955,14 @@ methods: {
 
     if (this.pickLookup[this.pickPostion].complex){
       // if it is a complex authorized heading then just replace the whole things with it
-      this.subjectString = this.pickLookup[this.pickPostion].label
+  const selLabel = this.pickLookup[this.pickPostion].label || this.pickLookup[this.pickPostion].suggestLabel || this.pickLookup[this.pickPostion].aLabel || ''
+  this.subjectString = selLabel
       this.activeComponentIndex = 0
 
       this.componetLookup = {}
       this.componetLookup[this.activeComponentIndex] = {}
 
-      this.componetLookup[this.activeComponentIndex][this.pickLookup[this.pickPostion].label] = this.pickLookup[this.pickPostion]
+  this.componetLookup[this.activeComponentIndex][selLabel] = this.pickLookup[this.pickPostion]
       for (let k in this.pickLookup){
         this.pickLookup[k].picked=false
       }
@@ -2157,7 +1988,8 @@ methods: {
       let splitString = this.subjectString.split('--')
 
       // replace the string with what we selected
-      splitString[this.activeComponentIndex] = this.pickLookup[this.pickPostion].label.replaceAll('-','‑')
+  const baseLabel = this.pickLookup[this.pickPostion].label || this.pickLookup[this.pickPostion].suggestLabel || this.pickLookup[this.pickPostion].aLabel || ''
+  splitString[this.activeComponentIndex] = baseLabel.replaceAll('-','‑')
 
       this.subjectString = splitString.join('--')
 
@@ -2166,8 +1998,8 @@ methods: {
         this.componetLookup[this.activeComponentIndex]= {}
       }
 
-      let _ = await this.getContext() //ensure the pickLookup has the marcKey
-      this.componetLookup[this.activeComponentIndex][this.pickLookup[this.pickPostion].label.replaceAll('-','‑')] = this.pickLookup[this.pickPostion]
+  let _ = await this.getContext() //ensure the pickLookup has the marcKey
+  this.componetLookup[this.activeComponentIndex][baseLabel.replaceAll('-','‑')] = this.pickLookup[this.pickPostion]
 
       for (let k in this.pickLookup){
         this.pickLookup[k].picked=false
@@ -2504,19 +2336,19 @@ methods: {
     if (event && this.nextInputIsTypeSelection){
       if (event.data.toLowerCase()==='a' || event.data.toLowerCase()==='x'){
         this.typeLookup[this.activeComponentIndex] = 'madsrdf:Topic'
-        this.subjectString=this.subjectString.replace('$'+event.data,'')
+        this.subjectString=this.subjectString.replace('$' + event.data,'')
       }
       if (event.data.toLowerCase()==='v'){
         this.typeLookup[this.activeComponentIndex] = 'madsrdf:GenreForm'
-        this.subjectString=this.subjectString.replace('$'+event.data,'')
+        this.subjectString=this.subjectString.replace('$' + event.data,'')
       }
       if (event.data.toLowerCase()==='z'){
         this.typeLookup[this.activeComponentIndex] = 'madsrdf:Geographic'
-        this.subjectString=this.subjectString.replace('$'+event.data,'')
+        this.subjectString=this.subjectString.replace('$' + event.data,'')
       }
       if (event.data.toLowerCase()==='y'){
         this.typeLookup[this.activeComponentIndex] = 'madsrdf:Temporal'
-        this.subjectString=this.subjectString.replace('$'+event.data,'')
+        this.subjectString=this.subjectString.replace('$' + event.data,'')
       }
 
       this.nextInputIsTypeSelection = false
@@ -3008,7 +2840,7 @@ methods: {
     if (typeof userValue == "string"){
 
 
-      // they sometimes come in with '.' at the end of the authorized form
+      // they sometimes come in with '.' at the end of the authorized form.
       if (userValue.slice(-1)=='.'){
         userValue=userValue.slice(0,-1)
       }
@@ -3276,8 +3108,8 @@ updated: function() {
       //Performs the search for linkmode
       this.linkModeTextChange({key:'Enter',shiftKey:false})
 
-      //Do the search for build mode
-      this.searchResults = this.searchApis(this.components[0].label, this.authorityLookupLocal, this)
+  //Do the search for build mode (do not assign; debounced async updates searchResults internally)
+  this.searchApis(this.components[0].label, this.authorityLookupLocal, this)
 
       //Wait for the search results
       this.searching = true
@@ -3317,7 +3149,7 @@ updated: function() {
           }, (2 * 1000)
       )
     this.searching = false
-    } catch(err){
+    } catch(err) {
       console.log("Error: ", err)
     }
 
@@ -3327,5 +3159,4 @@ updated: function() {
   }
 }
 };
-
 </script>
