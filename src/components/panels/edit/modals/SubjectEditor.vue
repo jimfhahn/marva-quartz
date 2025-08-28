@@ -81,12 +81,11 @@
                     {{ Array.isArray(contextData.title) ? contextData.title[0]["@value"] : contextData.title }}
                   </h3>
 
-                  <div class="modal-context-data-title" v-if="contextData.rdftypes">
-                    {{contextData.rdftypes.includes('Hub') ? 'Hub' : contextData.rdftypes[0]}}
+                  <div class="modal-context-meta" v-if="contextData.rdftypes || contextData.marcKey || (contextData.uri && contextData.literal != true)">
+                    <span v-if="contextData.rdftypes">{{ contextData.rdftypes.includes('Hub') ? 'Hub' : contextData.rdftypes[0] }}</span>
+                    <span v-if="contextData.marcKey"> • {{ contextData.marcKey }}</span>
+                    <span v-if="contextData.uri && contextData.literal != true"> • <a style="color:#2c3e50" :href="contextData.uri" target="_blank">id.loc.gov</a></span>
                   </div>
-                  <a style="color:#2c3e50" :href="contextData.uri" target="_blank" v-if="contextData.literal != true">view on id.loc.gov</a>
-
-                  <br><br>
 
                   <template v-for="key in panelDetailOrder">
                     <div v-if="contextData[key] && contextData[key].length>0">
@@ -139,21 +138,43 @@
               <div style="display: flex;">
                 <div style="flex:1; position: relative;">
                   <form autocomplete="off" style="height: 3em;">
-                    <input v-on:keydown.enter.prevent="linkModeTextChange" placeholder="Enter MARC encoded LCSH value" autocomplete="off" type="text" v-model="linkModeString" ref="subjectInput" class="input-single-subject subject-input">
+                    <input v-on:keydown.enter.prevent="linkModeTextChange" @input="linkModeOnInput" placeholder="Enter MARC encoded LCSH value" autocomplete="off" type="text" v-model="linkModeString" ref="subjectInput" class="input-single-subject subject-input">
                   </form>
                 </div>
               </div>
             </div>
 
             <ul v-if="!linkModeSearching">
-              <li v-if="linkModeResults===false">Enter MARC subject string above (with $ signs for subdivdion seperation) and press enter key</li>
+              <li v-if="linkModeResults===false">Type a MARC-encoded subject string (with $ signs between subdivisions). Results will appear automatically; press Enter to link.</li>
             </ul>
+
+            <!-- Live preview of parsed/linked components for Link Mode -->
+            <div v-if="linkModeResults && linkModeResults.resultType" style="margin: 0.75em 0 0.25em 0;">
+              <div v-if="linkModeResults.resultType==='COMPLEX'">
+                <span v-if="linkModeResults.hit" class="marc-deliminated-lcsh-mode-entity">
+                  <span class="material-icons marc-deliminated-lcsh-mode-icon">check_circle</span>
+                  <a :href="linkModeResults.hit.uri" target="_blank">{{ linkModeResults.hit.label }}</a>
+                </span>
+              </div>
+              <div v-else-if="linkModeResults.hit && Array.isArray(linkModeResults.hit)">
+                <template v-for="(heading, i) in linkModeResults.hit" :key="'lmh-'+i">
+                  <span v-if="heading.literal===false" class="marc-deliminated-lcsh-mode-entity">
+                    <span class="material-icons marc-deliminated-lcsh-mode-icon">check_circle</span>
+                    <a :href="heading.uri" target="_blank">{{ heading.label }}</a>
+                  </span>
+                  <span v-else class="marc-deliminated-lcsh-mode-entity">
+                    <span class="material-icons marc-deliminated-lcsh-mode-icon-warning">warning</span>
+                    {{ heading.label }}
+                  </span>
+                </template>
+              </div>
+            </div>
 
             <div style="display: flex;">
               <div style="flex:2">
                 <h1 v-if="linkModeSearching"><span id="loading-icon">⟳</span> Working...</h1>
                 <button v-if="linkModeSearching===false" style="margin-right: 1em; margin-left: 2em" @click="linkModeTextChange({key:'Enter',shiftKey:false})">Link Components [Enter]</button>
-                <button v-if="linkModeResults!==false" style="" @click="addLinkMode">Add Heading [SHIFT+Enter]</button>
+                <button v-if="linkModeResults && linkModeResults.resultType && linkModeResults.resultType!=='ERROR' && linkModeResults.hit" style="" @click="addLinkMode">Add Heading [SHIFT+Enter]</button>
               </div>
               <div style="flex:1">
                 <button style="float:right; margin-right:1em" @click="closeEditor">Close</button>
@@ -328,6 +349,11 @@
   .modal-context-data-title{
     font-size: 1.2em;
     font-weight: bold;
+  }
+
+  .modal-context-meta{
+    margin: 4px 0 12px 0;
+    color: #2c3e50;
   }
 
   .modal-context ul{
@@ -536,13 +562,18 @@ import utilsNetwork from '@/lib/utils_network';
 
 
 const debounce = (callback, wait) => {
-let timeoutId = null;
-return (...args) => {
-  window.clearTimeout(timeoutId);
-  timeoutId = window.setTimeout(() => {
-    callback.apply(null, args);
-  }, wait);
-};
+  let timeoutId = null;
+  return function(...args){
+    const context = this;
+    window.clearTimeout(timeoutId);
+    timeoutId = window.setTimeout(() => {
+      try {
+        callback.apply(context, args);
+      } catch (e) {
+        console.error('Debounced function error:', e);
+      }
+    }, wait);
+  };
 }
 
 
@@ -650,7 +681,7 @@ data: function() {
       "notes","nonlatinLabels","variantLabels","birthdates",
       "birthplaces","locales","activityfields","occupations",
       "languages","lcclasss","broaders","gacs","collections",
-      "sources", "subjects", "marcKey"
+      "sources", "subjects"
     ],
 
 
@@ -667,6 +698,25 @@ computed: {
 
 },
 methods: {
+  // Debounced auto-search for Link Mode as the user types
+  linkModeOnInput: debounce(async function() {
+    const q = (this.linkModeString || '').trim()
+    // Basic guard to avoid hammering the API on empty/short inputs
+  if (!q || q.length < 2) {
+      this.linkModeResults = false
+      this.linkModeSearching = false
+      return
+    }
+    this.linkModeSearching = true
+    try {
+      this.linkModeResults = await utilsNetwork.subjectLinkModeResolveLCSH(q)
+    } catch (e) {
+      console.error('linkMode auto-search failed', e)
+      this.linkModeResults = false
+    } finally {
+      this.linkModeSearching = false
+    }
+  }, 400),
   hasOverFlow: function(element){
     let overflow = element.scrollHeight > element.clientHeight
     return overflow
@@ -1567,6 +1617,10 @@ methods: {
     console.log("pickLookup[pickPostion]:", this.pickLookup[this.pickPostion])
     
     if (!this.pickLookup[this.pickPostion]) {
+      // If we're in Link Mode (no pick list active), skip context fetch entirely
+      if (this.subjectEditorMode === 'link') {
+        return false
+      }
       // Try to derive the entry directly from searchResults using the same index mapping
       const deriveFromResults = (pos) => {
         if (!this.searchResults) return null
@@ -1661,16 +1715,95 @@ methods: {
       } else {
         this.contextData.literal = true
       }
+      // Normalize into panel-friendly shape
+      this._normalizeContextForPanel(this.contextData, this.pickLookup[this.pickPostion])
     } else {
   console.log("No extra data available, fetching full context via _getContext()")
       // Delegate to network-backed context loader for full details
       await this._getContext()
+      // Normalize into panel-friendly shape
+      this._normalizeContextForPanel(this.contextData, this.pickLookup[this.pickPostion])
       console.log("getContext completed (via _getContext), contextData:", this.contextData)
       return
     }
 
     this.contextRequestInProgress = false
     console.log("getContext completed, contextData:", this.contextData)
+  },
+
+  /**
+   * Normalize contextData to the UI schema expected by the right pane
+   * - Ensures title is a string
+   * - Populates rdftypes (array) from type/typeFull if missing
+   * - Maps nodeMap keys to panelDetailOrder keys (birthdates, broaders, etc.)
+   * - Ensures marcKey is a string
+   */
+  _normalizeContextForPanel: function(ctx, fallbackItem){
+    if (!ctx || typeof ctx !== 'object') return
+
+    // Title: prefer explicit, else fallback to hovered label
+    if (Array.isArray(ctx.title)) {
+      // If array of objects with @value, pick first @value
+      const t = ctx.title.find(v => v && (v['@value'] || typeof v === 'string'))
+      ctx.title = t ? (t['@value'] || t) : (fallbackItem && (fallbackItem.label || fallbackItem.suggestLabel || fallbackItem.aLabel) || '')
+    } else if (!ctx.title || ctx.title === '') {
+      ctx.title = (fallbackItem && (fallbackItem.label || fallbackItem.suggestLabel || fallbackItem.aLabel)) || ''
+    }
+
+    // rdftypes: keep existing, otherwise derive from type/typeFull
+    if (!ctx.rdftypes || !Array.isArray(ctx.rdftypes) || ctx.rdftypes.length === 0) {
+      const typeFull = ctx.typeFull || ctx.type || ''
+      if (typeof typeFull === 'string' && typeFull.includes('#')) {
+        ctx.rdftypes = [ typeFull.split('#').pop() ]
+      } else if (typeof typeFull === 'string' && typeFull.includes('/bibframe/')) {
+        ctx.rdftypes = [ typeFull.split('/').pop() ]
+      } else if (typeof ctx.type === 'string' && ctx.type) {
+        ctx.rdftypes = [ ctx.type.replace('madsrdf:', '') ]
+      }
+    }
+
+    // marcKey: if it's an array or object, normalize to string
+    if (Array.isArray(ctx.marcKey)) {
+      const m = ctx.marcKey.find(v => v && (v['@value'] || typeof v === 'string'))
+      ctx.marcKey = m ? (m['@value'] || m) : ctx.marcKey[0]
+    }
+
+    // Map nodeMap keys (if present) into panel keys
+    const nm = ctx.nodeMap || {}
+    const mapKey = (srcKey) => Array.isArray(nm[srcKey]) ? nm[srcKey].filter(Boolean) : []
+    // Expected panel keys
+    ctx.birthdates   = ctx.birthdates   || mapKey('Birth Date')
+    ctx.birthplaces  = ctx.birthplaces  || mapKey('Birth Place')
+    ctx.locales      = ctx.locales      || mapKey('Associated Locale')
+    ctx.activityfields = ctx.activityfields || mapKey('Field of Activity')
+    ctx.occupations  = ctx.occupations  || mapKey('Occupation')
+    ctx.languages    = ctx.languages    || mapKey('Associated Language')
+    ctx.lcclasss     = ctx.lcclasss     || mapKey('LC Classification')
+    ctx.broaders     = ctx.broaders     || mapKey('Has Broader Authority')
+    ctx.collections  = ctx.collections  || mapKey('MADS Collection')
+    ctx.gacs         = ctx.gacs         || mapKey('GAC(s)')
+    ctx.subjects     = ctx.subjects     || mapKey('Subjects')
+
+    // nonlatinLabels and variantLabels
+    if (!ctx.nonlatinLabels && ctx.nonLatinTitle) {
+      // array of label objects -> values
+      try {
+        ctx.nonlatinLabels = (Array.isArray(ctx.nonLatinTitle) ? ctx.nonLatinTitle : []).map(v => v && (v['@value'] || v)).filter(Boolean)
+      } catch {}
+    }
+    if (!ctx.variantLabels && ctx.variant) {
+      if (Array.isArray(ctx.variant)) ctx.variantLabels = ctx.variant
+      else if (typeof ctx.variant === 'string' && ctx.variant.trim() !== '') ctx.variantLabels = [ctx.variant]
+    }
+
+    // sources: normalize to array of strings if provided
+    if (ctx.source && !ctx.sources) {
+      if (Array.isArray(ctx.source)) ctx.sources = ctx.source
+      else if (typeof ctx.source === 'string') ctx.sources = [ctx.source]
+    }
+
+    // Ensure uri
+    if (!ctx.uri && fallbackItem && fallbackItem.uri) ctx.uri = fallbackItem.uri
   },
 
   _getContext: async function(){
@@ -1937,7 +2070,7 @@ methods: {
   this.contextRequestInProgress = false
   this.skipPickBuild = false
 
-    // Cache the context data if available
+    // Cache the normalized context data if available
     if (this.contextData && this.contextData.uri) {
       this.localContextCache[this.contextData.uri] = JSON.parse(JSON.stringify(this.contextData))
     }
@@ -2486,10 +2619,10 @@ methods: {
     // console.log(this.linkModeResults)
 
 
-    if (this.linkModeResults){
+    if (this.linkModeResults && this.linkModeResults.resultType && this.linkModeResults.resultType!=='ERROR'){
 
 
-      if (this.linkModeResults.resultType && this.linkModeResults.resultType==='COMPLEX'){
+      if (this.linkModeResults.resultType==='COMPLEX' && this.linkModeResults.hit){
         sendResults.push({
           complex: true,
           id: 0,
@@ -2501,19 +2634,25 @@ methods: {
           uri: this.linkModeResults.hit.uri
         })
 
-      }else{
-        for (const [i, v] of this.linkModeResults.hit.entries()) {
+      } else if (this.linkModeResults.resultType==='SIMPLE' && Array.isArray(this.linkModeResults.hit)){
+        this.linkModeResults.hit.forEach((v, i) => {
+          const rdf = v && v.heading ? v.heading.rdfType : 'http://www.loc.gov/mads/rdf/v1#Topic'
+          const type = typeof rdf === 'string' ? rdf.replace('http://www.loc.gov/mads/rdf/v1#','madsrdf:') : 'madsrdf:Topic'
           sendResults.push({
             complex: false,
             id: i,
-            label: v.label,
-            literal: v.literal,
+            label: v.label || '',
+            literal: !!v.literal,
             posEnd: 0,
             posStart: 0,
-            type: v.heading.rdfType.replace('http://www.loc.gov/mads/rdf/v1#','madsrdf:'),
-            uri: v.uri
+            type,
+            uri: v.uri || null
           })
-        }
+        })
+      } else {
+        // Unexpected shape; bail out gracefully
+        this.linkModeResults = false
+        return
       }
 
 

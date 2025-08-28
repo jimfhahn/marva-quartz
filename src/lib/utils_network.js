@@ -2206,12 +2206,99 @@ const utilsNetwork = {
         };
       }
 
+      const raw = (marcString || '').trim();
+      const hasDelimiters = raw.includes('$');
+
+      // Support natural-language input by resolving directly against ID.Loc
+      if (!hasDelimiters) {
+        try {
+          const term = raw.replace(/—/g, '--');
+          // Try exact label match first
+          const exact = await this.fetchSimpleLookup(
+            `https://id.loc.gov/authorities/subjects/label/${encodeURIComponent(term)}.json`,
+            true
+          );
+          if (exact && exact['@id']) {
+            const isComplex = term.includes('--');
+            if (isComplex) {
+              return {
+                resultType: 'COMPLEX',
+                hit: {
+                  uri: exact['@id'],
+                  label: term,
+                  heading: { subdivision: false, rdfType: 'http://www.loc.gov/mads/rdf/v1#Topic' }
+                }
+              };
+            } else {
+              return {
+                resultType: 'SIMPLE',
+                hit: [
+                  {
+                    label: term,
+                    uri: exact['@id'] || null,
+                    literal: exact['@id'] ? false : true,
+                    heading: {
+                      primary: true,
+                      subdivision: false,
+                      type: 'a',
+                      rdfType: 'http://www.loc.gov/mads/rdf/v1#Topic'
+                    }
+                  }
+                ]
+              };
+            }
+          }
+
+          // Fallback to suggest2 keyword search and choose the first hit
+          const sugg = await this.fetchSimpleLookup(
+            `https://id.loc.gov/authorities/subjects/suggest2/?q=${encodeURIComponent(term)}&count=25`,
+            true
+          );
+          if (sugg && Array.isArray(sugg.hits) && sugg.hits.length > 0) {
+            const h = sugg.hits[0];
+            const label = h.aLabel || h.suggestLabel || term;
+            const uri = h.uri || null;
+            if (label.includes('--')) {
+              return {
+                resultType: 'COMPLEX',
+                hit: {
+                  uri,
+                  label,
+                  heading: { subdivision: false, rdfType: 'http://www.loc.gov/mads/rdf/v1#Topic' }
+                }
+              };
+            }
+            return {
+              resultType: 'SIMPLE',
+              hit: [
+                {
+                  label,
+                  uri,
+                  literal: uri ? false : true,
+                  heading: {
+                    primary: true,
+                    subdivision: false,
+                    type: 'a',
+                    rdfType: 'http://www.loc.gov/mads/rdf/v1#Topic'
+                  }
+                }
+              ]
+            };
+          }
+
+          return { resultType: 'ERROR', msg: 'No results found for input.' };
+        } catch (e) {
+          console.error('Natural-language resolve failed', e);
+          return { resultType: 'ERROR', msg: 'Lookup failed.' };
+        }
+      }
+
       let mainHeading = null;
       let subdivisions = [];
       const components = [];
 
       // Parse the MARC string
-      const parts = marcString.split('$').filter(p => p.trim());
+  const parts = raw.split('$').filter(p => p.trim());
       
       for (const part of parts) {
         if (!part) continue;
