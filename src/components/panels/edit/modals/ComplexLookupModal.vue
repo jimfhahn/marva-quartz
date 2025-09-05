@@ -983,6 +983,19 @@
           
           // For non-literals, use the regular approach with deep copy
           const contextCopy = JSON.parse(JSON.stringify(this.activeContext));
+
+          // Normalize minimal shape for exporter: ensure @id present for resources
+          if (!contextCopy['@id'] && contextCopy.uri) {
+            contextCopy['@id'] = contextCopy.uri;
+          }
+          // If this modal is used for a bf:genreForm field, ensure @type is bf:GenreForm
+          try {
+            if (this.structure && this.structure.propertyURI === 'http://id.loc.gov/ontologies/bibframe/genreForm') {
+              if (!contextCopy['@type']) {
+                contextCopy['@type'] = 'http://id.loc.gov/ontologies/bibframe/GenreForm';
+              }
+            }
+          } catch {}
           
           // Debug logging for Hub marcKey troubleshooting
           console.log("Emitting complex value for:", {

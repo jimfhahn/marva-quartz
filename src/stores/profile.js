@@ -2707,6 +2707,14 @@ export const useProfileStore = defineStore('profile', {
         }
       }
 
+      // Ensure GenreForm has correct @type when adding to bf:genreForm
+      try {
+        const isGenreProp = propertyPath.map(p => p.propertyURI).includes('http://id.loc.gov/ontologies/bibframe/genreForm') || lastProperty === 'http://id.loc.gov/ontologies/bibframe/genreForm';
+        if (isGenreProp && (!type || type === 'bf:Resource' || type === 'http://www.w3.org/2000/01/rdf-schema#Resource')) {
+          type = 'http://id.loc.gov/ontologies/bibframe/GenreForm';
+        }
+      } catch {}
+
       if (pt !== false){
         pt.hasData = true
         pt.userModified = true

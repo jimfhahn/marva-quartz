@@ -432,7 +432,10 @@ export default {
           this.propertyPath,
           contextValue.uri,
           contextValue.title,
-          null, //contextValue.type.includes("Hub") ? "Hub" : contextValue.extra.rdftypes[0],
+          // Ensure type for genreForm so exporter emits bf:GenreForm instead of bf:Resource
+          (this.structure && this.structure.propertyURI === 'http://id.loc.gov/ontologies/bibframe/genreForm'
+            ? 'http://id.loc.gov/ontologies/bibframe/GenreForm'
+            : (contextValue.typeFull || null)),
           contextValue.extra,
           this.normalizeMarcKey(contextValue.extra.marcKey)
         )

@@ -2326,14 +2326,26 @@ const utilsExport = {
                       xmlLog.push(`Failed to create element for Hub relationship ${ptObj.propertyURI}`);
                     }
                   } else {
-                    // Handle simple URI references (original logic)
-                    let p = this.createElByBestNS(ptObj.propertyURI);
-                    if (p && p.nodeType) { // Check if p is a valid element
-                      p.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:resource', userValueItem['@id']);
+                    // Handle simple URI references with special-case for bf:genreForm to ensure nested bf:GenreForm
+                    const isGenreProp = ptObj.propertyURI === 'http://id.loc.gov/ontologies/bibframe/genreForm' || ptObj.propertyURI === 'bf:genreForm';
+                    if (isGenreProp) {
+                      let p = this.createElByBestNS(ptObj.propertyURI);
+                      // Build nested bf:GenreForm resource element
+                      let genreEl = this.createElByBestNS('http://id.loc.gov/ontologies/bibframe/GenreForm');
+                      genreEl.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:about', userValueItem['@id']);
+                      p.appendChild(genreEl);
                       rootEl.appendChild(p);
                       componentXmlLookup[`${rt}-${pt}`] = formatXML(p.outerHTML);
                     } else {
-                       xmlLog.push(`Failed to create element for URI reference ${ptObj.propertyURI}`);
+                      // Original simple resource reference
+                      let p = this.createElByBestNS(ptObj.propertyURI);
+                      if (p && p.nodeType) { // Check if p is a valid element
+                        p.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:resource', userValueItem['@id']);
+                        rootEl.appendChild(p);
+                        componentXmlLookup[`${rt}-${pt}`] = formatXML(p.outerHTML);
+                      } else {
+                         xmlLog.push(`Failed to create element for URI reference ${ptObj.propertyURI}`);
+                      }
                     }
                   }
                 } else if (ptObj.propertyURI == 'http://www.w3.org/2000/01/rdf-schema#label'){
