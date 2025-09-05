@@ -48,29 +48,38 @@ const utilsNetwork = {
     /**
     * processes the data returned from id vocabularies
     *
-    * @async
-    * @param {array} uris - the id vocabulary to query
-    * @return {object} - returns the results processing
-    */
-    loadSimpleLookup: async function(uris){
-        // TODO make this better for multuple lookup list (might not be needed)
-        if (!Array.isArray(uris)){
-          uris=[uris]
-        }
-        for (let uri of uris){
-          let url = uri
-          // TODO more checks here
-          if (!uri.includes('.json') && !uri.includes("suggest2")){
-              url = url + '.json'
+      try {
+        const complexLookupRaw = await this.fetchSimpleLookup(`https://id.loc.gov/authorities/subjects/label/${encodeURIComponent(fullHeadingLabel)}.json`, true);
+        let complexId = null;
+        if (complexLookupRaw) {
+          if (Array.isArray(complexLookupRaw)) {
+            // Find the ComplexType node
+            const complexNode = complexLookupRaw.find(n => Array.isArray(n['@type']) ? n['@type'].includes('http://www.loc.gov/mads/rdf/v1#ComplexType') : n['@type'] === 'http://www.loc.gov/mads/rdf/v1#ComplexType');
+            if (complexNode && complexNode['@id']) {
+              complexId = complexNode['@id'];
+            }
+          } else if (complexLookupRaw['@id']) {
+            // Single object shape (unlikely but supported)
+            complexId = complexLookupRaw['@id'];
           }
-
-          if (!this.lookupLibrary[uri]){
-              let data = await this.fetchSimpleLookup(url)
-              data = this.simpleLookupProcess(data,uri)
-              this.lookupLibrary[uri] = data
-              return data
-          }else{
-              return this.lookupLibrary[uri]
+        }
+        if (complexId) {
+          let mk = await this.lookupMarcKeyFromUri(complexId);
+            result.resultType = 'COMPLEX';
+            result.hit = {
+              uri: complexId,
+              label: fullHeadingLabel,
+              heading: { subdivision: false, rdfType: headings[0].rdfType },
+              extra: { marcKeys: mk && mk.marcKey ? [mk.marcKey] : [] , components: headings }
+            };
+            return result;
+        } else if (!complexLookupRaw) {
+          result._complexLookup404 = true;
+          console.info('[LinkMode] Complex heading 404 (not authorized):', fullHeadingLabel);
+        }
+      } catch (e) {
+        result._complexLookupError = true;
+      }
           }
 
         }
@@ -425,9 +434,15 @@ const utilsNetwork = {
       // if we use the memberOf there might be a id URL in the params, make sure its not https
       url = url.replace('memberOf=https://id.loc.gov/','memberOf=http://id.loc.gov/')
 
-      let options = {signal: signal}
+      let options = { signal: signal }
       if (json){
-        options = {headers: {'Content-Type': 'application/json', 'Accept': 'application/json'}, mode: "cors", signal: signal}
+        // NOTE: For simple GET requests to id.loc.gov we only send the Accept header.
+        // Adding a Content-Type header on a GET makes the request "non-simple" per the
+        // Fetch / CORS spec and triggers a preflight OPTIONS request. id.loc.gov often
+        // does not answer these custom preflights in a way browsers accept, producing
+        // "CORS Preflight Did Not Succeed" errors. Keeping only Accept avoids the
+        // preflight and matches upstream behavior.
+        options = { headers: { 'Accept': 'application/json' }, mode: 'cors', signal }
       }
       try{
         console.log("[fetchSimpleLookup] Fetching URL:", url, "Options:", options)
@@ -2194,211 +2209,493 @@ const utilsNetwork = {
     },
 
     /**
-     * Resolve LCSH from MARC string
-     * @param {string} marcString - MARC-encoded subject string
-     * @returns {Promise<Object>} Resolved subject data
+     * Resolve an LCSH MARC-encoded subject string using multi-endpoint subdivision logic
+     * (Geographic, Temporal, Genre/Form, Children’s, Topic, etc.) closely mirroring upstream.
+     * Returns either a COMPLEX heading match or a SIMPLE array of component matches/literals.
+     *
+     * result.resultType: 'ERROR' | 'COMPLEX' | 'SIMPLE'
      */
-    subjectLinkModeResolveLCSH: async function(marcString) {
-      if (!marcString) {
-        return {
-          resultType: 'ERROR',
-          msg: 'Please enter a MARC formatted subject string, starting with the subfield delimiter $ followed by the subfield code.'
-        };
+    subjectLinkModeResolveLCSH: async function(lcsh, searchType = null){
+      // Abort any in‑flight subject searches (upstream parity)
+      if (this.subjectSearchActive){
+        for (let controller in this.controllers){
+          try { this.controllers[controller].abort(); } catch {}
+          this.controllers[controller] = new AbortController();
+        }
+      }
+      this.subjectSearchActive = true;
+
+      const result = { resultType: '', msg: '', hit: [] };
+
+      if (!lcsh || typeof lcsh !== 'string' || lcsh.trim() === ''){
+        result.resultType = 'ERROR';
+        result.msg = 'Enter a MARC encoded LCSH string (e.g. $a Dogs $z Portugal $x History).';
+        return result;
       }
 
-      const raw = (marcString || '').trim();
-      const hasDelimiters = raw.includes('$');
+      lcsh = lcsh.normalize().trim();
+      if (!lcsh.includes('$')){
+        result.resultType = 'ERROR';
+        result.msg = 'Value must contain MARC subfield codes beginning with $.';
+        return result;
+      }
 
-      // Support natural-language input by resolving directly against ID.Loc
-      if (!hasDelimiters) {
+      // Extract subfields: $a, $x, $y, $z, $v and $d (name dates) (ignore others for now)
+      // NOTE: $d will be merged with preceding $a when forming a PersonalName heading.
+      const regex = /\$([avxyzd])\s*([^$]+)/g;
+      let m; const headings = [];
+      while ((m = regex.exec(lcsh)) !== null){
+        const code = m[1];
+        const label = m[2].trim().replace(/[—–]/g,'-');
+        if (!label) continue;
+        let rdfType = 'http://www.loc.gov/mads/rdf/v1#Topic';
+        if (code === 'v') rdfType = 'http://www.loc.gov/mads/rdf/v1#GenreForm';
+        else if (code === 'y') rdfType = 'http://www.loc.gov/mads/rdf/v1#Temporal';
+        else if (code === 'z') rdfType = 'http://www.loc.gov/mads/rdf/v1#Geographic';
+        // $d treated specially later (dates part of PersonalName, not its own subdivision)
+        headings.push({ label, type: code, rdfType, subdivision: (code !== 'a' && code !== 'd') });
+      }
+
+      if (headings.length === 0 || headings.filter(h=>h.type==='a').length === 0){
+        result.resultType = 'ERROR';
+        result.msg = 'No $a (main heading) found.';
+        return result;
+      }
+
+      // Merge $d (dates) immediately following the first $a into the PersonalName label.
+      // Upstream behavior: Personal names often represented as $a Name, Surname, $d 1900-1999
+      // We'll combine into single heading for resolution attempts.
+      if (headings.length > 1 && headings[0].type === 'a' && headings[1].type === 'd') {
+        headings[0].label = `${headings[0].label.replace(/[,\s]+$/,'')}, ${headings[1].label}`;
+        // Mark as PersonalName candidate via heuristic (comma + 4-digit year pattern)
+        headings[0]._maybePersonalName = /\b\d{3,4}\b/.test(headings[1].label) || /,\s*\d{3,4}/.test(headings[0].label);
+        // Remove the $d heading (not treated as separate subdivision)
+        headings.splice(1,1);
+      } else if (headings[0].type === 'a') {
+        // Heuristic: name if contains comma and year range ANYWHERE
+        headings[0]._maybePersonalName = /,\s*[^$]+\b\d{3,4}(-\d{0,4})?\b/.test(headings[0].label);
+      }
+
+      const fullHeadingLabel = headings.map(h=>h.label).join('--');
+
+      // Attempt exact complex heading first
+      try {
+        const complexLookupRaw = await this.fetchSimpleLookup(`https://id.loc.gov/authorities/subjects/label/${encodeURIComponent(fullHeadingLabel)}.json`, true);
+        let complexRecord = null;
+        if (Array.isArray(complexLookupRaw)) {
+          // Find an object with @id that looks like a subjects authority
+            complexRecord = complexLookupRaw.find(o => o && o['@id'] && o['@id'].includes('/authorities/subjects/')) || null;
+        } else if (complexLookupRaw && complexLookupRaw['@id']) {
+          complexRecord = complexLookupRaw;
+        }
+        if (complexRecord && complexRecord['@id']){
+          try {
+            let mk = await this.lookupMarcKeyFromUri(complexRecord['@id']);
+            result.resultType = 'COMPLEX';
+            result.hit = {
+              uri: complexRecord['@id'],
+              label: fullHeadingLabel,
+              heading: { subdivision: false, rdfType: headings[0].rdfType },
+              extra: { marcKeys: mk && mk.marcKey ? [mk.marcKey] : [] , components: headings }
+            };
+            result.msg = 'Authorized complex heading';
+            return result;
+          } catch(e){
+            // Even if marcKey lookup fails, still treat as complex
+            result.resultType = 'COMPLEX';
+            result.hit = {
+              uri: complexRecord['@id'],
+              label: fullHeadingLabel,
+              heading: { subdivision: false, rdfType: headings[0].rdfType },
+              extra: { marcKeys: [], components: headings }
+            };
+            result.msg = 'Authorized complex heading (marcKey lookup failed)';
+            return result;
+          }
+        }
+        if (!complexRecord){
+          result._complexLookup404 = true;
+          console.info('[LinkMode] Complex heading not directly authorized (array scan produced no match):', fullHeadingLabel);
+        }
+      } catch (e) {
+        result._complexLookupError = true;
+      }
+
+      // SPECIAL CASE: single-component main heading (only one $a) that 404s on complex label lookup.
+      // Many country / jurisdiction names (e.g., "United States") should still authorize.
+      if (headings.length === 1 && headings[0].type === 'a' && !result.resultType) {
         try {
-          const term = raw.replace(/—/g, '--');
-          // Try exact label match first
-          const exact = await this.fetchSimpleLookup(
-            `https://id.loc.gov/authorities/subjects/label/${encodeURIComponent(term)}.json`,
-            true
-          );
-          if (exact && exact['@id']) {
-            const isComplex = term.includes('--');
-            if (isComplex) {
-              return {
-                resultType: 'COMPLEX',
-                hit: {
-                  uri: exact['@id'],
-                  label: term,
-                  heading: { subdivision: false, rdfType: 'http://www.loc.gov/mads/rdf/v1#Topic' }
+          const { useConfigStore } = await import('@/stores/config');
+          const cfg = useConfigStore().lookupConfig;
+          const searchVal = encodeURIComponent(headings[0].label);
+          const norm = (s)=> s.toLowerCase().trim().replace(/\s+/g,' ');
+          const targetNorm = norm(headings[0].label);
+          const controllers = this.controllers;
+          if (!controllers.controllerSingleMain1) controllers.controllerSingleMain1 = new AbortController();
+          if (!controllers.controllerSingleMain2) controllers.controllerSingleMain2 = new AbortController();
+          if (!controllers.controllerSingleMain3) controllers.controllerSingleMain3 = new AbortController();
+
+          const payloadFactory = (url, key)=> ({
+            processor: 'lcAuthorities',
+            url: [url],
+            searchValue: headings[0].label,
+            signal: controllers[key].signal
+          });
+
+          let urlsSingle = [];
+          try {
+            // Broad subjects ALL
+            if (cfg['http://id.loc.gov/authorities/subjects']){
+              const subjAll = cfg['http://id.loc.gov/authorities/subjects'].modes[0]['LCSH All'].url;
+              urlsSingle.push({u: subjAll.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace('<OFFSET>','1'), key:'controllerSingleMain1'});
+            }
+          } catch{}
+          try {
+            // Geographic hierarchical
+            if (cfg['HierarchicalGeographic']){
+              const hierGeo = cfg['HierarchicalGeographic'].modes[0]['All'].url;
+              urlsSingle.push({u: hierGeo.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace('<OFFSET>','1'), key:'controllerSingleMain2'});
+            }
+          } catch{}
+          try {
+            // Names ALL
+            const namesCfg = cfg['http://preprod.id.loc.gov/authorities/names'] || cfg['http://id.loc.gov/authorities/names'];
+            if (namesCfg){
+              const modeBlock = namesCfg.modes[0];
+              for (const k in modeBlock){ if (k.toLowerCase().includes('all')) { urlsSingle.push({u: modeBlock[k].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace('<OFFSET>','1'), key:'controllerSingleMain3'}); break; } }
+            }
+          } catch {}
+
+          // Execute sequentially (simpler; small count)
+          let authorizedHit = null;
+          for (const spec of urlsSingle){
+            try {
+              let rset = await this.searchComplex(payloadFactory(spec.u, spec.key));
+              rset = (rset||[]).filter(r=>r && !r.literal);
+              for (const r of rset){
+                if (!r.label) continue;
+                if (norm(r.label) === targetNorm){
+                  authorizedHit = r; break;
                 }
-              };
-            } else {
-              return {
-                resultType: 'SIMPLE',
-                hit: [
-                  {
-                    label: term,
-                    uri: exact['@id'] || null,
-                    literal: exact['@id'] ? false : true,
-                    heading: {
-                      primary: true,
-                      subdivision: false,
-                      type: 'a',
-                      rdfType: 'http://www.loc.gov/mads/rdf/v1#Topic'
+              }
+              if (authorizedHit) break;
+            } catch {}
+          }
+
+          if (authorizedHit){
+            // Attempt marcKey enrichment
+            try { let mk = await this.lookupMarcKeyFromUri(authorizedHit.uri); authorizedHit.extra = authorizedHit.extra||{}; authorizedHit.extra.marcKeys = mk && mk.marcKey ? [mk.marcKey] : []; } catch{}
+            authorizedHit.heading = headings[0];
+            result.resultType = 'SIMPLE';
+            result.hit = [ authorizedHit ];
+            result.msg = 'Single authorized heading resolved';
+            return result;
+          }
+        } catch(e){ /* non-fatal */ }
+      }
+
+      // Build endpoint templates once (mirrors upstream construction logic)
+      const { useConfigStore } = await import('@/stores/config');
+      const returnUrls = useConfigStore().returnUrls;
+
+      // Helpers for normalization & comparison
+      const normalizeForMatch = (s)=> s.toLowerCase().trim().replace(/\s+/g,' ').replace(/[\p{P}$+<=>^`|~]/gu,'');
+
+      // For each component, try targeted searches (index aware for name heuristics)
+      for (let i=0; i<headings.length; i++){
+        const heading = headings[i];
+        const searchVal = encodeURIComponent(heading.label);
+        let foundHeading = false;
+        let candidateResults = [];
+
+        // Prepare payload factory
+        const payload = (url, controllerKey)=> ({
+          processor: 'lcAuthorities',
+          url: [url],
+          searchValue: heading.label,
+          signal: this.controllers[controllerKey].signal
+        });
+
+        const urls = {};
+        try {
+          // Base subjects endpoint (environment aware)
+          const subjAll = useConfigStore().lookupConfig['http://id.loc.gov/authorities/subjects'].modes[0]['LCSH All'].url;
+          // Children subjects
+          const childAll = useConfigStore().lookupConfig['http://id.loc.gov/authorities/childrensSubjects'].modes[0]['LCSHAC All'].url;
+          // Hierarchical Geographic scheme (direct)
+          const hierGeo = useConfigStore().lookupConfig['HierarchicalGeographic'].modes[0]['All'].url;
+          // NAF geographic
+          const nafGeo = useConfigStore().lookupConfig['http://preprod.id.loc.gov/authorities/names'].modes[0]['NAF Geographic'].url;
+          // Names (Personal/Corporate) generic "All" mode – attempt both preprod and prod keys
+          let namesConfig = useConfigStore().lookupConfig['http://preprod.id.loc.gov/authorities/names'] || useConfigStore().lookupConfig['http://id.loc.gov/authorities/names'];
+          if (namesConfig) {
+            // Grab first mode object and find an 'All' key
+            const modeBlock = namesConfig.modes[0];
+            for (const k in modeBlock) {
+              if (k.toLowerCase().includes('all')) { urls.namesAll = modeBlock[k].url; break; }
+            }
+          }
+
+          urls.simpleSubdivision = subjAll.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace('<OFFSET>','1') + '&rdftype=SimpleType&memberOf=http://id.loc.gov/authorities/subjects/collection_TopicSubdivisions';
+          urls.temporal = subjAll.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace('<OFFSET>','1') + '&memberOf=http://id.loc.gov/authorities/subjects/collection_TemporalSubdivisions';
+          urls.genre = subjAll.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace('<OFFSET>','1') + '&rdftype=GenreForm';
+          urls.geoHier = hierGeo.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace('<OFFSET>','1');
+          urls.geoHierLCSH = subjAll.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace('<OFFSET>','1') + '&rdftype=HierarchicalGeographic';
+          urls.geoLCSH = subjAll.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace('<OFFSET>','1') + '&rdftype=Geographic&memberOf=http://id.loc.gov/authorities/subjects/collection_Subdivisions';
+          urls.geoLCNAF = nafGeo.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace('<OFFSET>','1');
+          urls.children = childAll.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace('<OFFSET>','1');
+          urls.childrenSub = childAll.replace('<QUERY>',searchVal).replace('&count=25','&count=4').replace('<OFFSET>','1') + '&memberOf=http://id.loc.gov/authorities/subjects/collection_Subdivisions';
+        } catch (e) {
+          // If lookupConfig missing, we fallback to direct id.loc.gov label lookup below
+        }
+
+        // Strategy by subfield type
+        const pushMatches = async (arr)=>{
+          if (!arr) return;
+          for (let r of arr){
+            if (foundHeading) break;
+            if (r && !r.literal){
+              if (normalizeForMatch(heading.label) === normalizeForMatch(r.label)){
+                r.heading = heading;
+                if (r.uri){
+                  try {
+                    let mk = await this.lookupMarcKeyFromUri(r.uri);
+                    r.extra = r.extra || {}; r.extra.marcKeys = mk && mk.marcKey ? [mk.marcKey] : [];
+                  } catch {}
+                }
+                result.hit.push(r);
+                foundHeading = true;
+              }
+            }
+          }
+        };
+
+        try {
+          // Personal / Corporate Name resolution attempt (only for first $a, heuristic flagged)
+          if (i === 0 && heading.type === 'a' && heading._maybePersonalName && urls.namesAll){
+            try {
+              const nameUrl = urls.namesAll.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace('<OFFSET>','1');
+              let nameResults = await this.searchComplex(payload(nameUrl,'controllerNamesAll'));
+              nameResults = (nameResults || []).filter(r=>!r.literal);
+              for (let r of nameResults){
+                if (foundHeading) break;
+                if (normalizeForMatch(heading.label.replace(/\.$/,'')) === normalizeForMatch((r.label||'').replace(/\.$/,''))){
+                  r.heading = heading;
+                  // Set rdfType to PersonalName if heuristic matched; attempt detection for Corporate
+                  if (heading._maybePersonalName){ r.heading.rdfType = 'http://www.loc.gov/mads/rdf/v1#PersonalName'; }
+                  if (r.uri){
+                    try { let mk = await this.lookupMarcKeyFromUri(r.uri); r.extra = r.extra || {}; r.extra.marcKeys = mk && mk.marcKey ? [mk.marcKey] : []; } catch {}
+                  }
+                  result.hit.push(r);
+                  foundHeading = true;
+                }
+              }
+            } catch(e){ /* Non-fatal */ }
+            if (foundHeading) {
+              // continue to next heading without falling into subject logic
+              if (!result._resolution){ result._resolution = { authorized: [], literal: [] }; }
+              result._resolution.authorized.push(heading.label);
+              continue;
+            }
+          }
+          if (heading.type === 'z') { // Geographic
+            let [hg, hgL, geoN, geoL] = await Promise.all([
+              urls.geoHier ? this.searchComplex(payload(urls.geoHier,'controllerHierarchicalGeographic')) : [],
+              urls.geoHierLCSH ? this.searchComplex(payload(urls.geoHierLCSH,'controllerHierarchicalGeographicLCSH')) : [],
+              urls.geoLCNAF ? this.searchComplex(payload(urls.geoLCNAF,'controllerGeographicLCNAF')) : [],
+              urls.geoLCSH ? this.searchComplex(payload(urls.geoLCSH,'controllerGeographicLCSH')) : []
+            ]);
+            hg = hg.filter(r=>!r.literal); hgL = hgL.filter(r=>!r.literal); geoN = geoN.filter(r=>!r.literal); geoL = geoL.filter(r=>!r.literal);
+            await pushMatches(hg); if (foundHeading) continue;
+            await pushMatches(hgL); if (foundHeading) continue;
+            await pushMatches(geoN); if (foundHeading) continue;
+            await pushMatches(geoL); if (foundHeading) continue;
+          } else if (heading.type === 'y'){ // Temporal
+            let temporal = urls.temporal ? await this.searchComplex(payload(urls.temporal,'controllerTemporal')) : [];
+            temporal = temporal.filter(r=>!r.literal);
+            await pushMatches(temporal); if (foundHeading) continue;
+          } else if (heading.type === 'v'){ // Genre/Form
+            let genre = urls.genre ? await this.searchComplex(payload(urls.genre,'controllerGenre')) : [];
+            genre = genre.filter(r=>!r.literal);
+            await pushMatches(genre); if (foundHeading) continue;
+          } else if (heading.type === 'x' || heading.type === 'a'){ // Topic / general
+            let simpleSub = urls.simpleSubdivision ? await this.searchComplex(payload(urls.simpleSubdivision,'controllerPayloadSubjectsSimpleSubdivision')) : [];
+            simpleSub = simpleSub.filter(r=>!r.literal);
+            await pushMatches(simpleSub); if (foundHeading) continue;
+            if (searchType && searchType.includes(':Topic:Childrens:')){
+              let childSub = urls.childrenSub ? await this.searchComplex(payload(urls.childrenSub,'controllerCyak')) : [];
+              childSub = childSub.filter(r=>!r.literal);
+              await pushMatches(childSub); if (foundHeading) continue;
+            }
+            // Fallback: main heading might actually be a geographic authorized heading (e.g., $aUnited States)
+            if (!foundHeading && heading.type === 'a') {
+              try {
+                let [hg, hgL, geoN, geoL] = await Promise.all([
+                  urls.geoHier ? this.searchComplex(payload(urls.geoHier,'controllerGeoFallbackHier')) : [],
+                  urls.geoHierLCSH ? this.searchComplex(payload(urls.geoHierLCSH,'controllerGeoFallbackHierL')) : [],
+                  urls.geoLCNAF ? this.searchComplex(payload(urls.geoLCNAF,'controllerGeoFallbackNAF')) : [],
+                  urls.geoLCSH ? this.searchComplex(payload(urls.geoLCSH,'controllerGeoFallbackLCSH')) : []
+                ]);
+                const geoSets = [hg, hgL, geoN, geoL].map(a => (a||[]).filter(r=>!r.literal));
+                for (const set of geoSets){
+                  if (foundHeading) break;
+                  for (const r of set){
+                    if (foundHeading) break;
+                    if (r && r.label && normalizeForMatch(heading.label) === normalizeForMatch(r.label)){
+                      // Coerce rdfType to Geographic
+                      heading.rdfType = 'http://www.loc.gov/mads/rdf/v1#Geographic';
+                      r.heading = heading;
+                      if (r.uri){
+                        try { let mk = await this.lookupMarcKeyFromUri(r.uri); r.extra = r.extra || {}; r.extra.marcKeys = mk && mk.marcKey ? [mk.marcKey] : []; } catch {}
+                      }
+                      result.hit.push(r);
+                      foundHeading = true;
                     }
                   }
-                ]
-              };
-            }
-          }
-
-          // Fallback to suggest2 keyword search and choose the first hit
-          const sugg = await this.fetchSimpleLookup(
-            `https://id.loc.gov/authorities/subjects/suggest2/?q=${encodeURIComponent(term)}&count=25`,
-            true
-          );
-          if (sugg && Array.isArray(sugg.hits) && sugg.hits.length > 0) {
-            const h = sugg.hits[0];
-            const label = h.aLabel || h.suggestLabel || term;
-            const uri = h.uri || null;
-            if (label.includes('--')) {
-              return {
-                resultType: 'COMPLEX',
-                hit: {
-                  uri,
-                  label,
-                  heading: { subdivision: false, rdfType: 'http://www.loc.gov/mads/rdf/v1#Topic' }
                 }
-              };
-            }
-            return {
-              resultType: 'SIMPLE',
-              hit: [
-                {
-                  label,
-                  uri,
-                  literal: uri ? false : true,
-                  heading: {
-                    primary: true,
-                    subdivision: false,
-                    type: 'a',
-                    rdfType: 'http://www.loc.gov/mads/rdf/v1#Topic'
+                if (foundHeading) continue;
+              } catch(e){ /* Silent fallback */ }
+
+              // Broad Subjects ALL fallback (unfiltered) – some main headings (e.g., country names) are SimpleType but not subdivision members
+              if (!foundHeading && urls.simpleSubdivision && useConfigStore().lookupConfig['http://id.loc.gov/authorities/subjects']) {
+                try {
+                  const subjAll = useConfigStore().lookupConfig['http://id.loc.gov/authorities/subjects'].modes[0]['LCSH All'].url;
+                  const broadUrl = subjAll.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace('<OFFSET>','1');
+                  let broadResults = await this.searchComplex(payload(broadUrl,'controllerSubjectsAllMainA'));
+                  broadResults = (broadResults||[]).filter(r=>!r.literal);
+                  for (const r of broadResults){
+                    if (foundHeading) break;
+                    if (r && r.label && normalizeForMatch(heading.label) === normalizeForMatch(r.label)){
+                      r.heading = heading;
+                      if (r.uri){
+                        try { let mk = await this.lookupMarcKeyFromUri(r.uri); r.extra = r.extra || {}; r.extra.marcKeys = mk && mk.marcKey ? [mk.marcKey] : []; } catch {}
+                      }
+                      result.hit.push(r);
+                      foundHeading = true;
+                    }
                   }
-                }
-              ]
-            };
-          }
+                  if (foundHeading) continue;
+                } catch(e){ /* non-fatal */ }
+              }
 
-          return { resultType: 'ERROR', msg: 'No results found for input.' };
-        } catch (e) {
-          console.error('Natural-language resolve failed', e);
-          return { resultType: 'ERROR', msg: 'Lookup failed.' };
-        }
-      }
-
-      let mainHeading = null;
-      let subdivisions = [];
-      const components = [];
-
-      // Parse the MARC string
-  const parts = raw.split('$').filter(p => p.trim());
-      
-      for (const part of parts) {
-        if (!part) continue;
-        
-        const code = part.substring(0, 1);
-        const value = part.substring(1).trim();
-        
-        if (!value) continue;
-
-        const component = {
-          type: code,
-          label: value,
-          subdivision: code !== 'a',
-          primary: code === 'a'
-        };
-
-        // Assign RDF type based on subfield code
-        switch (code) {
-          case 'a':
-            component.rdfType = 'http://www.loc.gov/mads/rdf/v1#Topic';
-            break;
-          case 'v':
-            component.rdfType = 'http://www.loc.gov/mads/rdf/v1#GenreForm';
-            break;
-          case 'x':
-            component.rdfType = 'http://www.loc.gov/mads/rdf/v1#Topic';
-            break;
-          case 'y':
-            component.rdfType = 'http://www.loc.gov/mads/rdf/v1#Temporal';
-            break;
-          case 'z':
-            component.rdfType = 'http://www.loc.gov/mads/rdf/v1#Geographic';
-            break;
-          default:
-            component.rdfType = 'http://www.loc.gov/mads/rdf/v1#Topic';
-        }
-
-        if (code === 'a') {
-          mainHeading = component;
-        } else {
-          subdivisions.push(component);
-        }
-        
-        components.push(component);
-      }
-
-      if (!mainHeading) {
-        return {
-          resultType: 'ERROR',
-          msg: 'No main heading found. Subject must include a $a subfield.'
-        };
-      }
-
-      // Try to find the complete heading
-      const fullHeading = components.map(c => c.label).join('--');
-      const complexSearch = await this.fetchSimpleLookup(
-        `https://id.loc.gov/authorities/subjects/label/${encodeURIComponent(fullHeading)}.json`,
-        true
-      );
-
-      if (complexSearch && complexSearch['@id']) {
-        // Found as complex heading
-        return {
-          resultType: 'COMPLEX',
-          hit: {
-            uri: complexSearch['@id'],
-            label: fullHeading,
-            heading: {
-              subdivision: false,
-              rdfType: mainHeading.rdfType
+              // Names ALL fallback (Corporate/Jurisdiction) – e.g., United States often lives in NAF
+              if (!foundHeading && urls.namesAll) {
+                try {
+                  const namesAllUrl = urls.namesAll.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace('<OFFSET>','1');
+                  let namesAllResults = await this.searchComplex(payload(namesAllUrl,'controllerNamesAllCorporate'));
+                  namesAllResults = (namesAllResults||[]).filter(r=>!r.literal);
+                  for (const r of namesAllResults){
+                    if (foundHeading) break;
+                    if (r && r.label && normalizeForMatch(heading.label) === normalizeForMatch(r.label)){
+                      // If upstream identifies as CorporateName or Geographic, preserve; else set CorporateName heuristic
+                      heading.rdfType = (r.rdfType && r.rdfType.includes('Corporate')) ? r.rdfType : (r.rdfType && r.rdfType.includes('Geographic') ? r.rdfType : 'http://www.loc.gov/mads/rdf/v1#CorporateName');
+                      r.heading = heading;
+                      if (r.uri){
+                        try { let mk = await this.lookupMarcKeyFromUri(r.uri); r.extra = r.extra || {}; r.extra.marcKeys = mk && mk.marcKey ? [mk.marcKey] : []; } catch {}
+                      }
+                      result.hit.push(r);
+                      foundHeading = true;
+                    }
+                  }
+                  if (foundHeading) continue;
+                } catch(e){ /* ignore */ }
+              }
             }
           }
-        };
+        } catch (e) {
+          // Endpoint failure => fallback literal handling below
+        }
+
+        if (!foundHeading){
+          // Fallback literal component
+            result.hit.push({
+              label: heading.label,
+              suggestLabel: heading.label,
+              uri: null,
+              literal: true,
+              depreciated: false,
+              extra: { marcKeys: [] },
+              heading: heading
+            });
+        }
+
+        // Track resolution state for diagnostics
+        if (!result._resolution){ result._resolution = { authorized: [], literal: [] }; }
+        if (foundHeading){
+          result._resolution.authorized.push(heading.label);
+        } else {
+          result._resolution.literal.push(heading.label);
+        }
       }
 
-      // Try components individually
-      const results = [];
-      for (const comp of components) {
-        const searchUrl = `https://id.loc.gov/authorities/subjects/label/${encodeURIComponent(comp.label)}.json`;
-        const compSearch = await this.fetchSimpleLookup(searchUrl, true);
-        
-        const result = {
-          label: comp.label,
-          uri: compSearch && compSearch['@id'] ? compSearch['@id'] : null,
-          literal: !compSearch || !compSearch['@id'],
-          heading: {
-            primary: comp.primary,
-            subdivision: comp.subdivision,
-            type: comp.type,
-            rdfType: comp.rdfType
+      result.resultType = 'SIMPLE';
+      // Upstream-inspired: if every component resolved to an authorized (non-literal) heading, attempt to promote to COMPLEX
+      try {
+        const allAuthorized = Array.isArray(result.hit) && result.hit.length === headings.length && result.hit.every(h => h && h.uri && !h.literal);
+        if (allAuthorized) {
+          const { useConfigStore } = await import('@/stores/config');
+          const subjAll = useConfigStore().lookupConfig['http://id.loc.gov/authorities/subjects'].modes[0]['LCSH All'].url;
+          const complexUrl = subjAll
+            .replace('<QUERY>', encodeURIComponent(fullHeadingLabel))
+            .replace('&count=25','&count=5')
+            .replace('<OFFSET>','1') + '&rdftype=ComplexType';
+          const complexPayload = {
+            processor: 'lcAuthorities',
+            url: [complexUrl],
+            searchValue: fullHeadingLabel,
+            subjectSearch: true,
+            signal: this.controllers.controllerSubjectsComplex.signal
+          };
+          let complexCandidates = await this.searchComplex(complexPayload);
+          if (Array.isArray(complexCandidates)) {
+            // Filter non-literals
+            complexCandidates = complexCandidates.filter(r => r && !r.literal);
+            // Normalize labels for comparison
+            const norm = (s)=> s.toLowerCase().trim().replace(/\s+/g,' ').replace(/[\p{P}$+<=>^`|~]/gu,'');
+            const targetNorm = norm(fullHeadingLabel);
+            const complexHit = complexCandidates.find(r => r.label && norm(r.label) === targetNorm || (r.vlabel && norm(r.vlabel) === targetNorm));
+            if (complexHit) {
+              // Enrich with marcKey if possible
+              try {
+                let mk = await this.lookupMarcKeyFromUri(complexHit.uri);
+                result.resultType = 'COMPLEX';
+                result.hit = {
+                  uri: complexHit.uri,
+                  label: fullHeadingLabel,
+                  heading: { subdivision: false, rdfType: headings[0].rdfType },
+                  extra: { marcKeys: mk && mk.marcKey ? [mk.marcKey] : [], components: headings }
+                };
+                result.msg = 'Promoted to authorized complex heading (all components authorized).';
+                return result;
+              } catch(e){
+                // If marcKey lookup fails, still promote
+                result.resultType = 'COMPLEX';
+                result.hit = {
+                  uri: complexHit.uri,
+                  label: fullHeadingLabel,
+                  heading: { subdivision: false, rdfType: headings[0].rdfType },
+                  extra: { marcKeys: [], components: headings }
+                };
+                result.msg = 'Promoted to complex heading (marcKey lookup failed).';
+                return result;
+              }
+            } else {
+              // Could not find a ComplexType record; keep SIMPLE but annotate
+              result.msg = (result.msg ? result.msg + ' ' : '') + 'All components authorized; no ComplexType record found.';
+            }
           }
-        };
-        
-        results.push(result);
+        }
+      } catch (e) {
+        console.info('[LinkMode] Complex promotion attempt failed (non-fatal):', e.message);
       }
-
-      return {
-        resultType: 'SIMPLE',
-        hit: results
-      };
+      // Provide a human readable reason if complex failed
+      if (result._complexLookup404){
+        result.msg = 'Complex authorized heading not found (404); components resolved individually.';
+      }
+      if (result._resolution && result._resolution.literal.length>0){
+        result.msg = (result.msg? result.msg + ' ' : '') + 'Unmatched components treated as literals: ' + result._resolution.literal.join(', ');
+      }
+      return result;
     },
 
 };

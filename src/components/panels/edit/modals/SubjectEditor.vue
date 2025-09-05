@@ -140,8 +140,32 @@
                   <form autocomplete="off" style="height: 3em;">
                     <input v-on:keydown.enter.prevent="linkModeTextChange" @input="linkModeOnInput" placeholder="Enter MARC encoded LCSH value" autocomplete="off" type="text" v-model="linkModeString" ref="subjectInput" class="input-single-subject subject-input">
                   </form>
+                  <label style="display:block; margin-top:4px; font-size:0.7em; user-select:none;">
+                    <input type="checkbox" v-model="linkModeDebug"> Debug parse
+                  </label>
                 </div>
               </div>
+            </div>
+
+            <!-- Examples / Guidance -->
+            <div v-if="showLinkExamples" class="link-mode-examples" :style="`${this.preferenceStore.styleModalTextColor()}`">
+              <div class="examples-header">
+                <strong>Examples (using subfields)</strong>
+                <button type="button" class="examples-toggle" @click="showLinkExamples=false">Hide</button>
+              </div>
+              <ul class="examples-list">
+                <li v-for="ex in linkExamples" :key="ex.value">
+                  <code :title="'Click to copy'" @click="copyExample(ex.value)">{{ ex.display }}</code>
+                  <button type="button" class="copy-btn" @click="copyExample(ex.value)" :aria-label="'Copy '+ex.value">Copy</button>
+                  <span class="example-desc">{{ ex.desc }}</span>
+                </li>
+              </ul>
+              <div class="examples-notes">
+                IMPORTANT: The two spaces after the tag must be real spaces (ASCII 0x20). Do not use middle dots, non‑breaking spaces, or tabs. A warning icon means at least one component was not matched and will be treated as a literal.
+              </div>
+            </div>
+            <div v-else class="link-mode-examples-collapsed">
+              <button type="button" class="examples-toggle" @click="showLinkExamples=true">Show MARC syntax examples</button>
             </div>
 
             <ul v-if="!linkModeSearching">
@@ -188,6 +212,11 @@
 </template>
 
 <style type="text/css" scoped>
+  /* Ensure spacing between link mode entities and prevent icon text crowding when icon font not loaded */
+  .marc-deliminated-lcsh-mode-entity { margin-right: 0.6em; }
+  .marc-deliminated-lcsh-mode-entity .material-icons { vertical-align: middle; margin-right: 2px; }
+  /* Fallback styling: if material icon font fails, ensure readable separation */
+  .marc-deliminated-lcsh-mode-icon::after, .marc-deliminated-lcsh-mode-icon-warning::after { content: '\00a0'; }
   .subject-lookup-modal-container{
     margin-left: auto;
     margin-right: auto;
@@ -482,6 +511,56 @@ padding-right: 0.25em;
   font-size: x-large;
 }
 
+/* Link Mode Examples */
+.link-mode-examples {
+  margin: 0.75em 0 0.5em 0;
+  padding: 0.75em 1em;
+  border: 1px solid #c7c7c7;
+  background: #fafafa;
+  border-radius: 6px;
+  font-size: 0.85em;
+}
+.link-mode-examples code {
+  background: #eee;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-family: monospace;
+  white-space: pre;
+}
+.link-mode-examples .examples-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.examples-toggle {
+  font-size: 0.75em;
+  background: #e5e5e5;
+  border: 1px solid #bbb;
+  padding: 2px 6px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.examples-toggle:hover { background: #dcdcdc; }
+.examples-list {
+  margin: 0.25em 0 0.5em 1.1em;
+  padding: 0;
+}
+.examples-list li { margin-bottom: 2px; }
+.examples-notes { line-height: 1.3em; }
+.link-mode-examples-collapsed { margin: 0.5em 0; }
+.copy-btn {
+  margin-left: 6px;
+  font-size: 0.65em;
+  padding: 2px 6px;
+  background: #eef;
+  border: 1px solid #aac;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.copy-btn:hover { background: #dde; }
+.example-desc { margin-left: 6px; color: #555; }
+
 .clear-selected-button {
 margin-top: 10px;
 }
@@ -645,6 +724,16 @@ data: function() {
     linkModeString: "",
     linkModeResults: false,
     linkModeSearching: false,
+  linkModeRequestSeq: 0,
+  showLinkExamples: true,
+    linkExamples: [
+  // Updated: parser now supports $d (dates) merged with preceding $a for PersonalNames
+  { display: '$aKnitting', value: '$aKnitting', desc: 'Topical heading ($a)' },
+  { display: '$aKnitting$vPatterns', value: '$aKnitting$vPatterns', desc: 'Topical + genre/form ($v) subdivision' },
+  { display: '$aCookbooks', value: '$aCookbooks', desc: 'Genre/Form (simple single component)' },
+  { display: '$aWoolf, Virginia,$d1882-1941', value: '$aWoolf, Virginia,$d1882-1941', desc: 'Personal name with dates ($a + $d merged)' }
+    ],
+  linkModeDebug: false,
 
     showTypes: false,
 
@@ -657,6 +746,8 @@ data: function() {
       'madsrdf:GenreForm': {label:'Genre ($v)', value:'madsrdf:GenreForm',selected:false},
       'madsrdf:Geographic': {label:'Geographic ($z)', value:'madsrdf:Geographic',selected:false},
       'madsrdf:Temporal': {label:'Chronological ($y)', value:'madsrdf:Temporal',selected:false},
+      'madsrdf:PersonalName': {label:'Personal Name ($a $d)', value:'madsrdf:PersonalName',selected:false},
+      'madsrdf:CorporateName': {label:'Corporate Name ($a)', value:'madsrdf:CorporateName',selected:false},
     },
 
     labelMap: {
@@ -698,6 +789,36 @@ computed: {
 
 },
 methods: {
+  // Normalize marcKey values from various shapes into a clean string or null
+  normalizeMarcKey(val){
+    try{
+      if (!val) return null
+      if (typeof val === 'string') return val.trim() || null
+      if (Array.isArray(val)){
+        const pref = val.find(v => v && typeof v === 'object' && v['@value'] && (v['@language'] === undefined || v['@language'] === null || v['@language'] === ''))
+        if (pref && pref['@value']) return String(pref['@value'])
+        const first = val.find(v => typeof v === 'string' || (v && typeof v === 'object' && v['@value']))
+        if (!first) return null
+        return typeof first === 'string' ? (first.trim() || null) : (first['@value'] ? String(first['@value']) : null)
+      }
+      if (typeof val === 'object' && val['@value']) return String(val['@value'])
+      return null
+    } catch { return null }
+  },
+  copyExample(str){
+    try {
+      navigator.clipboard.writeText(str)
+      console.log('Copied example:', str)
+    } catch(err){
+      // Fallback: create a temp textarea
+      const ta = document.createElement('textarea')
+      ta.value = str
+      document.body.appendChild(ta)
+      ta.select()
+      try { document.execCommand('copy') } catch {}
+      document.body.removeChild(ta)
+    }
+  },
   // Debounced auto-search for Link Mode as the user types
   linkModeOnInput: debounce(async function() {
     const q = (this.linkModeString || '').trim()
@@ -707,19 +828,44 @@ methods: {
       this.linkModeSearching = false
       return
     }
+    // Only run auto-preview for MARC-encoded strings (must include a subfield marker)
+    if (!/[\$‡|]/.test(q)) {
+      this.linkModeResults = false
+      this.linkModeSearching = false
+      return
+    }
+    const reqId = ++this.linkModeRequestSeq
     this.linkModeSearching = true
     try {
-      this.linkModeResults = await utilsNetwork.subjectLinkModeResolveLCSH(q)
+      const res = await utilsNetwork.subjectLinkModeResolveLCSH(q)
+      // Discard stale responses
+      if (reqId !== this.linkModeRequestSeq || q !== (this.linkModeString || '').trim()) return
+      this.linkModeResults = res
+      if (this.linkModeDebug) {
+        this.debugLogLinkMode('AUTO', q, res)
+      }
     } catch (e) {
       console.error('linkMode auto-search failed', e)
       this.linkModeResults = false
     } finally {
-      this.linkModeSearching = false
+      // Only clear the searching flag if this is the latest request
+      if (reqId === this.linkModeRequestSeq) this.linkModeSearching = false
     }
   }, 400),
   hasOverFlow: function(element){
     let overflow = element.scrollHeight > element.clientHeight
     return overflow
+  },
+  // Convenience to extract a normalized marcKey from a pickLookup item or context entry
+  safeGetMarcKeyFrom(item){
+    if (!item) return null
+    // prefer top-level marcKey, else extra.marcKey, else nodeMap.marcKey
+    const candidates = [item.marcKey, item.extra && item.extra.marcKey, item.nodeMap && item.nodeMap.marcKey]
+    for (const c of candidates){
+      const mk = this.normalizeMarcKey(c)
+      if (mk) return mk
+    }
+    return null
   },
   // Return the number of search results that are populated.
   // Used to determine how tall to make each set of search results
@@ -1001,7 +1147,18 @@ methods: {
     if (event.key==='Enter' && event.shiftKey===false){
       this.linkModeResults=false
       this.linkModeSearching=true
-      this.linkModeResults = await utilsNetwork.subjectLinkModeResolveLCSH(this.linkModeString)
+      const q = (this.linkModeString || '').trim()
+      // Only attempt link resolution if the string appears MARC-encoded
+      if (!q || !/[\$‡|]/.test(q)){
+        this.linkModeSearching=false
+        console.warn('Link Mode expects a MARC-encoded string with subfield markers like $a')
+        return false
+      }
+      const res = await utilsNetwork.subjectLinkModeResolveLCSH(q)
+      this.linkModeResults = res
+      if (this.linkModeDebug) {
+        this.debugLogLinkMode('ENTER', q, res)
+      }
       this.linkModeSearching=false
 
     }else if (event.key==='Enter' && event.shiftKey===true){
@@ -1010,6 +1167,42 @@ methods: {
 
     if (event.preventDefault) {event.preventDefault()}
     return false
+  },
+  debugLogLinkMode(origin, raw, result){
+    try {
+      const tag = raw.slice(0,3)
+      const tagOk = /^\d{3}$/.test(tag)
+      const spaceBlock = raw.slice(3,5)
+      const spacesOk = spaceBlock === '  '
+      // extract subfields after initial pattern
+      const body = raw.slice(5)
+      const subfields = body.match(/\$[a-z0-9](?=[^$]*)/gi) || []
+      const uniqueCodes = [...new Set(subfields.map(s=>s[1]))]
+      const hasA = subfields.some(s=>s.startsWith('$a'))
+      const problems = []
+      if (!tagOk) problems.push('TAG')
+      if (!spacesOk) problems.push('SPACES')
+      if (!hasA) problems.push('NO_$a')
+      if (result === false) problems.push('NO_RESULT')
+      if (result && result.resultType==='ERROR') problems.push('RES_ERROR')
+      if (result && result.resultType==='SIMPLE' && Array.isArray(result.hit)) {
+        // check literals presence
+        if (result.hit.some(h=>h.literal)) problems.push('LITERAL_PART')
+      }
+      if (result && result.resultType==='COMPLEX' && result.hit && result.hit.literal) {
+        problems.push('COMPLEX_LITERAL')
+      }
+      console.groupCollapsed(`LinkModeDebug ${origin} => tag:${tag} subfields:${subfields.length} issues:${problems.join(',')||'NONE'}`)
+      console.log('Raw Input:', raw)
+      console.log('Tag OK:', tagOk, 'Spaces OK:', spacesOk, 'First $a present:', hasA)
+      console.log('Subfields parsed:', subfields)
+      console.log('Unique codes:', uniqueCodes)
+      console.log('Result object:', result)
+      console.log('Problem flags:', problems)
+      console.groupEnd()
+    } catch(err){
+      console.warn('debugLogLinkMode failed', err)
+    }
   },
 
   focusInput: function(){
@@ -1038,6 +1231,10 @@ methods: {
       this.subjectStringChanged()
     }else{
       this.linkModeString = this.subjectString
+  // Clear any stale link-mode results so nothing autopopulates
+  this.linkModeResults = false
+  this.linkModeSearching = false
+  this.linkModeRequestSeq++
     }
 
     this.$nextTick(() => {
@@ -1537,6 +1734,9 @@ methods: {
         item.label = item.suggestLabel || item.aLabel || item.authLabel || display || item.title || ''
       }
       if (!item.uri && item['@id']) item.uri = item['@id']
+      // normalize marcKey from possible locations
+      const mk = this.normalizeMarcKey(item.marcKey || (item.extra && item.extra.marcKey))
+      if (mk) item.marcKey = mk
       return item
     }
 
@@ -2079,52 +2279,215 @@ methods: {
   },
 
   selectContext: async function(pickPostion, update=true){
+    console.log("🔍 selectContext called with pickPostion:", pickPostion, "current this.pickPostion:", this.pickPostion);
+    
     if (pickPostion != null){
       this.pickPostion=pickPostion
       this.pickCurrent=pickPostion
+      console.log("🔍 Updated pickPostion to:", pickPostion);
+      console.log("🔍 pickLookup item:", this.pickLookup[pickPostion]);
+      console.log("🔍 pickLookup keys:", Object.keys(this.pickLookup));
+      console.log("🔍 Full pickLookup:", this.pickLookup);
       this.getContext()
       //Science—Experiments
     }
 
-    if (this.pickLookup[this.pickPostion].complex){
+    // Add safety check for pickLookup item
+    if (!this.pickLookup[this.pickPostion]) {
+      console.error("🚨 No pickLookup item found for position:", this.pickPostion);
+      console.log("🔍 Available pickLookup positions:", Object.keys(this.pickLookup));
+      return;
+    }
+
+  // Treat all negative indices (names/exact) as full heading replacements (complex) regardless of current typed string
+  const isNameResult = parseInt(this.pickPostion) < 0
+  if (isNameResult){
+      // DIRECT COMPONENT PATH FOR LCNAF NAME SELECTIONS (single heading behavior)
+      const selLabel = this.pickLookup[this.pickPostion].label || this.pickLookup[this.pickPostion].suggestLabel || this.pickLookup[this.pickPostion].aLabel || ''
+      // Normalize and persist a canonical label on the pickLookup item so downstream code sees the same string
+      if (!this.pickLookup[this.pickPostion].label) {
+        this.pickLookup[this.pickPostion].label = selLabel
+      }
+      this.subjectString = selLabel
+      // Ensure context first (rdftypes/marcKey)
+      if (!this.contextData || !this.contextData.rdftypes || !this.safeGetMarcKeyFrom(this.pickLookup[this.pickPostion])) {
+        try { await this.getContext() } catch(e){ console.warn('Name getContext failed (pre)', e) }
+      }
+      // Fallback: deeper fetch if still no marcKey
+      if (!this.safeGetMarcKeyFrom(this.pickLookup[this.pickPostion])) {
+        try { await this._getContext() } catch(e){ console.warn('Name _getContext fallback failed', e) }
+      }
+      // Derive name type
+      let nameType = 'madsrdf:PersonalName'
+      try {
+        const rts = (this.contextData && this.contextData.rdftypes) ? this.contextData.rdftypes : (this.pickLookup[this.pickPostion].extra && this.pickLookup[this.pickPostion].extra.rdftypes) || []
+        if (rts.includes('CorporateName')) nameType = 'madsrdf:CorporateName'
+        else if (rts.includes('ConferenceName')) nameType = 'madsrdf:ConferenceName'
+        else if (rts.includes('FamilyName')) nameType = 'madsrdf:FamilyName'
+        else if (rts.includes('Geographic')) nameType = 'madsrdf:Geographic'
+      } catch {}
+      this.activeComponentIndex = 0
+      if (!this.typeLookup) this.typeLookup = {}
+      this.typeLookup[0] = nameType
+      // Extract marcKey from multiple possible locations
+      let mk = this.safeGetMarcKeyFrom(this.pickLookup[this.pickPostion]) || this.safeGetMarcKeyFrom(this.contextData) || null
+      // Additional fallback: contextData.marcKeys array
+      if (!mk && this.contextData && Array.isArray(this.contextData.marcKeys)) {
+        try { mk = this.normalizeMarcKey(this.contextData.marcKeys[0]) } catch{}
+      }
+      if (mk) this.pickLookup[this.pickPostion].marcKey = mk
+      // Build single component
+      const uri = this.pickLookup[this.pickPostion].uri || (this.contextData && this.contextData.uri) || null
+      this.components = [{
+        id: 0,
+        label: selLabel,
+        posStart: 0,
+        posEnd: selLabel.length,
+        uri: uri,
+        type: nameType,
+        literal: false,
+        complex: false,
+        marcKey: mk
+      }]
+      // Sync lookup structures
+      this.componetLookup = { 0: {} }
+      this.componetLookup[0][selLabel] = Object.assign({}, this.pickLookup[this.pickPostion], { type: nameType, marcKey: mk })
+      // Mark selection
+      for (let k in this.pickLookup){ this.pickLookup[k].picked = false }
+      this.pickLookup[this.pickPostion].picked = true
+      this.activeComponent = this.components[0]
+      // Render UI overlays safely
+      if (typeof this.renderHintBoxes === 'function') {
+        try { this.renderHintBoxes() } catch {}
+      }
+      // Validate
+      if (typeof this.validateOkayToAdd === 'function') {
+        this.validateOkayToAdd()
+        if (!this.okayToAdd) console.log('⚠️ validateOkayToAdd (name) failed', JSON.parse(JSON.stringify(this.components)))
+      }
+      try { this.$refs.subjectInput.focus() } catch {}
+      return
+  }
+  const treatAsComplex = this.pickLookup[this.pickPostion].complex
+  if (treatAsComplex){
       // if it is a complex authorized heading then just replace the whole things with it
   const selLabel = this.pickLookup[this.pickPostion].label || this.pickLookup[this.pickPostion].suggestLabel || this.pickLookup[this.pickPostion].aLabel || ''
+  console.log("🔍 Complex heading selected. Label:", selLabel);
+  console.log("🔍 Full pickLookup item:", this.pickLookup[this.pickPostion]);
   this.subjectString = selLabel
       this.activeComponentIndex = 0
 
       this.componetLookup = {}
       this.componetLookup[this.activeComponentIndex] = {}
 
-  this.componetLookup[this.activeComponentIndex][selLabel] = this.pickLookup[this.pickPostion]
-      for (let k in this.pickLookup){
-        this.pickLookup[k].picked=false
+    this.componetLookup[this.activeComponentIndex][selLabel] = this.pickLookup[this.pickPostion]
+    for (let k in this.pickLookup){
+      this.pickLookup[k].picked=false
+    }
+    // For names, set type based on the result type
+  if (isNameResult) {
+      // Names from LCNAF should be PersonalName by default, but check contextData
+      let nameType = 'madsrdf:PersonalName';
+      if (this.contextData && this.contextData.rdftypes) {
+        if (this.contextData.rdftypes.includes('CorporateName')) {
+          nameType = 'madsrdf:CorporateName';
+        } else if (this.contextData.rdftypes.includes('ConferenceName')) {
+          nameType = 'madsrdf:ConferenceName';
+        } else if (this.contextData.rdftypes.includes('FamilyName')) {
+          nameType = 'madsrdf:FamilyName';
+        }
       }
+      this.typeLookup[this.activeComponentIndex] = nameType;
+    } else {
       // complex headings are all topics (...probably)
       this.typeLookup[this.activeComponentIndex] = 'madsrdf:Topic'
-      this.pickLookup[this.pickPostion].picked=true
+    }
+    this.pickLookup[this.pickPostion].picked=true
 
-      //This check is needed to prevent falling into recursive loop when loading
-      // existing data.
-      if (update == true) {
-        this.subjectStringChanged()
-      }
-
+    // For name results ensure we have a marcKey; if missing force a full context fetch
+    if (isNameResult && !this.safeGetMarcKeyFrom(this.pickLookup[this.pickPostion])) {
       try {
-        this.$refs.subjectInput.focus()
-      } catch(err) {
-        console.log("working with existing data: $refs")
+        console.log("🔄 Forcing full context fetch for name result lacking marcKey")
+        await this._getContext()
+        const mk = this.safeGetMarcKeyFrom(this.contextData)
+        if (mk) {
+          this.pickLookup[this.pickPostion].marcKey = mk
+          this.componetLookup[this.activeComponentIndex][selLabel].marcKey = mk
+        }
+        
+        // Update the type based on fetched context
+        if (this.contextData && this.contextData.rdftypes) {
+          let nameType = 'madsrdf:PersonalName';
+          if (this.contextData.rdftypes.includes('CorporateName')) {
+            nameType = 'madsrdf:CorporateName';
+          } else if (this.contextData.rdftypes.includes('ConferenceName')) {
+            nameType = 'madsrdf:ConferenceName';
+          } else if (this.contextData.rdftypes.includes('FamilyName')) {
+            nameType = 'madsrdf:FamilyName';
+          } else if (this.contextData.rdftypes.includes('Geographic')) {
+            nameType = 'madsrdf:Geographic';
+          }
+          this.typeLookup[this.activeComponentIndex] = nameType;
+          this.componetLookup[this.activeComponentIndex][selLabel].type = nameType;
+        }
+      } catch(fetchErr){
+        console.warn("Failed to enrich name result with full context", fetchErr)
       }
+    }
 
-    }else{
+    //This check is needed to prevent falling into recursive loop when loading existing data.
+    if (update == true) {
+      // Let normal pipeline rebuild components (ensures positions & UI consistency)
+      if (typeof this.subjectStringChanged === 'function') this.subjectStringChanged()
+      // After rebuild, ensure first component enriched
+      if (Array.isArray(this.components) && this.components.length > 0) {
+        const first = this.components[0]
+        if (!first.uri) first.uri = this.pickLookup[this.pickPostion].uri
+        if (!first.type) first.type = this.typeLookup[this.activeComponentIndex]
+        first.literal = false
+        if (this.pickLookup[this.pickPostion].marcKey && !first.marcKey) {
+          first.marcKey = this.pickLookup[this.pickPostion].marcKey
+        }
+        first.complex = !!treatAsComplex
+      } else if (isNameResult) {
+        // Fallback: manual insertion if components not built (edge case)
+        this.components = [{
+          id: 0,
+          label: this.subjectString,
+          posStart: 0,
+          posEnd: this.subjectString.length-1,
+          uri: this.pickLookup[this.pickPostion].uri,
+          type: this.typeLookup[this.activeComponentIndex],
+          literal: false,
+          complex: true,
+          marcKey: this.pickLookup[this.pickPostion].marcKey || null
+        }]
+        this.activeComponentIndex = 0
+        this.activeComponent = this.components[0]
+      }
+      if (typeof this.validateOkayToAdd === 'function') {
+        this.validateOkayToAdd()
+        if (!this.okayToAdd) {
+          console.log('⚠️ validateOkayToAdd failed after name/complex selection', JSON.parse(JSON.stringify(this.components)))
+        }
+      }
+    }
+
+    try { this.$refs.subjectInput.focus() } catch(err) { console.log("working with existing data: $refs") }  }else{
       // console.log('1',JSON.parse(JSON.stringify(this.componetLookup)))
       // take the subject string and split
       let splitString = this.subjectString.split('--')
 
       // replace the string with what we selected
   const baseLabel = this.pickLookup[this.pickPostion].label || this.pickLookup[this.pickPostion].suggestLabel || this.pickLookup[this.pickPostion].aLabel || ''
+  console.log("🔍 Simple heading selected. Base label:", baseLabel);
+  console.log("🔍 Before replacement, subjectString:", this.subjectString);
+  console.log("🔍 Active component index:", this.activeComponentIndex);
+  console.log("🔍 Full pickLookup item:", this.pickLookup[this.pickPostion]);
   splitString[this.activeComponentIndex] = baseLabel.replaceAll('-','‑')
 
-      this.subjectString = splitString.join('--')
+  this.subjectString = splitString.join('--')
+      console.log("🔍 After replacement, subjectString:", this.subjectString);
 
 
       if (!this.componetLookup[this.activeComponentIndex]){
@@ -2141,10 +2504,20 @@ methods: {
       this.pickLookup[this.pickPostion].picked=true
 
       try {
-        let marcKey = this.pickLookup[this.pickPostion].marcKey
-        let type = marcKey.match(/\$[axyzv]{1}/g)
-        type = this.getTypeFromSubfield(type[0])
-        this.setTypeClick(null, type)
+        let marcKey = this.safeGetMarcKeyFrom(this.pickLookup[this.pickPostion])
+        // persist normalized value if available
+        if (marcKey) this.pickLookup[this.pickPostion].marcKey = marcKey
+        if (marcKey && typeof marcKey === 'string') {
+          let type = marcKey.match(/\$[axyzv]{1}/g)
+          if (type && type.length > 0) {
+            type = this.getTypeFromSubfield(type[0])
+            this.setTypeClick(null, type)
+          } else {
+            console.warn("No valid subfield found in marcKey:", marcKey)
+          }
+        } else {
+          console.warn("marcKey is undefined or invalid for pickLookup item:", this.pickLookup[this.pickPostion])
+        }
       } catch(err) {
         console.error("Error getting the type. ", err)
       }
@@ -2623,6 +2996,7 @@ methods: {
 
 
       if (this.linkModeResults.resultType==='COMPLEX' && this.linkModeResults.hit){
+        const mk = this.linkModeResults.hit.extra && this.linkModeResults.hit.extra.marcKeys ? this.linkModeResults.hit.extra.marcKeys[0] : null
         sendResults.push({
           complex: true,
           id: 0,
@@ -2630,8 +3004,10 @@ methods: {
           literal: false,
           posEnd: 0,
           posStart: 0,
-          type:  "madsrdf:Topic",
-          uri: this.linkModeResults.hit.uri
+          type:  this.linkModeResults.hit.heading && this.linkModeResults.hit.heading.rdfType ? ('madsrdf:' + this.linkModeResults.hit.heading.rdfType.split('#').pop()) : 'madsrdf:Topic',
+          uri: this.linkModeResults.hit.uri,
+          marcKey: mk,
+          authorized: true
         })
 
       } else if (this.linkModeResults.resultType==='SIMPLE' && Array.isArray(this.linkModeResults.hit)){
@@ -2646,7 +3022,9 @@ methods: {
             posEnd: 0,
             posStart: 0,
             type,
-            uri: v.uri || null
+            uri: v.uri || null,
+            marcKey: v.extra && v.extra.marcKeys ? v.extra.marcKeys[0] : null,
+            authorized: !!(v.uri && !v.literal)
           })
         })
       } else {
@@ -2738,13 +3116,144 @@ methods: {
   },
 
   add: async function(){
+    console.log('🟢 add() invoked. okayToAdd (initial):', this.okayToAdd, 'components(current):', JSON.parse(JSON.stringify(this.components)))
+    // If not okay, try to validate again (reactivity timing safeguard)
+    if (!this.okayToAdd && typeof this.validateOkayToAdd === 'function') {
+      this.validateOkayToAdd()
+      console.log('🔄 Revalidated okayToAdd:', this.okayToAdd)
+    }
+    // Self-heal: single authoritative component with uri & type should be addable even if flag not yet set
+    if (!this.okayToAdd && this.components.length===1) {
+      const c0 = this.components[0]
+      if (c0 && c0.uri && c0.type) {
+        console.log('🩹 Forcing okayToAdd true (single component has uri & type).')
+        this.okayToAdd = true
+      }
+    }
+    if (!this.okayToAdd){
+      console.warn('⛔ add() aborted after self-heal attempt because okayToAdd is still false.', JSON.parse(JSON.stringify(this.components)))
+      return
+    }
+    // Fallback enrichment for single-component name selections missing uri/type/marcKey
+    if (this.components.length===1){
+      const c0 = this.components[0]
+      // Try to recover a uri from pickLookup/contextData if missing
+      if (!c0.uri && this.contextData && this.contextData.uri){
+        c0.uri = this.contextData.uri
+        console.log('🔄 Filled missing uri from contextData:', c0.uri)
+      }
+      // Try to recover a marcKey if missing
+      if (!c0.marcKey){
+        let mk = this.safeGetMarcKeyFrom ? this.safeGetMarcKeyFrom(this.contextData||{}) : null
+        if (!mk && this.contextData && Array.isArray(this.contextData.marcKeys)){
+          try { mk = this.normalizeMarcKey(this.contextData.marcKeys[0]) } catch {}
+        }
+        if (mk){
+          c0.marcKey = mk
+          console.log('🔄 Filled missing marcKey from contextData:', mk)
+        }
+      }
+        // Compare selected pick label (if available) to component label for mismatch diagnostics
+        try {
+          if (this.pickLookup && this.pickLookup[this.pickPostion] && this.components.length===1) {
+            const pickedLabel = this.pickLookup[this.pickPostion].label || this.pickLookup[this.pickPostion].suggestLabel || this.pickLookup[this.pickPostion].aLabel
+            const compLabel = this.components[0].label
+            if (pickedLabel && compLabel && pickedLabel !== compLabel) {
+              console.warn('⚠️ Label mismatch at add(). pickedLabel != compLabel', { pickedLabel, compLabel })
+            } else {
+              console.log('✅ Label parity at add()', { pickedLabel, compLabel })
+            }
+          }
+        } catch(e){ console.warn('Label parity check failed', e) }
+        this.$emit('subjectAdded', this.components)
+      if (!c0.type && this.contextData){
+        if (this.contextData.rdftypes && this.contextData.rdftypes.length>0){
+          c0.type = 'madsrdf:' + this.contextData.rdftypes[0]
+          console.log('🔄 Filled missing type from rdftypes:', c0.type)
+        } else if (this.contextData.type){
+          c0.type = this.contextData.type.startsWith('madsrdf:')? this.contextData.type : this.contextData.type.replace('http://www.loc.gov/mads/rdf/v1#','madsrdf:')
+          console.log('🔄 Filled missing type from contextData.type:', c0.type)
+        }
+      }
+    }
+    // If we have no components but we have context data (user selected something but didn't build it yet)
+    // Build the component first
+    if (this.components.length === 0 && this.subjectString && this.subjectString.length > 0) {
+      console.log("🔧 Building components from subjectString before adding:", this.subjectString);
+      this.buildComponents(this.subjectString);
+    }
+    
+    // If we still have no components, check if we have context data to work with
+    if (this.components.length === 0 && Object.keys(this.contextData).length > 0 && this.contextData.title) {
+      console.log("🔧 Creating component from contextData:", this.contextData);
+      
+      // Create a component from the context data
+      // Robust title extraction: try multiple fields, fall back to subjectString
+      let titleRaw = this.contextData.title || this.contextData.label || this.contextData.authoritativeLabel || this.subjectString || ''
+      if (Array.isArray(titleRaw)) {
+        // Prefer first @value if object array, else first primitive
+        if (titleRaw.length > 0) {
+          if (typeof titleRaw[0] === 'object' && titleRaw[0] && '@value' in titleRaw[0]) {
+            titleRaw = titleRaw[0]['@value']
+          } else {
+            titleRaw = titleRaw[0]
+          }
+        } else {
+          titleRaw = ''
+        }
+      }
+      const title = typeof titleRaw === 'string' ? titleRaw : ''
+      
+      // Ensure we have a proper marcKey - create a default one if missing
+      let marcKey = this.contextData.marcKey || '';
+      if (!marcKey && this.contextData.rdftypes) {
+        // Create a basic marcKey based on the type
+        if (this.contextData.rdftypes.includes('Topic')) {
+          marcKey = '150  $a' + title;
+        } else if (this.contextData.rdftypes.includes('Geographic')) {
+          marcKey = '151  $a' + title;
+        } else if (this.contextData.rdftypes.includes('PersonalName')) {
+          marcKey = '100  $a' + title;
+        } else if (this.contextData.rdftypes.includes('GenreForm')) {
+          marcKey = '155  $a' + title;
+        } else if (this.contextData.rdftypes.includes('Temporal')) {
+          marcKey = '148  $a' + title;
+        } else {
+          marcKey = '150  $a' + title; // Default to Topic
+        }
+      } else if (!marcKey) {
+        // Last resort: create a basic Topic marcKey
+        marcKey = '150  $a' + title;
+      }
+      
+      const component = {
+        label: title,
+        uri: this.contextData.uri || null,
+        id: 0,
+        type: this.contextData.rdftypes ? (this.contextData.rdftypes.includes('Hub') ? 'madsrdf:Topic' : `madsrdf:${this.contextData.rdftypes[0]}`) : 'madsrdf:Topic',
+        complex: false,
+        literal: this.contextData.literal || false,
+        posStart: 0,
+        posEnd: title.length,
+        marcKey: marcKey,
+      };
+      
+      this.components.push(component);
+      console.log("🔧 Added component:", component);
+    }
+
     //remove any existing thesaurus label, so it has the most current
     //this.profileStore.removeValueSimple(componentGuid, fieldGuid)
 
     // console.log('this.components',JSON.parse(JSON.stringify(this.components)))
     // remove our werid hyphens before we send it back
     for (let c of this.components){
-      c.label = c.label.replaceAll('‑','-')
+      if (!c || typeof c !== 'object') { continue }
+      if (!c.label || typeof c.label !== 'string') {
+        console.warn('⚠️ Component missing valid label; skipping normalization', c)
+      } else {
+        c.label = c.label.replaceAll('‑','-')
+      }
       // we have the full mads type from the build process, check if the component is a id name authortiy
       // if so over write the user defined type with the full type from the authority file so that
       // something like a name becomes a madsrdf:PersonalName instead of madsrdf:Topic
@@ -2765,8 +3274,16 @@ methods: {
     const componentCheck = this.components.length > 0 ? this.components.map((component) => component.label).join("--") : false
     let componentTypes
     try {
-      componentTypes = this.components.length > 0 ? this.components.map((component) => component.marcKey.slice(5)).join("") : false
-    } catch {
+      componentTypes = this.components.length > 0 ? this.components.map((component) => {
+        if (component.marcKey && component.marcKey.length > 5) {
+          return component.marcKey.slice(5);
+        } else {
+          console.warn("Component missing or invalid marcKey:", component);
+          return "$a" + component.label; // Default fallback
+        }
+      }).join("") : false
+    } catch (err) {
+      console.warn("Error building componentTypes:", err);
       componentTypes = false
     }
 
@@ -2785,7 +3302,7 @@ methods: {
           marcKey = targetContext.marcKey //[0]["@value"]
         }
 
-        if (marcKey.slice(5) == componentTypes){
+        if (marcKey.length > 5 && marcKey.slice(5) == componentTypes){
           //the entire built subject can be replaced by 1 term
           match = true
           this.components.push({
@@ -2826,6 +3343,11 @@ methods: {
           data = target
         }
 				let subs
+        // Add error handling for marcKey
+        if (!target.marcKey) {
+          console.warn("target.marcKey is undefined for:", target);
+          continue; // Skip this component if no marcKey
+        }
 				subs = target.marcKey.slice(5)
 			    // subfields = subfields.match(/\$./g)
 			    subs = subs.match(/\$[axyzv]{1}/g)
@@ -2838,15 +3360,26 @@ methods: {
 				  if (data){
 				    subfield = data["subfields"][idx]
 				  } else if (target.marcKey){
-					  let marcKey = target.marcKey.slice(5)
-					  subfield = marcKey.match(/\$[axyzv]{1}/g)
-					  subfield = subfield[idx]
+            // Add error handling for marcKey
+            if (target.marcKey.length > 5) {
+					    let marcKey = target.marcKey.slice(5)
+					    subfield = marcKey.match(/\$[axyzv]{1}/g)
+					    subfield = subfield[idx]
+            } else {
+              console.warn("target.marcKey too short:", target.marcKey);
+              subfield = "$a"; // Default subfield
+            }
 				  }
 
 				subfield = this.getTypeFromSubfield(subfield)
 
 				  // Override the subfield of the first element based on the marc tag
-				  let tag = target.marcKey.slice(0,3)
+          let tag = ""
+          if (target.marcKey && target.marcKey.length >= 3) {
+            tag = target.marcKey.slice(0,3)
+          } else {
+            tag = "150" // Default to Topic tag
+          }
 				  if (idx == 0){
 					  switch(tag){
 						  case "151":
@@ -2916,8 +3449,9 @@ methods: {
     if (newComponents.length > 0){
       this.components = newComponents
     }
-
-    this.$emit('subjectAdded', this.components)
+  console.log('📤 Emitting subjectAdded with components:', JSON.parse(JSON.stringify(this.components)))
+  this.$emit('subjectAdded', this.components)
+  console.log('✅ add() complete / event emitted')
   },
 
 

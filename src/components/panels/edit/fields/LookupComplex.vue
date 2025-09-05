@@ -334,6 +334,28 @@ export default {
 
   methods:{
 
+    // Normalize marcKey values from various shapes (string | object | array) into a clean string or null
+    normalizeMarcKey(val){
+      try{
+        if (!val) return null
+        // If already a non-empty string
+        if (typeof val === 'string') return val.trim() || null
+        // If array, prefer item with no language tag
+        if (Array.isArray(val)){
+          // objects with @value and no/empty @language
+          const pref = val.find(v => v && typeof v === 'object' && v['@value'] && (v['@language'] === undefined || v['@language'] === null || v['@language'] === ''))
+          if (pref && pref['@value']) return String(pref['@value'])
+          // first string or object with @value
+          const first = val.find(v => typeof v === 'string' || (v && typeof v === 'object' && v['@value']))
+          if (!first) return null
+          return typeof first === 'string' ? (first.trim() || null) : (first['@value'] ? String(first['@value']) : null)
+        }
+        // If object with @value
+        if (typeof val === 'object' && val['@value']) return String(val['@value'])
+        return null
+      } catch { return null }
+    },
+
 
 
     focusClick: function(){
@@ -412,7 +434,7 @@ export default {
           contextValue.title,
           null, //contextValue.type.includes("Hub") ? "Hub" : contextValue.extra.rdftypes[0],
           contextValue.extra,
-          contextValue.extra.marcKey
+          this.normalizeMarcKey(contextValue.extra.marcKey)
         )
       }
         this.searchValue=''
@@ -475,7 +497,7 @@ export default {
                     literal: false,
                     posEnd: 0,
                     posStart: 0,
-                    marcKey: this.marcDeliminatedLCSHModeResults.hit.marcKey,
+                    marcKey: this.normalizeMarcKey(this.marcDeliminatedLCSHModeResults.hit.marcKey),
                     type:  "madsrdf:Topic",
                     uri: this.marcDeliminatedLCSHModeResults.hit.uri
                   })
@@ -489,7 +511,7 @@ export default {
                       literal: v.literal,
                       posEnd: 0,
                       posStart: 0,
-                      marcKey: v.marcKey,
+                      marcKey: this.normalizeMarcKey(v.marcKey),
                       type: v.heading.rdfType.replace('http://www.loc.gov/mads/rdf/v1#','madsrdf:'),
                       uri: v.uri
                     })

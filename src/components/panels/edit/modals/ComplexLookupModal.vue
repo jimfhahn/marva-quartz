@@ -620,6 +620,11 @@
       },
 
       selectChange: async function(){
+        // Early guard: avoid noisy logs when no results present
+        if (!this.authorityLookupLocal && (!this.activeComplexSearch || this.activeComplexSearch.length===0) && (!this.activeSimpleLookup || this.activeSimpleLookup.length===0)){
+          console.debug('SelectChange: no results & no authorityLookupLocal; ignoring.')
+          return false
+        }
         let toLoad = null
         if (this.authorityLookupLocal == null && this.$refs.selectOptions != null ){
           const selectedIndex = this.$refs.selectOptions.selectedIndex;
@@ -719,7 +724,36 @@
 
         console.log("Final toLoad:", toLoad)
 
-        if (!toLoad){ return false }
+        // Fallback handling: sometimes SelectChange fires before arrays populate or authorityLookupLocal doesn't match
+        if (!toLoad){
+          // 1. Attempt to use the currently selected index from the DOM select (if present)
+          let domIdx = null
+          try { domIdx = this.$refs.selectOptions ? this.$refs.selectOptions.selectedIndex : null } catch {}
+          if (domIdx != null && domIdx > -1){
+            toLoad = this.activeComplexSearch[domIdx] || this.activeSimpleLookup[domIdx] || toLoad
+          }
+          // 2. If still not found and we have exactly one result in either list, assume that's the intended selection
+          if (!toLoad){
+            if (this.activeComplexSearch && this.activeComplexSearch.length === 1){
+              toLoad = this.activeComplexSearch[0]
+              console.log("Fallback: using sole activeComplexSearch result")
+            } else if (this.activeSimpleLookup && this.activeSimpleLookup.length === 1){
+              toLoad = this.activeSimpleLookup[0]
+              console.log("Fallback: using sole activeSimpleLookup result")
+            }
+          }
+          // 3. If still empty but we have populated arrays, pick first non-literal complex then simple
+          if (!toLoad){
+            const firstComplex = (this.activeComplexSearch || []).find(r => r)
+            const firstSimple = (this.activeSimpleLookup || []).find(r => r)
+            toLoad = firstComplex || firstSimple || null
+            if (toLoad){ console.log("Fallback: picked first available result") }
+          }
+          if (!toLoad){
+            console.warn("SelectChange: No resolvable selection (toLoad still null); aborting.")
+            return false
+          }
+        }
         
         // Check if this is a subject selection and handle it specially
         if (this.structure && this.structure.propertyURI && 
