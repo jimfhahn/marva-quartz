@@ -1775,7 +1775,7 @@
                   "valueDataType": {}
               },
               "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
-              "propertyLabel": "Use Policy",
+              "propertyLabel": "Item policy",
               "remark": "Alma Physical Material Type"
           },
                 {
@@ -5542,7 +5542,7 @@
                   "defaults": []
                 },
                 "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
-                "propertyLabel": "Usage and access policy"
+                "propertyLabel": "Item policy"
               },
               {
                 "mandatory": "false",

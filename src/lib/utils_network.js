@@ -386,6 +386,91 @@ const utilsNetwork = {
     },
 
     /**
+     * Loads simple lookup data for one or more URIs and normalizes it into the
+     * internal lookupLibrary cache format expected by LookupSimple components.
+     * Supports:
+     *  - id.loc.gov simple list endpoints returning JSON-LD arrays/objects
+     *  - Local JSON files served from /public (e.g., /accessPolicies.json)
+     *  - Arrays of URIs (merged together)
+     *
+     * @async
+     * @param {string|string[]} uris - One URI or an array of URIs to load
+     * @returns {object} processed lookup results
+     */
+    loadSimpleLookup: async function(uris){
+      // Normalize to array
+      const uriList = Array.isArray(uris) ? uris : [uris]
+
+      // Helper to process a single URI and return normalized lookup data
+      const processOne = async (uri) => {
+        try {
+          let raw
+          // Local JSON file from /public
+          if (uri.startsWith('/')) {
+            const resp = await fetch(uri)
+            if (!resp.ok) {
+              console.warn('[loadSimpleLookup] Non-OK response for', uri, resp.status)
+              return { metadata: { uri, values: {} } }
+            }
+            raw = await resp.json()
+          } else {
+            // id.loc.gov or other HTTP(s) endpoint, ask for JSON
+            raw = await this.fetchSimpleLookup(uri, true)
+          }
+
+          if (!raw) {
+            return { metadata: { uri, values: {} } }
+          }
+
+          // If the response is already in processed shape, return as-is
+          if (raw && raw.metadata && raw.metadata.values) {
+            return raw
+          }
+
+          // Otherwise, normalize via simpleLookupProcess
+          return this.simpleLookupProcess(raw, uri)
+        } catch (e) {
+          console.error('[loadSimpleLookup] Error loading', uri, e)
+          return { metadata: { uri, values: {} } }
+        }
+      }
+
+      // Load all in sequence to keep memory predictable (these are small)
+      let merged = { metadata: { uri: uriList[0], values: {} } }
+      for (const uri of uriList){
+        const processed = await processOne(uri)
+
+        // Initialize top-level arrays/objects if missing
+        if (!merged.metadata) merged.metadata = { uri: uriList[0], values: {} }
+        if (!merged.metadata.values) merged.metadata.values = {}
+
+        // Merge keys except metadata
+        Object.keys(processed).forEach((k)=>{
+          if (k === 'metadata') return
+          // Each k should map to an array of display strings
+          if (!merged[k]) merged[k] = []
+          const srcVal = Array.isArray(processed[k]) ? processed[k] : []
+          for (const v of srcVal){
+            if (!merged[k].includes(v)) merged[k].push(v)
+          }
+        })
+
+        // Merge metadata values
+        if (processed.metadata && processed.metadata.values){
+          for (const key of Object.keys(processed.metadata.values)){
+            merged.metadata.values[key] = processed.metadata.values[key]
+          }
+        }
+      }
+
+      // Store primary key using the first URI for compatibility with callers
+      // (LookupSimple uses the exact URI string as the cache key)
+      this.lookupLibrary[uriList[0]] = merged
+
+      return merged
+    },
+
+    /**
      * Get the exact match from the known-label lookup. This only really returns a header with the URL for the term.
      * We've got to get that URL and then get the madsrdf for it and process that to get the details for the term.
      *
