@@ -1448,7 +1448,7 @@ methods: {
     }
 
     if (this.activeComponent && this.activeComponent.label){
-      this.searchApis(this.activeComponent.label,this.subjectString,this)
+      this.searchApis(this.activeComponent.label || '', this.subjectString || '', this)
     }
     this.$refs.subjectInput.focus()
   },
@@ -1462,8 +1462,8 @@ methods: {
     that.x = 'Seaching...'
     that.pickPostion = 0
 
-    searchString = searchString.trim().normalize()
-    searchStringFull = searchStringFull.trim().normalize()
+  searchString = (searchString || '').trim().normalize()
+  searchStringFull = (searchStringFull || '').trim().normalize()
 
     // make the "searching..." text grow
     let ti = window.setInterval(()=>{ that.activeSearch = ((!that.activeSearch) ? '' : that.activeSearch) + '.'},100)
@@ -1474,8 +1474,8 @@ methods: {
       that.activeSearch = false
     }, 10000)
 
-    searchString=searchString.replaceAll('‑','-')
-    searchStringFull=searchStringFull.replaceAll('‑','-')
+  searchString=searchString.replaceAll('‑','-')
+  searchStringFull=searchStringFull.replaceAll('‑','-')
 
   that.searchResults = await utilsNetwork.subjectSearch(searchString,searchStringFull,that.searchMode)
 
@@ -1487,17 +1487,19 @@ methods: {
       console.log("🔍 searchApis: processing names, searchResults.names.length:", that.searchResults.names?.length || 0)
       if (that.searchResults.names && that.searchResults.names.length > 0) {
         for (let s of that.searchResults.names){
-          s.labelOrginal = s.label
-          s.label = s.label.replaceAll('-','‑')
+          const baseLabel = s.label ?? s.suggestLabel ?? ''
+          s.labelOrginal = baseLabel
+          s.label = baseLabel.replaceAll('-','‑')
         }
       }
 
       console.log("🔍 searchApis: processing subjectsComplex, length:", that.searchResults.subjectsComplex?.length || 0)
       if (that.searchResults.subjectsComplex && that.searchResults.subjectsComplex.length > 0) {
         for (let s of that.searchResults.subjectsComplex){
-          s.labelOrginal = s.label
+          const baseLabel = s.label ?? s.suggestLabel ?? ''
+          s.labelOrginal = baseLabel
           s.complex=true
-          s.label = s.label.replaceAll('-','‑')
+          s.label = baseLabel.replaceAll('-','‑')
         }
       }
 
@@ -1507,14 +1509,17 @@ methods: {
           if (s.suggestLabel && s.suggestLabel.includes('(DEPRECATED')){
             s.suggestLabel = s.suggestLabel.split('(DEPRECATED')[0] + "(DEPRECATED)"
           }
+          // Ensure a stable label field exists for downstream code
+          if (s.label == null) { s.label = s.suggestLabel ?? '' }
         }
       }
 
       if (that.searchResults.hierarchicalGeographic && that.searchResults.hierarchicalGeographic.length > 0) {
         for (let s of that.searchResults.hierarchicalGeographic){
-          if (s.suggestLabel && s.suggestLabel.includes(' (USE ')){
-            s.suggestLabel = s.label
+          if ((s.suggestLabel || '').includes(' (USE ')){
+            s.suggestLabel = s.label || s.suggestLabel
           }
+          if (s.label == null) { s.label = s.suggestLabel ?? '' }
         }
       }
       
@@ -3258,12 +3263,20 @@ methods: {
       // if so over write the user defined type with the full type from the authority file so that
       // something like a name becomes a madsrdf:PersonalName instead of madsrdf:Topic
       if (c.uri && c.uri.includes('id.loc.gov/authorities/names/') && this.localContextCache && this.localContextCache[c.uri]){
-        let tempType = this.localContextCache[c.uri].typeFull.replace('http://www.loc.gov/mads/rdf/v1#','madsrdf:')
-        if (!Object.keys(this.activeTypes).includes(tempType)){
-          c.type = tempType
-        }
-        if (c.type == 'madsrdf:Topic'){
-          c.type = tempType
+        const cacheEntry = this.localContextCache[c.uri]
+        const rawType = cacheEntry.typeFull ?? cacheEntry.type ?? null
+        if (rawType) {
+          const normalized = rawType.startsWith('madsrdf:') ? rawType : rawType.replace('http://www.loc.gov/mads/rdf/v1#','madsrdf:')
+          if (normalized) {
+            if (!Object.keys(this.activeTypes).includes(normalized)){
+              c.type = normalized
+            }
+            if (c.type === 'madsrdf:Topic'){
+              c.type = normalized
+            }
+          }
+        } else {
+          console.warn('⚠️ Missing typeFull/type in localContextCache for', c.uri, cacheEntry)
         }
       }
     }
@@ -3758,7 +3771,7 @@ updated: function() {
 
   let searchValue = this.searchValue
   if (!searchValue){ return }
-  searchValue = searchValue.replace("—", "--")
+  searchValue = (searchValue || '').replace("—", "--")
 
   //When there is existing data, we need to make sure that the number of components matches
   // the number subjects in the searchValue
@@ -3799,7 +3812,7 @@ updated: function() {
 
             //Select the context that matches the incoming value
             for (const pos in list){
-              let label = list[pos].label
+              let label = list[pos].label ?? list[pos].suggestLabel ?? ''
               if (this.authorityLookupLocal && label.replace(/\W/g, ' ') == this.authorityLookupLocal.replace(/\W/g, ' ')){
                 try{
                   let idx = 0
