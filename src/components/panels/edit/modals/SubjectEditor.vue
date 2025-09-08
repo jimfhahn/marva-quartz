@@ -1019,7 +1019,16 @@ methods: {
   buildComponents: function(searchString){
     // searchString = searchString.replace("—", "--") // when copying a heading from class web
 
+    // Guard: if empty or whitespace, clear and exit
+    if (!searchString || searchString.trim() === '') {
+      this.components = []
+      this.subjectString = ''
+      return
+    }
+
     let subjectStringSplit = searchString.split('--')
+    // Remove any empty segments that can occur during editing
+    subjectStringSplit = subjectStringSplit.filter(s => s !== '')
 
     let targetIndex = []
     let componentLookUpCount = Object.keys(this.componetLookup).length
@@ -1112,7 +1121,10 @@ methods: {
         label: ss,
         uri: uri,
         id: id,
-        type: this.componetLookup && this.componetLookup[id+offset] && this.componetLookup[id+offset][ss].extra ? this.componetLookup[id+offset][ss].extra.type : type,
+        // Guard missing componetLookup entries before accessing .extra
+        type: (this.componetLookup && this.componetLookup[id+offset] && this.componetLookup[id+offset][ss] && this.componetLookup[id+offset][ss].extra)
+          ? this.componetLookup[id+offset][ss].extra.type
+          : type,
         complex: ss.includes('‑‑'),
         literal:literal,
         posStart: activePosStart,
@@ -2886,6 +2898,9 @@ methods: {
       //search for nothing. Otherwise, if the user deletes their search
       // quickly, it will end up searcing on the last letter to be deleted
       this.searchApis("", "", this)
+  // Nothing to build/render beyond this point
+  this.renderHintBoxes()
+  return
     }
     if (!this.subjectString.endsWith("-")){
       this.buildComponents(this.subjectString)
