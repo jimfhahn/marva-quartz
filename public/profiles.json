@@ -2889,6 +2889,88 @@
                 },
                 "propertyURI": "http://id.loc.gov/ontologies/bibframe/immediateAcquisition",
                 "propertyLabel": "Immediate source of acquisition"
+              },
+              {
+                "propertyLabel": "Storing or shelving location",
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/physicalLocation",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:physicalLocation"
+                  ],
+                  "useValuesFrom": [],
+                  "valueDataType": "http://www.w3.org/2001/XMLSchema#string",
+                  "defaults": []
+                },
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "literal"
+              },
+              {
+                "propertyLabel": "Held in sublocation",
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/sublocation",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:Location"
+                  ],
+                  "useValuesFrom": [],
+                  "valueDataType": "http://www.w3.org/2001/XMLSchema#string",
+                  "defaults": []
+                },
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "literal"
+              },
+              {
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "resource",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Identifiers:Barcode"
+                  ],
+                  "useValuesFrom": [],
+                  "defaults": [],
+                  "valueDataType": {}
+                },
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/identifiedBy",
+                "propertyLabel": "Barcode"
+              },
+              {
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "resource",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:Access"
+                  ],
+                  "useValuesFrom": [],
+                  "defaults": [],
+                  "valueDataType": {}
+                },
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
+                "propertyLabel": "Access Policy",
+                "remark": "Alma Policy"
+              },
+              {
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "resource",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:Use"
+                  ],
+                  "useValuesFrom": [],
+                  "defaults": [],
+                  "valueDataType": {}
+                },
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
+                "propertyLabel": "Item policy",
+                "remark": "Alma Physical Material Type"
               }
             ],
             "id": "lc:RT:bf2:PrintPhoto:Item",
@@ -4207,22 +4289,86 @@
                 "type": "resource"
               },
               {
-                "propertyLabel": "Lending, reproduction, and retention policies",
-                "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "resource",
                 "resourceTemplates": [],
                 "valueConstraint": {
                   "valueTemplateRefs": [
-                    "lc:RT:bf2:Item:Access",
-                    "lc:RT:bf2:Item:Use",
-                    "lc:RT:bf2:Item:Retention"
+                    "lc:RT:bf2:Item:Access"
                   ],
                   "useValuesFrom": [],
                   "valueDataType": {},
                   "defaults": []
                 },
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
+                "propertyLabel": "Access Policy",
+                "remark": "Alma Policy"
+              },
+              {
                 "mandatory": "false",
                 "repeatable": "true",
-                "type": "resource"
+                "type": "resource",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:Use"
+                  ],
+                  "useValuesFrom": [],
+                  "valueDataType": {},
+                  "defaults": []
+                },
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
+                "propertyLabel": "Item policy",
+                "remark": "Alma Physical Material Type"
+              },
+              {
+                "propertyLabel": "Storing or shelving location",
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/physicalLocation",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:physicalLocation"
+                  ],
+                  "useValuesFrom": [],
+                  "valueDataType": "http://www.w3.org/2001/XMLSchema#string",
+                  "defaults": []
+                },
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "literal"
+              },
+              {
+                "propertyLabel": "Held in sublocation",
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/sublocation",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:Location"
+                  ],
+                  "useValuesFrom": [],
+                  "valueDataType": "http://www.w3.org/2001/XMLSchema#string",
+                  "defaults": []
+                },
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "literal"
+              },
+              {
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "resource",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Identifiers:Barcode"
+                  ],
+                  "useValuesFrom": [],
+                  "defaults": [],
+                  "valueDataType": {}
+                },
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/identifiedBy",
+                "propertyLabel": "Barcode"
               },
               {
                 "mandatory": "false",
@@ -4708,6 +4854,88 @@
                 "propertyURI": "http://id.loc.gov/ontologies/bibframe/digitalCharacteristic",
                 "propertyLabel": "Digital file characteristics",
                 "remark": "https://original.rdatoolkit.org/3.19.html"
+              },
+              {
+                "propertyLabel": "Storing or shelving location",
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/physicalLocation",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:physicalLocation"
+                  ],
+                  "useValuesFrom": [],
+                  "valueDataType": "http://www.w3.org/2001/XMLSchema#string",
+                  "defaults": []
+                },
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "literal"
+              },
+              {
+                "propertyLabel": "Held in sublocation",
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/sublocation",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:Location"
+                  ],
+                  "useValuesFrom": [],
+                  "valueDataType": "http://www.w3.org/2001/XMLSchema#string",
+                  "defaults": []
+                },
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "literal"
+              },
+              {
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "resource",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Identifiers:Barcode"
+                  ],
+                  "useValuesFrom": [],
+                  "defaults": [],
+                  "valueDataType": {}
+                },
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/identifiedBy",
+                "propertyLabel": "Barcode"
+              },
+              {
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "resource",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:Access"
+                  ],
+                  "useValuesFrom": [],
+                  "defaults": [],
+                  "valueDataType": {}
+                },
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
+                "propertyLabel": "Access Policy",
+                "remark": "Alma Policy"
+              },
+              {
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "resource",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:Use"
+                  ],
+                  "useValuesFrom": [],
+                  "defaults": [],
+                  "valueDataType": {}
+                },
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
+                "propertyLabel": "Item policy",
+                "remark": "Alma Physical Material Type"
               },
               {
                 "mandatory": "false",
@@ -5758,6 +5986,88 @@
                 "propertyURI": "http://id.loc.gov/ontologies/bibframe/custodialHistory",
                 "propertyLabel": "Custodial history/Provenance",
                 "remark": "https://original.rdatoolkit.org/2.18.html"
+              },
+              {
+                "propertyLabel": "Storing or shelving location",
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/physicalLocation",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:physicalLocation"
+                  ],
+                  "useValuesFrom": [],
+                  "valueDataType": "http://www.w3.org/2001/XMLSchema#string",
+                  "defaults": []
+                },
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "literal"
+              },
+              {
+                "propertyLabel": "Held in sublocation",
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/sublocation",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:Location"
+                  ],
+                  "useValuesFrom": [],
+                  "valueDataType": "http://www.w3.org/2001/XMLSchema#string",
+                  "defaults": []
+                },
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "literal"
+              },
+              {
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "resource",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Identifiers:Barcode"
+                  ],
+                  "useValuesFrom": [],
+                  "defaults": [],
+                  "valueDataType": {}
+                },
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/identifiedBy",
+                "propertyLabel": "Barcode"
+              },
+              {
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "resource",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:Access"
+                  ],
+                  "useValuesFrom": [],
+                  "defaults": [],
+                  "valueDataType": {}
+                },
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
+                "propertyLabel": "Access Policy",
+                "remark": "Alma Policy"
+              },
+              {
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "resource",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:Use"
+                  ],
+                  "useValuesFrom": [],
+                  "defaults": [],
+                  "valueDataType": {}
+                },
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
+                "propertyLabel": "Item policy",
+                "remark": "Alma Physical Material Type"
               }
             ],
             "id": "lc:RT:bf2:RareMat:Item",
@@ -7353,6 +7663,88 @@
                 "mandatory": "false",
                 "repeatable": "true",
                 "type": "resource"
+              },
+              {
+                "propertyLabel": "Storing or shelving location",
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/physicalLocation",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:physicalLocation"
+                  ],
+                  "useValuesFrom": [],
+                  "valueDataType": "http://www.w3.org/2001/XMLSchema#string",
+                  "defaults": []
+                },
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "literal"
+              },
+              {
+                "propertyLabel": "Held in sublocation",
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/sublocation",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:Location"
+                  ],
+                  "useValuesFrom": [],
+                  "valueDataType": "http://www.w3.org/2001/XMLSchema#string",
+                  "defaults": []
+                },
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "literal"
+              },
+              {
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "resource",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Identifiers:Barcode"
+                  ],
+                  "useValuesFrom": [],
+                  "defaults": [],
+                  "valueDataType": {}
+                },
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/identifiedBy",
+                "propertyLabel": "Barcode"
+              },
+              {
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "resource",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:Access"
+                  ],
+                  "useValuesFrom": [],
+                  "defaults": [],
+                  "valueDataType": {}
+                },
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
+                "propertyLabel": "Access Policy",
+                "remark": "Alma Policy"
+              },
+              {
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "resource",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:Use"
+                  ],
+                  "useValuesFrom": [],
+                  "defaults": [],
+                  "valueDataType": {}
+                },
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
+                "propertyLabel": "Item policy",
+                "remark": "Alma Physical Material Type"
               }
             ],
             "resourceLabel": "BIBFRAME Item",
@@ -8514,6 +8906,88 @@
                 "propertyURI": "http://id.loc.gov/ontologies/bibframe/acquisitionSource",
                 "remark": "http://access.rdatoolkit.org/rdachp4_rda4-93.html",
                 "propertyLabel": "Contact information"
+              },
+              {
+                "propertyLabel": "Storing or shelving location",
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/physicalLocation",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:physicalLocation"
+                  ],
+                  "useValuesFrom": [],
+                  "valueDataType": "http://www.w3.org/2001/XMLSchema#string",
+                  "defaults": []
+                },
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "literal"
+              },
+              {
+                "propertyLabel": "Held in sublocation",
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/sublocation",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:Location"
+                  ],
+                  "useValuesFrom": [],
+                  "valueDataType": "http://www.w3.org/2001/XMLSchema#string",
+                  "defaults": []
+                },
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "literal"
+              },
+              {
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "resource",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Identifiers:Barcode"
+                  ],
+                  "useValuesFrom": [],
+                  "defaults": [],
+                  "valueDataType": {}
+                },
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/identifiedBy",
+                "propertyLabel": "Barcode"
+              },
+              {
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "resource",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:Access"
+                  ],
+                  "useValuesFrom": [],
+                  "defaults": [],
+                  "valueDataType": {}
+                },
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
+                "propertyLabel": "Access Policy",
+                "remark": "Alma Policy"
+              },
+              {
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "resource",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:Use"
+                  ],
+                  "useValuesFrom": [],
+                  "defaults": [],
+                  "valueDataType": {}
+                },
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
+                "propertyLabel": "Item policy",
+                "remark": "Alma Physical Material Type"
               }
             ],
             "resourceLabel": "BIBFRAME Item",
@@ -10035,6 +10509,88 @@
                 "type": "resource"
               },
               {
+                "propertyLabel": "Storing or shelving location",
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/physicalLocation",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:physicalLocation"
+                  ],
+                  "useValuesFrom": [],
+                  "valueDataType": "http://www.w3.org/2001/XMLSchema#string",
+                  "defaults": []
+                },
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "literal"
+              },
+              {
+                "propertyLabel": "Held in sublocation",
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/sublocation",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:Location"
+                  ],
+                  "useValuesFrom": [],
+                  "valueDataType": "http://www.w3.org/2001/XMLSchema#string",
+                  "defaults": []
+                },
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "literal"
+              },
+              {
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "resource",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Identifiers:Barcode"
+                  ],
+                  "useValuesFrom": [],
+                  "defaults": [],
+                  "valueDataType": {}
+                },
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/identifiedBy",
+                "propertyLabel": "Barcode"
+              },
+              {
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "resource",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:Access"
+                  ],
+                  "useValuesFrom": [],
+                  "defaults": [],
+                  "valueDataType": {}
+                },
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
+                "propertyLabel": "Access Policy",
+                "remark": "Alma Policy"
+              },
+              {
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "resource",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:Use"
+                  ],
+                  "useValuesFrom": [],
+                  "defaults": [],
+                  "valueDataType": {}
+                },
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
+                "propertyLabel": "Item policy",
+                "remark": "Alma Physical Material Type"
+              },
+              {
                 "mandatory": "false",
                 "repeatable": "true",
                 "type": "resource",
@@ -10084,6 +10640,95 @@
             "resourceLabel": "BIBFRAME Item",
             "resourceURI": "http://id.loc.gov/ontologies/bibframe/Item"
           },
+              {
+                "propertyTemplates": [
+                  {
+                    "propertyLabel": "Storing or shelving location",
+                    "propertyURI": "http://id.loc.gov/ontologies/bibframe/physicalLocation",
+                    "resourceTemplates": [],
+                    "valueConstraint": {
+                      "valueTemplateRefs": [
+                        "lc:RT:bf2:Item:physicalLocation"
+                      ],
+                      "useValuesFrom": [],
+                      "valueDataType": "http://www.w3.org/2001/XMLSchema#string",
+                      "defaults": []
+                    },
+                    "mandatory": "false",
+                    "repeatable": "true",
+                    "type": "literal"
+                  },
+                  {
+                    "propertyLabel": "Held in sublocation",
+                    "propertyURI": "http://id.loc.gov/ontologies/bibframe/sublocation",
+                    "resourceTemplates": [],
+                    "valueConstraint": {
+                      "valueTemplateRefs": [
+                        "lc:RT:bf2:Item:Location"
+                      ],
+                      "useValuesFrom": [],
+                      "valueDataType": "http://www.w3.org/2001/XMLSchema#string",
+                      "defaults": []
+                    },
+                    "mandatory": "false",
+                    "repeatable": "true",
+                    "type": "literal"
+                  },
+                  {
+                    "mandatory": "false",
+                    "repeatable": "true",
+                    "type": "resource",
+                    "resourceTemplates": [],
+                    "valueConstraint": {
+                      "valueTemplateRefs": [
+                        "lc:RT:bf2:Identifiers:Barcode"
+                      ],
+                      "useValuesFrom": [],
+                      "defaults": [],
+                      "valueDataType": {}
+                    },
+                    "propertyURI": "http://id.loc.gov/ontologies/bibframe/identifiedBy",
+                    "propertyLabel": "Barcode"
+                  },
+                  {
+                    "mandatory": "false",
+                    "repeatable": "true",
+                    "type": "resource",
+                    "resourceTemplates": [],
+                    "valueConstraint": {
+                      "valueTemplateRefs": [
+                        "lc:RT:bf2:Item:Access"
+                      ],
+                      "useValuesFrom": [],
+                      "defaults": [],
+                      "valueDataType": {}
+                    },
+                    "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
+                    "propertyLabel": "Access Policy",
+                    "remark": "Alma Policy"
+                  },
+                  {
+                    "mandatory": "false",
+                    "repeatable": "true",
+                    "type": "resource",
+                    "resourceTemplates": [],
+                    "valueConstraint": {
+                      "valueTemplateRefs": [
+                        "lc:RT:bf2:Item:Use"
+                      ],
+                      "useValuesFrom": [],
+                      "defaults": [],
+                      "valueDataType": {}
+                    },
+                    "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
+                    "propertyLabel": "Item policy",
+                    "remark": "Alma Physical Material Type"
+                  }
+                ],
+                "id": "lc:RT:bf2:RareMat:Item:LocalAdditions",
+                "resourceURI": "http://id.loc.gov/ontologies/bibframe/Item",
+                "resourceLabel": "BIBFRAME Item (Local additions)"
+              },
           {
             "propertyTemplates": [
               {
@@ -12868,6 +13513,88 @@
                 },
                 "propertyURI": "http://id.loc.gov/ontologies/bibframe/contribution",
                 "propertyLabel": "Collection/contribution"
+              },
+              {
+                "propertyLabel": "Storing or shelving location",
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/physicalLocation",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:physicalLocation"
+                  ],
+                  "useValuesFrom": [],
+                  "valueDataType": "http://www.w3.org/2001/XMLSchema#string",
+                  "defaults": []
+                },
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "literal"
+              },
+              {
+                "propertyLabel": "Held in sublocation",
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/sublocation",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:Location"
+                  ],
+                  "useValuesFrom": [],
+                  "valueDataType": "http://www.w3.org/2001/XMLSchema#string",
+                  "defaults": []
+                },
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "literal"
+              },
+              {
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "resource",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Identifiers:Barcode"
+                  ],
+                  "useValuesFrom": [],
+                  "defaults": [],
+                  "valueDataType": {}
+                },
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/identifiedBy",
+                "propertyLabel": "Barcode"
+              },
+              {
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "resource",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:Access"
+                  ],
+                  "useValuesFrom": [],
+                  "defaults": [],
+                  "valueDataType": {}
+                },
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
+                "propertyLabel": "Access Policy",
+                "remark": "Alma Policy"
+              },
+              {
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "resource",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:Use"
+                  ],
+                  "useValuesFrom": [],
+                  "defaults": [],
+                  "valueDataType": {}
+                },
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
+                "propertyLabel": "Item policy",
+                "remark": "Alma Physical Material Type"
               }
             ],
             "id": "lc:RT:bf2:Cartographic:Item",
@@ -14263,6 +14990,88 @@
                 "mandatory": "false",
                 "repeatable": "true",
                 "type": "resource"
+              },
+              {
+                "propertyLabel": "Storing or shelving location",
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/physicalLocation",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:physicalLocation"
+                  ],
+                  "useValuesFrom": [],
+                  "valueDataType": "http://www.w3.org/2001/XMLSchema#string",
+                  "defaults": []
+                },
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "literal"
+              },
+              {
+                "propertyLabel": "Held in sublocation",
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/sublocation",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:Location"
+                  ],
+                  "useValuesFrom": [],
+                  "valueDataType": "http://www.w3.org/2001/XMLSchema#string",
+                  "defaults": []
+                },
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "literal"
+              },
+              {
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "resource",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Identifiers:Barcode"
+                  ],
+                  "useValuesFrom": [],
+                  "defaults": [],
+                  "valueDataType": {}
+                },
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/identifiedBy",
+                "propertyLabel": "Barcode"
+              },
+              {
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "resource",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:Access"
+                  ],
+                  "useValuesFrom": [],
+                  "defaults": [],
+                  "valueDataType": {}
+                },
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
+                "propertyLabel": "Access Policy",
+                "remark": "Alma Policy"
+              },
+              {
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "resource",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:Use"
+                  ],
+                  "useValuesFrom": [],
+                  "defaults": [],
+                  "valueDataType": {}
+                },
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
+                "propertyLabel": "Item policy",
+                "remark": "Alma Physical Material Type"
               }
             ],
             "resourceLabel": "BIBFRAME Item",
@@ -15354,6 +16163,88 @@
                 "mandatory": "false",
                 "repeatable": "true",
                 "type": "resource"
+              },
+              {
+                "propertyLabel": "Storing or shelving location",
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/physicalLocation",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:physicalLocation"
+                  ],
+                  "useValuesFrom": [],
+                  "valueDataType": "http://www.w3.org/2001/XMLSchema#string",
+                  "defaults": []
+                },
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "literal"
+              },
+              {
+                "propertyLabel": "Held in sublocation",
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/sublocation",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:Location"
+                  ],
+                  "useValuesFrom": [],
+                  "valueDataType": "http://www.w3.org/2001/XMLSchema#string",
+                  "defaults": []
+                },
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "literal"
+              },
+              {
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "resource",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Identifiers:Barcode"
+                  ],
+                  "useValuesFrom": [],
+                  "defaults": [],
+                  "valueDataType": {}
+                },
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/identifiedBy",
+                "propertyLabel": "Barcode"
+              },
+              {
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "resource",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:Access"
+                  ],
+                  "useValuesFrom": [],
+                  "defaults": [],
+                  "valueDataType": {}
+                },
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
+                "propertyLabel": "Access Policy",
+                "remark": "Alma Policy"
+              },
+              {
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "resource",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:Use"
+                  ],
+                  "useValuesFrom": [],
+                  "defaults": [],
+                  "valueDataType": {}
+                },
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
+                "propertyLabel": "Item policy",
+                "remark": "Alma Physical Material Type"
               }
             ],
             "resourceLabel": "BIBFRAME Item",
@@ -16396,6 +17287,88 @@
                 },
                 "propertyURI": "http://id.loc.gov/ontologies/bibframe/note",
                 "propertyLabel": "Notes about the Item"
+              },
+              {
+                "propertyLabel": "Storing or shelving location",
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/physicalLocation",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:physicalLocation"
+                  ],
+                  "useValuesFrom": [],
+                  "valueDataType": "http://www.w3.org/2001/XMLSchema#string",
+                  "defaults": []
+                },
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "literal"
+              },
+              {
+                "propertyLabel": "Held in sublocation",
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/sublocation",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:Location"
+                  ],
+                  "useValuesFrom": [],
+                  "valueDataType": "http://www.w3.org/2001/XMLSchema#string",
+                  "defaults": []
+                },
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "literal"
+              },
+              {
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "resource",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Identifiers:Barcode"
+                  ],
+                  "useValuesFrom": [],
+                  "defaults": [],
+                  "valueDataType": {}
+                },
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/identifiedBy",
+                "propertyLabel": "Barcode"
+              },
+              {
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "resource",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:Access"
+                  ],
+                  "useValuesFrom": [],
+                  "defaults": [],
+                  "valueDataType": {}
+                },
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
+                "propertyLabel": "Access Policy",
+                "remark": "Alma Policy"
+              },
+              {
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "resource",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:Use"
+                  ],
+                  "useValuesFrom": [],
+                  "defaults": [],
+                  "valueDataType": {}
+                },
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
+                "propertyLabel": "Item policy",
+                "remark": "Alma Physical Material Type"
               }
             ],
             "id": "lc:RT:bf2:SoundCassette:Item",
@@ -17497,6 +18470,88 @@
                 "mandatory": "false",
                 "repeatable": "true",
                 "type": "resource"
+              },
+              {
+                "propertyLabel": "Storing or shelving location",
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/physicalLocation",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:physicalLocation"
+                  ],
+                  "useValuesFrom": [],
+                  "valueDataType": "http://www.w3.org/2001/XMLSchema#string",
+                  "defaults": []
+                },
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "literal"
+              },
+              {
+                "propertyLabel": "Held in sublocation",
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/sublocation",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:Location"
+                  ],
+                  "useValuesFrom": [],
+                  "valueDataType": "http://www.w3.org/2001/XMLSchema#string",
+                  "defaults": []
+                },
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "literal"
+              },
+              {
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "resource",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Identifiers:Barcode"
+                  ],
+                  "useValuesFrom": [],
+                  "defaults": [],
+                  "valueDataType": {}
+                },
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/identifiedBy",
+                "propertyLabel": "Barcode"
+              },
+              {
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "resource",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:Access"
+                  ],
+                  "useValuesFrom": [],
+                  "defaults": [],
+                  "valueDataType": {}
+                },
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
+                "propertyLabel": "Access Policy",
+                "remark": "Alma Policy"
+              },
+              {
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "resource",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:Use"
+                  ],
+                  "useValuesFrom": [],
+                  "defaults": [],
+                  "valueDataType": {}
+                },
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
+                "propertyLabel": "Item policy",
+                "remark": "Alma Physical Material Type"
               }
             ],
             "resourceLabel": "BIBFRAME Item",
@@ -28152,6 +29207,88 @@
                 },
                 "propertyLabel": "Enumeration and chronology of Item",
                 "propertyURI": "http://id.loc.gov/ontologies/bibframe/enumerationAndChronology"
+              },
+              {
+                "propertyLabel": "Storing or shelving location",
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/physicalLocation",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:physicalLocation"
+                  ],
+                  "useValuesFrom": [],
+                  "valueDataType": "http://www.w3.org/2001/XMLSchema#string",
+                  "defaults": []
+                },
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "literal"
+              },
+              {
+                "propertyLabel": "Held in sublocation",
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/sublocation",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:Location"
+                  ],
+                  "useValuesFrom": [],
+                  "valueDataType": "http://www.w3.org/2001/XMLSchema#string",
+                  "defaults": []
+                },
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "literal"
+              },
+              {
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "resource",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Identifiers:Barcode"
+                  ],
+                  "useValuesFrom": [],
+                  "defaults": [],
+                  "valueDataType": {}
+                },
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/identifiedBy",
+                "propertyLabel": "Barcode"
+              },
+              {
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "resource",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:Access"
+                  ],
+                  "useValuesFrom": [],
+                  "defaults": [],
+                  "valueDataType": {}
+                },
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
+                "propertyLabel": "Access Policy",
+                "remark": "Alma Policy"
+              },
+              {
+                "mandatory": "false",
+                "repeatable": "true",
+                "type": "resource",
+                "resourceTemplates": [],
+                "valueConstraint": {
+                  "valueTemplateRefs": [
+                    "lc:RT:bf2:Item:Use"
+                  ],
+                  "useValuesFrom": [],
+                  "defaults": [],
+                  "valueDataType": {}
+                },
+                "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
+                "propertyLabel": "Item policy",
+                "remark": "Alma Physical Material Type"
               }
             ],
             "resourceLabel": "BIBFRAME Item",
