@@ -472,7 +472,7 @@
                   "defaults": []
                 },
                 "propertyURI": "http://www.w3.org/2000/01/rdf-schema#label",
-                "propertyLabel": "Alma Lending Policy",
+                "propertyLabel": "Alma Item Policy",
                 "resourceTemplates": []
               },
               {
@@ -492,7 +492,7 @@
             ],
             "id": "lc:RT:bf2:Item:Access",
             "resourceURI": "http://id.loc.gov/ontologies/bibframe/AccessPolicy",
-            "resourceLabel": "Alma Lending Policy",
+            "resourceLabel": "Alma Item Policy",
             "author": "NDMSO",
             "date": "2019-06-11"
           },
@@ -510,7 +510,7 @@
                   "defaults": []
                 },
                 "propertyURI": "http://www.w3.org/2000/01/rdf-schema#label",
-                "propertyLabel": "Alma Physical Material Type",
+                "propertyLabel": "Alma Material Type",
                 "resourceTemplates": []
               },
               {
@@ -531,7 +531,7 @@
               }
             ],
             "id": "lc:RT:bf2:Item:Use",
-            "resourceLabel": "Item policy",
+            "resourceLabel": "Material type",
             "resourceURI": "http://id.loc.gov/ontologies/bibframe/UsePolicy",
             "author": "NDMSO",
             "date": "2019-06-11"
@@ -1823,7 +1823,7 @@
                   "valueDataType": {}
                 },
                 "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
-                "propertyLabel": "Access Policy",
+                "propertyLabel": "Item Policy",
                 "remark": "Alma Policy"
               },
               {
@@ -1840,8 +1840,8 @@
                   "valueDataType": {}
                 },
                 "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
-                "propertyLabel": "Item policy",
-                "remark": "Alma Physical Material Type"
+                "propertyLabel": "Material type",
+                "remark": "Alma Material Type"
               },
               {
                 "propertyLabel": "URL of Item",
@@ -2952,7 +2952,7 @@
                   "valueDataType": {}
                 },
                 "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
-                "propertyLabel": "Access Policy",
+                "propertyLabel": "Item Policy",
                 "remark": "Alma Policy"
               },
               {
@@ -2969,8 +2969,8 @@
                   "valueDataType": {}
                 },
                 "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
-                "propertyLabel": "Item policy",
-                "remark": "Alma Physical Material Type"
+                "propertyLabel": "Material type",
+                "remark": "Alma Material Type"
               }
             ],
             "id": "lc:RT:bf2:PrintPhoto:Item",
@@ -4302,7 +4302,7 @@
                   "defaults": []
                 },
                 "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
-                "propertyLabel": "Access Policy",
+                "propertyLabel": "Item Policy",
                 "remark": "Alma Policy"
               },
               {
@@ -4319,8 +4319,8 @@
                   "defaults": []
                 },
                 "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
-                "propertyLabel": "Item policy",
-                "remark": "Alma Physical Material Type"
+                "propertyLabel": "Material type",
+                "remark": "Alma Material Type"
               },
               {
                 "propertyLabel": "Storing or shelving location",
@@ -4917,7 +4917,7 @@
                   "valueDataType": {}
                 },
                 "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
-                "propertyLabel": "Access Policy",
+                "propertyLabel": "Item Policy",
                 "remark": "Alma Policy"
               },
               {
@@ -4934,8 +4934,8 @@
                   "valueDataType": {}
                 },
                 "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
-                "propertyLabel": "Item policy",
-                "remark": "Alma Physical Material Type"
+                "propertyLabel": "Material type",
+                "remark": "Alma Material Type"
               },
               {
                 "mandatory": "false",
@@ -5853,7 +5853,7 @@
                   "defaults": []
                 },
                 "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
-                "propertyLabel": "Item policy"
+                "propertyLabel": "Material type"
               },
               {
                 "mandatory": "false",
@@ -6049,7 +6049,7 @@
                   "valueDataType": {}
                 },
                 "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
-                "propertyLabel": "Access Policy",
+                "propertyLabel": "Item Policy",
                 "remark": "Alma Policy"
               },
               {
@@ -6066,8 +6066,8 @@
                   "valueDataType": {}
                 },
                 "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
-                "propertyLabel": "Item policy",
-                "remark": "Alma Physical Material Type"
+                "propertyLabel": "Material type",
+                "remark": "Alma Material Type"
               }
             ],
             "id": "lc:RT:bf2:RareMat:Item",
@@ -7726,7 +7726,7 @@
                   "valueDataType": {}
                 },
                 "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
-                "propertyLabel": "Access Policy",
+                "propertyLabel": "Item Policy",
                 "remark": "Alma Policy"
               },
               {
@@ -7743,8 +7743,8 @@
                   "valueDataType": {}
                 },
                 "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
-                "propertyLabel": "Item policy",
-                "remark": "Alma Physical Material Type"
+                "propertyLabel": "Material type",
+                "remark": "Alma Material Type"
               }
             ],
             "resourceLabel": "BIBFRAME Item",
@@ -8969,7 +8969,7 @@
                   "valueDataType": {}
                 },
                 "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
-                "propertyLabel": "Access Policy",
+                "propertyLabel": "Item Policy",
                 "remark": "Alma Policy"
               },
               {
@@ -8986,8 +8986,8 @@
                   "valueDataType": {}
                 },
                 "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
-                "propertyLabel": "Item policy",
-                "remark": "Alma Physical Material Type"
+                "propertyLabel": "Material type",
+                "remark": "Alma Material Type"
               }
             ],
             "resourceLabel": "BIBFRAME Item",
@@ -10570,7 +10570,7 @@
                   "valueDataType": {}
                 },
                 "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
-                "propertyLabel": "Access Policy",
+                "propertyLabel": "Item Policy",
                 "remark": "Alma Policy"
               },
               {
@@ -10587,8 +10587,8 @@
                   "valueDataType": {}
                 },
                 "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
-                "propertyLabel": "Item policy",
-                "remark": "Alma Physical Material Type"
+                "propertyLabel": "Material type",
+                "remark": "Alma Material Type"
               },
               {
                 "mandatory": "false",
@@ -10704,7 +10704,7 @@
                       "valueDataType": {}
                     },
                     "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
-                    "propertyLabel": "Access Policy",
+                    "propertyLabel": "Item Policy",
                     "remark": "Alma Policy"
                   },
                   {
@@ -10721,8 +10721,8 @@
                       "valueDataType": {}
                     },
                     "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
-                    "propertyLabel": "Item policy",
-                    "remark": "Alma Physical Material Type"
+                    "propertyLabel": "Material type",
+                    "remark": "Alma Material Type"
                   }
                 ],
                 "id": "lc:RT:bf2:RareMat:Item:LocalAdditions",
@@ -13576,7 +13576,7 @@
                   "valueDataType": {}
                 },
                 "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
-                "propertyLabel": "Access Policy",
+                "propertyLabel": "Item Policy",
                 "remark": "Alma Policy"
               },
               {
@@ -13593,8 +13593,8 @@
                   "valueDataType": {}
                 },
                 "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
-                "propertyLabel": "Item policy",
-                "remark": "Alma Physical Material Type"
+                "propertyLabel": "Material type",
+                "remark": "Alma Material Type"
               }
             ],
             "id": "lc:RT:bf2:Cartographic:Item",
@@ -15053,7 +15053,7 @@
                   "valueDataType": {}
                 },
                 "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
-                "propertyLabel": "Access Policy",
+                "propertyLabel": "Item Policy",
                 "remark": "Alma Policy"
               },
               {
@@ -15070,8 +15070,8 @@
                   "valueDataType": {}
                 },
                 "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
-                "propertyLabel": "Item policy",
-                "remark": "Alma Physical Material Type"
+                "propertyLabel": "Material type",
+                "remark": "Alma Material Type"
               }
             ],
             "resourceLabel": "BIBFRAME Item",
@@ -16226,7 +16226,7 @@
                   "valueDataType": {}
                 },
                 "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
-                "propertyLabel": "Access Policy",
+                "propertyLabel": "Item Policy",
                 "remark": "Alma Policy"
               },
               {
@@ -16243,8 +16243,8 @@
                   "valueDataType": {}
                 },
                 "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
-                "propertyLabel": "Item policy",
-                "remark": "Alma Physical Material Type"
+                "propertyLabel": "Material type",
+                "remark": "Alma Material Type"
               }
             ],
             "resourceLabel": "BIBFRAME Item",
@@ -17350,7 +17350,7 @@
                   "valueDataType": {}
                 },
                 "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
-                "propertyLabel": "Access Policy",
+                "propertyLabel": "Item Policy",
                 "remark": "Alma Policy"
               },
               {
@@ -17367,8 +17367,8 @@
                   "valueDataType": {}
                 },
                 "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
-                "propertyLabel": "Item policy",
-                "remark": "Alma Physical Material Type"
+                "propertyLabel": "Material type",
+                "remark": "Alma Material Type"
               }
             ],
             "id": "lc:RT:bf2:SoundCassette:Item",
@@ -18533,7 +18533,7 @@
                   "valueDataType": {}
                 },
                 "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
-                "propertyLabel": "Access Policy",
+                "propertyLabel": "Item Policy",
                 "remark": "Alma Policy"
               },
               {
@@ -18550,8 +18550,8 @@
                   "valueDataType": {}
                 },
                 "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
-                "propertyLabel": "Item policy",
-                "remark": "Alma Physical Material Type"
+                "propertyLabel": "Material type",
+                "remark": "Alma Material Type"
               }
             ],
             "resourceLabel": "BIBFRAME Item",
@@ -29270,7 +29270,7 @@
                   "valueDataType": {}
                 },
                 "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
-                "propertyLabel": "Access Policy",
+                "propertyLabel": "Item Policy",
                 "remark": "Alma Policy"
               },
               {
@@ -29287,8 +29287,8 @@
                   "valueDataType": {}
                 },
                 "propertyURI": "http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy",
-                "propertyLabel": "Item policy",
-                "remark": "Alma Physical Material Type"
+                "propertyLabel": "Material type",
+                "remark": "Alma Material Type"
               }
             ],
             "resourceLabel": "BIBFRAME Item",
