@@ -60,6 +60,7 @@ const formatXML = function (xml, tab = '\t', nl = '\n') {
 };
 
 // Returns a DOMParser instance using the built-in browser API
+// Hardened to always parse as XML and strip accidental HTML wrappers
 const returnDOMParser = function () {
     let p;
     try {
@@ -67,6 +68,54 @@ const returnDOMParser = function () {
     } catch (error) {
         p = new window.DOMParser();
     }
+
+    // Wrap parseFromString to enforce XML parsing and cleanup
+    const originalParse = p.parseFromString.bind(p);
+    p.parseFromString = function (xmlString, mimeType) {
+      // Force XML mimetype if missing or incorrect
+      if (!mimeType || mimeType.toLowerCase() === 'text/html') {
+        mimeType = 'text/xml';
+      }
+      // Favor text/xml over application/xml to avoid HTML parsing fallback behaviors
+      if (mimeType.toLowerCase() === 'application/xml') {
+        mimeType = 'text/xml';
+      }
+
+      const doc = originalParse(xmlString, mimeType);
+
+      try {
+        // If the document accidentally parsed as HTML, its documentElement may be html
+        if (doc && doc.documentElement) {
+          const de = doc.documentElement;
+          const deName = (de.localName || de.nodeName || '').toLowerCase();
+          const deNS = de.namespaceURI || '';
+          // Remove known stray XHTML containers
+          if (deName === 'html' || deNS === 'http://www.w3.org/1999/xhtml') {
+            // Attempt a reparsing with strict XML
+            const reparsed = originalParse(xmlString, 'text/xml');
+            if (reparsed && reparsed.documentElement && (reparsed.getElementsByTagName('parsererror').length === 0)) {
+              return reparsed;
+            }
+          }
+        }
+
+        // Remove any stray <body> or <html> elements if they slipped in
+        const removeNodes = [];
+        const pushNodeList = (nl) => { for (let i = 0; i < nl.length; i++) removeNodes.push(nl[i]); };
+        // Namespace-aware search
+        pushNodeList(doc.getElementsByTagNameNS('http://www.w3.org/1999/xhtml', 'body'));
+        pushNodeList(doc.getElementsByTagNameNS('http://www.w3.org/1999/xhtml', 'html'));
+        // Fallback non-NS search
+        pushNodeList(doc.getElementsByTagName('body'));
+        pushNodeList(doc.getElementsByTagName('html'));
+        removeNodes.forEach(n => { if (n && n.parentNode) n.parentNode.removeChild(n); });
+      } catch (e) {
+        console.warn('Non-fatal cleanup error in returnDOMParser.parseFromString:', e.message);
+      }
+
+      return doc;
+    };
+
     return p;
 };
 
@@ -1211,7 +1260,7 @@ const utilsExport = {
   ensureOrganizationLabels: function(xmlString) {
     if (!xmlString) return xmlString;
     try {
-      const parser = new DOMParser();
+      const parser = returnDOMParser();
       const doc = parser.parseFromString(xmlString, "text/xml");
       if (doc.getElementsByTagName("parsererror").length) {
         console.error("XML parsing error in ensureOrganizationLabels.");
@@ -1241,6 +1290,34 @@ const utilsExport = {
       console.error("Error in ensureOrganizationLabels:", e);
       return xmlString;
     }
+  },
+
+  /**
+   * Removes any stray HTML/XHTML elements (html, body, div, span, p, head) from an XML Element tree.
+   * Safe no-op on non-existent elements.
+   * @param {Element} xmlElement
+   * @returns {Element}
+   */
+  removeHTMLElements: function(xmlElement) {
+    if (!xmlElement) return xmlElement;
+    try {
+      const htmlNS = 'http://www.w3.org/1999/xhtml';
+      const tags = ['html', 'body', 'div', 'span', 'p', 'head'];
+
+      // Helper to collect nodes to remove to avoid live NodeList mutation issues
+      const collect = (list) => Array.prototype.slice.call(list || []);
+      const toRemove = [];
+      for (const t of tags) {
+        toRemove.push(...collect(xmlElement.getElementsByTagNameNS(htmlNS, t)));
+        toRemove.push(...collect(xmlElement.getElementsByTagName(t)));
+      }
+      for (const n of toRemove) {
+        if (n && n.parentNode) n.parentNode.removeChild(n);
+      }
+    } catch (e) {
+      console.warn('removeHTMLElements encountered a non-fatal error:', e.message);
+    }
+    return xmlElement;
   },
 
   /** 
@@ -3205,12 +3282,17 @@ const utilsExport = {
     deduplicateAllAdminMetadataAssigners(rdfBasic);
     deduplicateAllAdminMetadataAssigners(bf2MarcXmlElRdf);
 
+  // Remove any stray XHTML/HTML elements that may have sneaked into the RDF DOMs
+  rdf = this.removeHTMLElements(rdf);
+  rdfBasic = this.removeHTMLElements(rdfBasic);
+  bf2MarcXmlElRdf = this.removeHTMLElements(bf2MarcXmlElRdf);
+
     // Fix barcode structures before returning the final XML
     rdf = this.fixBarcodeStructures(rdf);
     rdfBasic = this.fixBarcodeStructures(rdfBasic);
     bf2MarcXmlElRdf = this.fixBarcodeStructures(bf2MarcXmlElRdf); // Corrected variable name
 
-    // Clean up XML strings (optional, but kept from previous state)
+  // Clean up XML strings (optional, but kept from previous state)
     strXml = this.sanitizeXmlString(strXml)
     strXmlFormatted = this.sanitizeXmlString(strXmlFormatted)
     strBf2MarcXmlElBib = this.sanitizeXmlString(strBf2MarcXmlElBib)
@@ -3477,6 +3559,11 @@ const utilsExport = {
       // Remove parser error elements and their content (Chrome-specific issue)
       xmlString = xmlString.replace(/<parsererror[^>]*>[\s\S]*?<\/parsererror>/g, '');
       xmlString = xmlString.replace(/<sourcetext[^>]*>[\s\S]*?<\/sourcetext>/g, '');
+      // Remove accidental XHTML/HTML body or html wrappers if any leaked into serialization
+      xmlString = xmlString.replace(/<body[^>]*xmlns="http:\/\/www\.w3\.org\/1999\/xhtml"[^>]*\/>/g, '');
+      xmlString = xmlString.replace(/<body[^>]*xmlns="http:\/\/www\.w3\.org\/1999\/xhtml"[^>]*>[\s\S]*?<\/body>/g, '');
+      xmlString = xmlString.replace(/<html[^>]*xmlns="http:\/\/www\.w3\.org\/1999\/xhtml"[^>]*\/>/g, '');
+      xmlString = xmlString.replace(/<html[^>]*xmlns="http:\/\/www\.w3\.org\/1999\/xhtml"[^>]*>[\s\S]*?<\/html>/g, '');
       // Remove undefined values that could cause parsing errors
       xmlString = xmlString.replace(/undefined/g, '');
       // Additional Chrome-specific fixes
