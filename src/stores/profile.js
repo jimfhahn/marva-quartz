@@ -3547,42 +3547,56 @@ export const useProfileStore = defineStore('profile', {
     marcPreview: async function(){
       let xml = await utilsExport.buildXML(this.activeProfile)
       let preview = null
-      if (!usePreferenceStore().returnValue('--b-edit-main-splitpane-opac-marc-html')){
-        preview = await utilsNetwork.marcPreview(xml.bf2Marc, false)
-      } else {
-        preview = await utilsNetwork.marcPreview(xml.bf2Marc, true)
-      }
+      const wantsHtmlMarc = usePreferenceStore().returnValue('--b-edit-main-splitpane-opac-marc-html')
+      preview = await utilsNetwork.marcPreview(xml.bf2Marc, wantsHtmlMarc)
 
-      // Handle the new array format returned by utilsNetwork.marcPreview
+      // Normalize results into the structure expected by the Marc preview sidebar
       let newResults = []
 
-      // Create a version object with the data we need
-      if (preview && preview.length > 0) {
-        let marcItem = preview[0]
+      const coerceVersionObj = (marcItem = {}, index = 0) => {
+        const versionLabel = marcItem.version || marcItem.name || (marcItem.results && (marcItem.results.version || marcItem.results.name)) || `current${index ? `-${index}` : ''}`
+        const hasResultsObject = marcItem.results && Object.keys(marcItem.results || {}).length > 0
+        const resultsObj = hasResultsObject ? marcItem.results : { stdout: marcItem.marc || marcItem.preview || '' }
 
-        // prefer an explicit version returned by the backend; fall back to name or 'current'
-        let versionLabel = marcItem.version || marcItem.name || (marcItem.results && (marcItem.results.version || marcItem.results.name)) || 'current'
-
-        // Use returned results object if available, otherwise build a simple stdout wrapper
-        let resultsObj = (marcItem.results && Object.keys(marcItem.results || {}).length) ? marcItem.results : { stdout: (marcItem.marc || '') }
-
-        let versionObj = {
+        return {
           version: versionLabel,
-          marcRecord: marcItem.preview || marcItem.marcRecord || '',
+          marcRecord: marcItem.preview || marcItem.marcRecord || marcItem.marc || '',
           results: resultsObj,
+          default: marcItem.default === true || false,
+          error: marcItem.error === true
+        }
+      }
+
+      if (Array.isArray(preview) && preview.length > 0) {
+        preview.forEach((marcItem, idx) => {
+          const versionObj = coerceVersionObj(marcItem, idx)
+          newResults.push(versionObj)
+        })
+      } else if (preview && typeof preview === 'object') {
+        newResults.push(coerceVersionObj(preview, 0))
+      }
+
+      if (newResults.length === 0) {
+        // fall back to a single entry using the raw bf2Marc string
+        newResults.push({
+          version: 'current',
+          marcRecord: xml.bf2Marc || '',
+          results: { stdout: xml.bf2Marc || '' },
           default: true,
           error: false
-        }
-        newResults.push(versionObj)
+        })
       }
 
-      let defaultVer = newResults.filter((p) => { return (p.default == true) })[0]
-      if (defaultVer && defaultVer.default){
-        defaultVer = defaultVer.version
-      }else{
-        defaultVer = null
+      // ensure exactly one default version is flagged
+      const hasExplicitDefault = newResults.some(ver => ver.default === true)
+      if (!hasExplicitDefault && newResults.length > 0) {
+        newResults[0].default = true
       }
-      return({
+
+      const defaultVerObj = newResults.find(p => p.default === true) || null
+      const defaultVer = defaultVerObj ? defaultVerObj.version : null
+
+      return ({
         default: defaultVer,
         versions: newResults,
       })

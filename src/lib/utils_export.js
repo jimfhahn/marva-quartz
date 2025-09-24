@@ -1365,7 +1365,11 @@ const utilsExport = {
         ${(profile.xmlSource) ? profile.xmlSource : 'No Source Found'}
         ***End Source***
         `;
-        utilsNetwork.sendErrorReportLog(errorReport,filename,profileAsJson);
+        if (utilsNetwork && typeof utilsNetwork.sendErrorReportLog === 'function') {
+          utilsNetwork.sendErrorReportLog(errorReport,filename,profileAsJson);
+        } else {
+          console.warn('utilsNetwork.sendErrorReportLog is unavailable; skipping error report upload.');
+        }
         return false;
       }
     }
@@ -2641,14 +2645,37 @@ const utilsExport = {
       } // <-- This closes the `for (let pt of profile.rt[rt].ptOrder)` loop
 
       // Handle any unused XML
-      let unusedXmlNode = xmlParser.parseFromString(orginalProfile.rt[rt].unusedXml, "text/xml");
-      unusedXmlNode = unusedXmlNode.children[0];
-      for (let el of unusedXmlNode.children){
-        if (el.tagName != 'rdfs:label'){
-          let newEl = (new XMLSerializer()).serializeToString(el);
-          newEl = xmlParser.parseFromString(newEl, "text/xml");
-          newEl = newEl.children[0];
-          rootEl.appendChild(newEl);
+      const rawUnusedXml = orginalProfile?.rt?.[rt]?.unusedXml;
+      if (rawUnusedXml && typeof rawUnusedXml === 'string' && rawUnusedXml.trim() !== '') {
+        let unusedXmlDoc;
+        try {
+          unusedXmlDoc = xmlParser.parseFromString(rawUnusedXml, "text/xml");
+        } catch (parseError) {
+          console.warn('[unusedXml] Failed to parse unusedXml string, skipping reinsertion.', parseError);
+          unusedXmlDoc = null;
+        }
+
+        if (unusedXmlDoc) {
+          const hasParseError = unusedXmlDoc.getElementsByTagName('parsererror').length > 0;
+          if (hasParseError) {
+            console.warn('[unusedXml] Detected parsererror element in unusedXml, skipping reinsertion.');
+          } else {
+            let unusedXmlNode = unusedXmlDoc.documentElement || unusedXmlDoc.children?.[0];
+            if (unusedXmlNode && unusedXmlNode.children && unusedXmlNode.children.length > 0) {
+              for (let el of Array.from(unusedXmlNode.children)) {
+                if (el.tagName !== 'rdfs:label') {
+                  let newEl = (new XMLSerializer()).serializeToString(el);
+                  newEl = xmlParser.parseFromString(newEl, "text/xml");
+                  newEl = newEl.documentElement || newEl.children?.[0];
+                  if (newEl) {
+                    rootEl.appendChild(newEl);
+                  }
+                }
+              }
+            } else {
+              console.log('[unusedXml] No child elements found in unusedXml node; skipping.');
+            }
+          }
         }
       }
 
