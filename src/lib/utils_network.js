@@ -85,6 +85,65 @@ const utilsNetwork = {
         }
     },
 
+    /**
+     * Request string transliteration via the backend Scriptshifter API
+     * @async
+     * @param {string} lang - Scriptshifter language key (matches config.scriptShifterLangCodes keys)
+     * @param {string} text - The string to transliterate
+     * @param {boolean|null} capitalize - Whether to ask service to capitalize all words (optional)
+     * @param {string} t_dir - 's2r' or 'r2s' (not all languages support both)
+     * @return {object|false} - { output: string, ... } on success, false on failure
+     */
+    scriptShifterRequestTrans: async function(lang, text, capitalize, t_dir) {
+      try {
+        const cfg = useConfigStore().returnUrls;
+        const url = (cfg && cfg.scriptshifter ? cfg.scriptshifter : '/scriptshifter/') + 'trans';
+
+        const payload = {
+          lang: lang,
+          text: text,
+          capitalize: capitalize,
+          t_dir: t_dir
+        };
+
+        const resp = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json, text/plain, */*',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const raw = await resp.text();
+        if (!resp.ok) {
+          console.warn('[scriptShifterRequestTrans] non-OK response', resp.status, raw);
+          try { alert(raw); } catch(_) {}
+          return false;
+        }
+
+        let results;
+        try {
+          results = raw ? JSON.parse(raw) : {};
+        } catch (e) {
+          console.error('[scriptShifterRequestTrans] JSON parse error:', e, 'raw:', raw);
+          return false;
+        }
+
+        // Optionally capitalize the first character if preference is enabled
+        try {
+          if (results && results.output && usePreferenceStore().returnValue('--b-scriptshifter-capitalize-first-letter')) {
+            results.output = results.output.charAt(0).toUpperCase() + results.output.slice(1);
+          }
+        } catch(_) { /* ignore preference errors */ }
+
+        return results;
+      } catch (err) {
+        console.error('[scriptShifterRequestTrans] Network error:', err);
+        return false;
+      }
+    },
+
 
     /**
     * processes the data returned
@@ -543,6 +602,9 @@ const utilsNetwork = {
         if (contentType.includes('xml') || contentType.includes('rdf')) {
           data = await response.text();
           console.log("[fetchSimpleLookup] XML/RDF response text (first 200 chars):", data ? data.substring(0,200) : "EMPTY");
+        } else if (contentType.includes('html')) {
+          console.warn("[fetchSimpleLookup] HTML response received; skipping JSON parse:", url);
+          return false;
         } else {
           const responseText = await response.text();
           if (!responseText || responseText.trim() === '') {

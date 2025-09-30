@@ -69,6 +69,132 @@ const utilsParse = {
     item:[]
   },
 
+  /**
+   * Reorders all multi-lingual literal values throughout the profile based on script type and user preferences.
+   *
+   * This method recursively traverses the entire profile data structure searching for arrays of literal
+   * values that contain at least one element with a language tag (@language). When found, it sorts these
+   * arrays according to the user's preference for display order:
+   *
+   * - When "--b-edit-main-literal-non-latin-first" is true: Non-Latin literals appear first (reverse sort)
+   * - When "--b-edit-main-literal-non-latin-first" is false: Latin literals appear first (standard sort)
+   *
+   * The sorting is performed using the ProfileStore's sortObjectsByLatinMatch method, which checks each
+   * value against Latin character patterns to determine the appropriate ordering.
+   *
+   * @param {Object} profile - The BibFrame profile object containing resource templates
+   * @return {Object} - The profile with reordered literal arrays
+   */
+  reorderAllNonLatinLiterals: function (profile) {
+
+    function process(obj, func) {
+      if (obj && obj.userValue) {
+        obj = obj.userValue
+      }
+      if (Array.isArray(obj)) {
+        obj.forEach(function (child) {
+          process(child, func)
+        })
+      } else if (typeof obj == 'object' && obj !== null) {
+        for (let k in obj) {
+          if (Array.isArray(obj[k])) {
+            if (!k.startsWith('@') && obj[k].length > 1) {
+              func(obj, k, obj[k])
+            }
+            process(obj[k], func)
+          }
+        }
+      }
+    }
+
+    for (let rt of profile.rtOrder) {
+      for (let pt of profile.rt[rt].ptOrder) {
+        let ptObj = profile.rt[rt].pt[pt]
+
+        process(ptObj, function (obj, key, value) {
+          // don't try to sort known complex arrays that shouldn't be re-ordered here
+          if ([
+            'http://id.loc.gov/ontologies/bibframe/contribution',
+            'http://id.loc.gov/ontologies/bibframe/subject',
+            'http://id.loc.gov/ontologies/bibframe/geographicCoverage',
+          ].indexOf(ptObj.propertyURI) > -1) {
+            return null
+          }
+
+          // only arrays with @language in them make it here and only if they do not all have it
+          if (value.length > 1 && value.filter((v) => { return (v['@language']) }).length >= 1) {
+            if (usePreferenceStore().returnValue('--b-edit-main-literal-non-latin-first')) {
+              obj[key] = useProfileStore().sortObjectsByLatinMatch(value, key).reverse()
+            } else {
+              obj[key] = useProfileStore().sortObjectsByLatinMatch(value, key)
+            }
+          }
+        })
+      }
+    }
+
+    return profile
+  },
+
+  /**
+   * Sets up indicators for paired literals in a profile to manage UI presentation.
+   *
+   * For these paired literals, it marks each value with a position indicator in the
+   * pairedLitearlIndicatorLookup (stored in the ProfileStore). The indicators help the UI
+   * layer properly display multi-language text entries with appropriate styling.
+   *
+   * @param {Object} profile - The BibFrame profile object containing resource templates
+   * @returns {void} - Updates the pairedLitearlIndicatorLookup in the ProfileStore
+   */
+  buildPairedLiteralsIndicators: function (profile) {
+    // reset lookup
+    useProfileStore().pairedLitearlIndicatorLookup = {}
+
+    function process(obj, func) {
+      if (obj && obj.userValue) {
+        obj = obj.userValue
+      }
+      if (Array.isArray(obj)) {
+        obj.forEach(function (child) {
+          process(child, func)
+        })
+      } else if (typeof obj == 'object' && obj !== null) {
+        for (let k in obj) {
+          if (Array.isArray(obj[k])) {
+            if (!k.startsWith('@') && obj[k].length > 1) {
+              func(obj, k, obj[k])
+            }
+            process(obj[k], func)
+          }
+        }
+      }
+    }
+
+    for (let rt of profile.rtOrder) {
+      for (let pt of profile.rt[rt].ptOrder) {
+        let ptObj = profile.rt[rt].pt[pt]
+        process(ptObj, function (obj, key, value) {
+          // only arrays with @language in them make it here
+          if (value.filter((v) => { return (v['@language']) }).length >= 1) {
+            value.forEach((v, index) => {
+              // basic heuristic: flag positions to allow drawing lines/indicators between paired values
+              if (index % 2 === 0) {
+                // even index marks start of a pair sequence; store length for potential grouping logic
+                useProfileStore().pairedLitearlIndicatorLookup[v['@guid']] = value.length
+              } else if (index == value.length - 1) {
+                // last item in sequence
+                useProfileStore().pairedLitearlIndicatorLookup[v['@guid']] = -1
+              } else {
+                // middle or unmatched
+                useProfileStore().pairedLitearlIndicatorLookup[v['@guid']] = -1
+              }
+            })
+          }
+        })
+      }
+    }
+  },
+
   activeDom: null,
   hasItem: false,
 

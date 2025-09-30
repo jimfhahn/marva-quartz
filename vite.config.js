@@ -16,7 +16,15 @@ export default defineConfig({
   },
   server: {
     // Ensure navigation routes return index.html
-    historyApiFallback: true
+    historyApiFallback: true,
+    proxy: {
+      '/scriptshifter': {
+        target: 'https://quartz.bibframe.app',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (path) => path.replace(/^\/scriptshifter/, '/scriptshifter')
+      }
+    }
     // Removed global headers setting to allow correct MIME types for JS modules.
   },
   optimizeDeps: {

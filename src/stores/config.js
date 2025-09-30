@@ -16,7 +16,8 @@ export const useConfigStore = defineStore('config', {
         ldpjs: "https://quartz.bibframe.app/api-staging/",
         util: "https://quartz.bibframe.app/util/",
         utilLang: "https://quartz.bibframe.app/util-lang/",
-        scriptshifter  :  'https://quartz.bibframe.app/scriptshifter/',
+  // Use local proxy to avoid CORS in dev
+  scriptshifter  :  '/scriptshifter/',
         publish: "https://quartz.bibframe.app/util/publish/staging",
         workpublish: "https://quartz.bibframe.app/util/publish/staging/work",
         instancepublish: "https://quartz.bibframe.app/util/publish/staging/instance",
@@ -441,7 +442,7 @@ export const useConfigStore = defineStore('config', {
 			"processor" : 'lcAuthorities',
 			"modes":[
 				{
-					'MARC Audience':{"url": "https://id.loc.gov/vocabulary/maudience.html"},
+          'MARC Audience':{"url":"https://id.loc.gov/vocabulary/maudience/suggest2/?q=<QUERY>&count=25&offset=<OFFSET>", "all": true},
 					'LCDGT':{"url": "https://id.loc.gov/authorities/demographicTerms/suggest2/?q=<QUERY>&count=25&offset=<OFFSET>"},
 				}
 			]
@@ -940,12 +941,30 @@ export const useConfigStore = defineStore('config', {
     * @return {void} -
     */
     async getScriptShifterLanguages() {
-
-      let req = await fetch(this.returnUrls.scriptshifter + 'languages')
-      this.scriptshifterLanguages = await req.json()
-
-
-
+      try {
+        const url = this.returnUrls.scriptshifter + 'languages'
+        const req = await fetch(url)
+        if (!req || !req.ok) {
+          console.warn('[getScriptShifterLanguages] Failed to fetch languages:', req ? req.status : 'no response', 'URL:', url)
+          this.scriptshifterLanguages = {}
+          return
+        }
+        try {
+          const json = await req.json()
+          if (json && typeof json === 'object') {
+            this.scriptshifterLanguages = json
+          } else {
+            console.warn('[getScriptShifterLanguages] Unexpected response shape; defaulting to empty object')
+            this.scriptshifterLanguages = {}
+          }
+        } catch (parseErr) {
+          console.error('[getScriptShifterLanguages] JSON parse error:', parseErr)
+          this.scriptshifterLanguages = {}
+        }
+      } catch (error) {
+        console.error('[getScriptShifterLanguages] Error fetching scriptshifter languages:', error)
+        this.scriptshifterLanguages = {}
+      }
 
     },
 
