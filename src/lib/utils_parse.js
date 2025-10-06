@@ -861,6 +861,9 @@ const utilsParse = {
         // remove any default values since we will be populating from the record
         // ptk.valueConstraint.defaultsBackup = JSON.parse(JSON.stringify(ptk.valueConstraint.defaults))
         ptk.valueConstraint.defaults=[]
+        
+        // Clear any existing userValue data from previous loads to prevent duplication
+        ptk.userValue = { '@root': ptk.propertyURI }
 
         let propertyURI = ptk.propertyURI
         let prefixURI = this.namespaceUri(propertyURI)

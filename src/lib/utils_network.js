@@ -2506,7 +2506,7 @@ const utilsNetwork = {
           } catch{}
           try {
             // Names ALL
-            const namesCfg = cfg['http://preprod.id.loc.gov/authorities/names'] || cfg['http://id.loc.gov/authorities/names'];
+            const namesCfg = cfg['http://id.loc.gov/authorities/names'];
             if (namesCfg){
               const modeBlock = namesCfg.modes[0];
               for (const k in modeBlock){ if (k.toLowerCase().includes('all')) { urlsSingle.push({u: modeBlock[k].url.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace('<OFFSET>','1'), key:'controllerSingleMain3'}); break; } }
@@ -2572,9 +2572,10 @@ const utilsNetwork = {
           // Hierarchical Geographic scheme (direct)
           const hierGeo = useConfigStore().lookupConfig['HierarchicalGeographic'].modes[0]['All'].url;
           // NAF geographic
-          const nafGeo = useConfigStore().lookupConfig['http://preprod.id.loc.gov/authorities/names'].modes[0]['NAF Geographic'].url;
-          // Names (Personal/Corporate) generic "All" mode – attempt both preprod and prod keys
-          let namesConfig = useConfigStore().lookupConfig['http://preprod.id.loc.gov/authorities/names'] || useConfigStore().lookupConfig['http://id.loc.gov/authorities/names'];
+          const namesLookup = useConfigStore().lookupConfig['http://id.loc.gov/authorities/names'];
+          const nafGeo = namesLookup?.modes?.[0]?.['NAF Geographic']?.url;
+          // Names (Personal/Corporate) generic "All" mode
+          const namesConfig = namesLookup;
           if (namesConfig) {
             // Grab first mode object and find an 'All' key
             const modeBlock = namesConfig.modes[0];
@@ -2589,7 +2590,9 @@ const utilsNetwork = {
           urls.geoHier = hierGeo.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace('<OFFSET>','1');
           urls.geoHierLCSH = subjAll.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace('<OFFSET>','1') + '&rdftype=HierarchicalGeographic';
           urls.geoLCSH = subjAll.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace('<OFFSET>','1') + '&rdftype=Geographic&memberOf=http://id.loc.gov/authorities/subjects/collection_Subdivisions';
-          urls.geoLCNAF = nafGeo.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace('<OFFSET>','1');
+          if (nafGeo) {
+            urls.geoLCNAF = nafGeo.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace('<OFFSET>','1');
+          }
           urls.children = childAll.replace('<QUERY>',searchVal).replace('&count=25','&count=5').replace('<OFFSET>','1');
           urls.childrenSub = childAll.replace('<QUERY>',searchVal).replace('&count=25','&count=4').replace('<OFFSET>','1') + '&memberOf=http://id.loc.gov/authorities/subjects/collection_Subdivisions';
         } catch (e) {

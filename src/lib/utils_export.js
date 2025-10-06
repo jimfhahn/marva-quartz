@@ -27,7 +27,7 @@ function debugLog(message, data = undefined) {
   }
 }
 
-const escapeHTML = str => str.replace(/[&<>'"]/g,
+const escapeHTML = str => (str == null ? '' : String(str)).replace(/[&<>'"]/g,
   tag => ({
       '&': '&amp;',
       '<': '&lt;',
@@ -686,22 +686,154 @@ const utilsExport = {
     }
     
     // some special cases here
-    if (property == 'http://id.loc.gov/ontologies/bibframe/agent') {
-      // if it is an agent create the Agent bnode and just add the type to it as rdf:type
-      let bnode = this.createElByBestNS('bf:Agent');
-      if (userValue['@id']) {
-        bnode.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:about', userValue['@id']);
+    if (property === 'http://id.loc.gov/ontologies/bibframe/agent' || property === 'bf:agent') {
+      const agentTypeUri = 'http://id.loc.gov/ontologies/bibframe/Agent';
+      // normalise processedAgents cache
+      if (!this.processedAgents) {
+        this.processedAgents = new Set();
       }
-      
-      // Check if @type exists before using it
-      if (userValue['@type']) {
-        let rdftype = this.createElByBestNS('rdf:type');
-        rdftype.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:resource', userValue['@type']);
+
+      const agentId = userValue && userValue['@id'] ? userValue['@id'] : null;
+      const alreadyProcessed = agentId ? this.processedAgents.has(agentId) : false;
+
+      // CRITICAL: Return early with minimal structure if already processed
+      if (agentId && alreadyProcessed) {
+        console.log(`Agent ${agentId} already processed, returning reference-only element`);
+        let bnode = this.createElByBestNS('bf:Agent');
+        bnode.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:about', agentId);
+        // Add type but NO labels or marcKeys
+        const rdftype = this.createElByBestNS('rdf:type');
+        rdftype.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:resource', agentTypeUri);
         bnode.appendChild(rdftype);
-      } else {
-        console.warn("createBnode: agent missing @type");
+        return bnode;
       }
-      
+
+      // Mark as processed BEFORE creating the full structure
+      if (agentId) {
+        this.processedAgents.add(agentId);
+        console.log(`Marked agent ${agentId} as processed`);
+      }
+
+      // Normalise @type so downstream code always sees the Agent type
+      const rawType = userValue ? userValue['@type'] : null;
+      if (!rawType) {
+        userValue['@type'] = agentTypeUri;
+      } else if (Array.isArray(rawType)) {
+        if (!rawType.includes(agentTypeUri)) {
+          rawType.push(agentTypeUri);
+        }
+      } else if (typeof rawType === 'object') {
+        if (rawType['@id'] === agentTypeUri) {
+          // nothing to do
+        } else if (rawType['@id']) {
+          userValue['@type'] = [rawType, agentTypeUri];
+        } else {
+          userValue['@type'] = agentTypeUri;
+        }
+      } else if (rawType !== agentTypeUri) {
+        userValue['@type'] = [rawType, agentTypeUri];
+      }
+
+      let bnode = this.createElByBestNS('bf:Agent');
+      if (agentId) {
+        bnode.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:about', agentId);
+      }
+
+      const typeValues = userValue['@type'];
+      const typeArray = Array.isArray(typeValues) ? typeValues : [typeValues];
+      for (let t of typeArray) {
+        const typeUri = typeof t === 'string' ? t : (t && t['@id']);
+        if (!typeUri) {
+          continue;
+        }
+        const rdftype = this.createElByBestNS('rdf:type');
+        rdftype.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:resource', typeUri);
+        bnode.appendChild(rdftype);
+      }
+
+      const rdfsLabelURI = 'http://www.w3.org/2000/01/rdf-schema#label';
+      const collectLabelTexts = () => {
+        const candidates = [];
+        const addCandidate = value => {
+          if (typeof value === 'string') {
+            candidates.push(value.trim());
+          } else if (value && typeof value === 'object') {
+            if (typeof value['@value'] === 'string') {
+              candidates.push(value['@value'].trim());
+            } else if (typeof value[rdfsLabelURI] === 'string') {
+              candidates.push(value[rdfsLabelURI].trim());
+            }
+          }
+        };
+
+        if (userValue.label) {
+          if (Array.isArray(userValue.label)) {
+            userValue.label.forEach(addCandidate);
+          } else {
+            addCandidate(userValue.label);
+          }
+        }
+
+        if (userValue[rdfsLabelURI]) {
+          if (Array.isArray(userValue[rdfsLabelURI])) {
+            userValue[rdfsLabelURI].forEach(addCandidate);
+          } else {
+            addCandidate(userValue[rdfsLabelURI]);
+          }
+        }
+
+        return Array.from(new Set(candidates.filter(Boolean)));
+      };
+
+      const labelCandidates = collectLabelTexts();
+      if (!alreadyProcessed && labelCandidates.length > 0) {
+        const labelElement = this.createElByBestNS(rdfsLabelURI);
+        labelElement.textContent = labelCandidates[0];
+        bnode.appendChild(labelElement);
+        console.log(`Added agent label: ${labelCandidates[0]}`);
+      }
+
+      const marcKeyURI = 'http://id.loc.gov/ontologies/bflc/marcKey';
+      const collectMarcKeys = () => {
+        const candidates = [];
+        const addCandidate = value => {
+          if (typeof value === 'string') {
+            candidates.push(value.trim());
+          } else if (value && typeof value === 'object' && typeof value['@value'] === 'string') {
+            candidates.push(value['@value'].trim());
+          }
+        };
+
+        if (userValue.marcKey) {
+          if (Array.isArray(userValue.marcKey)) {
+            userValue.marcKey.forEach(addCandidate);
+          } else {
+            addCandidate(userValue.marcKey);
+          }
+        }
+
+        if (userValue[marcKeyURI]) {
+          if (Array.isArray(userValue[marcKeyURI])) {
+            userValue[marcKeyURI].forEach(addCandidate);
+          } else {
+            addCandidate(userValue[marcKeyURI]);
+          }
+        }
+
+        return Array.from(new Set(candidates.filter(Boolean)));
+      };
+
+      const marcKeyCandidates = collectMarcKeys();
+      if (!alreadyProcessed && marcKeyCandidates.length > 0) {
+        const marcKeyText = marcKeyCandidates.find(text => text.includes('$'));
+        if (marcKeyText) {
+          const marcKeyElement = this.createElByBestNS(marcKeyURI);
+          marcKeyElement.textContent = marcKeyText;
+          bnode.appendChild(marcKeyElement);
+          console.log(`Added agent marcKey: ${marcKeyText}`);
+        }
+      }
+
       if (userValue['@parseType']) {
         bnode.setAttribute('rdf:parseType', userValue['@parseType']);
       }
@@ -1111,15 +1243,7 @@ const utilsExport = {
     dateEl.textContent = new Date().toISOString();
     adminContainer.appendChild(dateEl);
     
-    // Add catalogerId element if available
-    if (userValue && userValue['http://id.loc.gov/ontologies/bflc/catalogerId'] && 
-        userValue['http://id.loc.gov/ontologies/bflc/catalogerId'][0] && 
-        userValue['http://id.loc.gov/ontologies/bflc/catalogerId'][0]['http://id.loc.gov/ontologies/bflc/catalogerId']) {
-        
-      const catalogerIdEl = this.createElByBestNS('bflc:catalogerId');
-      catalogerIdEl.textContent = userValue['http://id.loc.gov/ontologies/bflc/catalogerId'][0]['http://id.loc.gov/ontologies/bflc/catalogerId'];
-      adminContainer.appendChild(catalogerIdEl);
-    }
+    // Structured-only cataloger handling is applied elsewhere during export.
     
     adminMetadata.appendChild(adminContainer);
     return adminMetadata;
@@ -1155,9 +1279,9 @@ const utilsExport = {
     if (!assignerEl) return;
     
     // Use getElementsByTagNameNS for robust selection
-    const orgEls = assignerEl.getElementsByTagNameNS(utilsRDF.namespace.bf, 'Organization');
+  const orgEls = assignerEl.getElementsByTagNameNS(utilsRDF.namespace.bf, 'Organization');
     
-    orgEls.forEach(orgEl => {
+  Array.from(orgEls).forEach(orgEl => {
       let orgUri = 'http://id.loc.gov/vocabulary/organizations/pu'; // Default URI
       let orgLabel = useConfigStore().defaultAssignerLabel || "University of Pennsylvania, Van Pelt-Dietrich Library"; // Default Label
 
@@ -1183,7 +1307,24 @@ const utilsExport = {
       }
 
       // 3. Ensure rdfs:label exists and is nested correctly
-      let labelEl = orgEl.querySelector('rdfs\\:label'); // Use querySelector for simplicity here
+      // Namespace-aware selection for labels
+      let labelEl = null;
+      const allLabels = Array.from(orgEl.getElementsByTagNameNS(utilsRDF.namespace.rdfs, 'label'));
+      if (allLabels.length > 0) {
+        labelEl = allLabels[0];
+        // If multiple labels exist, keep the first and remove duplicates by text
+        const seen = new Set([(labelEl.textContent || '').trim()]);
+        for (let i = 1; i < allLabels.length; i++) {
+          const lbl = allLabels[i];
+          const text = (lbl.textContent || '').trim();
+          if (seen.has(text)) {
+            lbl.parentNode && lbl.parentNode.removeChild(lbl);
+          } else {
+            // Remove extra labels even if different text to ensure single label policy
+            lbl.parentNode && lbl.parentNode.removeChild(lbl);
+          }
+        }
+      }
       if (!labelEl) {
         // If no label, create and append one
         labelEl = this.createRdfsLabel(orgLabel);
@@ -1243,8 +1384,9 @@ const utilsExport = {
         return xmlString;
       }
       this.removeRedundantNamespaces(doc.documentElement);
-      const assigners = doc.querySelectorAll("bf\\:assigner");
-      assigners.forEach(assignerEl => this.cleanAssignerElement(assignerEl));
+  // Namespace-aware selection of assigners for robustness
+  const assigners = Array.from(doc.getElementsByTagNameNS(utilsRDF.namespace.bf, 'assigner'));
+  assigners.forEach(assignerEl => this.cleanAssignerElement(assignerEl));
       return new XMLSerializer().serializeToString(doc);
     } catch (e) {
       console.error("Error when cleaning XML:", e);
@@ -1266,10 +1408,10 @@ const utilsExport = {
         console.error("XML parsing error in ensureOrganizationLabels.");
         return xmlString;
       }
-      const organizations = doc.querySelectorAll("bf\\:Organization");
+      const organizations = Array.from(doc.getElementsByTagNameNS(utilsRDF.namespace.bf, 'Organization'));
       organizations.forEach(org => {
-        if (org.querySelector("rdfs\\:label")) return;
-        const aboutAttr = org.getAttribute('rdf:about');
+        if (org.getElementsByTagNameNS(utilsRDF.namespace.rdfs, 'label').length > 0) return;
+        const aboutAttr = org.getAttributeNS(utilsRDF.namespace.rdf, 'about') || org.getAttribute('rdf:about');
         if (aboutAttr) {
           let label = null;
           if (aboutAttr === 'http://id.loc.gov/vocabulary/organizations/dlc') {
@@ -1333,16 +1475,23 @@ const utilsExport = {
 
     // if we are in dev mode let the error bubble, but otherwise catch the error and try to recover
     if (useConfigStore().returnUrls.dev === true){
-      return await this.buildXMLProcess(profile);
+      let result = await this.buildXMLProcess(profile);
+      // Clear processedAgents Set after ALL processing is complete
+      this.processedAgents = null;
+      return result;
     } else {
       try {
         let xmlObj = await this.buildXMLProcess(profile);
         this.lastGoodXMLBuildProfile = JSON.parse(JSON.stringify(profile));
         this.lastGoodXMLBuildProfileTimestamp = Math.floor(Date.now() / 1000);
+        // Clear processedAgents Set after ALL processing is complete
+        this.processedAgents = null;
         return xmlObj;
       } catch (error) {
         console.warn("XML Parsing Error:");
         console.warn(error);
+        // Clear processedAgents Set on error too
+        this.processedAgents = null;
         useProfileStore().triggerBadXMLBuildRecovery(this.lastGoodXMLBuildProfile, this.lastGoodXMLBuildProfileTimestamp);
         let profileAsJson;
         try {
@@ -1400,6 +1549,12 @@ const utilsExport = {
     let xmlLog = [];
     let componentXmlLookup = {};
 
+    // Track processed agents globally across all RTs to prevent duplicate label creation
+    // Only initialize if it doesn't exist (buildXMLProcess may be called multiple times)
+    if (!this.processedAgents) {
+      this.processedAgents = new Set();
+    }
+
     // keep a copy of the org profile around
     let orginalProfile = profile;
     // cut the ref to the original
@@ -1434,7 +1589,7 @@ const utilsExport = {
       Item: {},
       Hub: {}
     };
-
+    
     for (let rt of profile.rtOrder){
       xmlLog.push(`Processing rt: ${rt}`);
 
@@ -1470,6 +1625,8 @@ const utilsExport = {
       }
 
       xmlLog.push(`Building ${rootElName}`);
+  // Track duplicates for geographicCoverage across all PTs for this resource
+  const emittedGeoCoverageGlobal = new Set();
 
       if (profile.rt[rt].URI){
         rootEl.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:about', profile.rt[rt].URI);
@@ -1552,7 +1709,9 @@ const utilsExport = {
           // ...existing code for non-Latin processing...
         }
 
-        xmlLog.push(['Set userValue to:', JSON.parse(JSON.stringify(userValue))]);
+  xmlLog.push(['Set userValue to:', JSON.parse(JSON.stringify(userValue))]);
+  // Use the per-resource geographicCoverage dedup set
+  const emittedGeoCoverageKeys = emittedGeoCoverageGlobal;
 
         // <START> Special handling for usageAndAccessPolicy
         if (ptObj.propertyURI === 'http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy') {
@@ -1738,8 +1897,126 @@ const utilsExport = {
           if (this.isBnode(userValue)){
             xmlLog.push(`Root level bnode: ${ptObj.propertyURI}`);
 
+      // *** SPECIAL HANDLING FOR HUB PROPERTIES (expressionOf, relatedTo) ***
+            if (ptObj.propertyURI === 'http://id.loc.gov/ontologies/bibframe/expressionOf' || 
+                ptObj.propertyURI === 'http://id.loc.gov/ontologies/bibframe/relatedTo') {
+              xmlLog.push(`Special Hub property handling for: ${ptObj.propertyURI}`);
+              // Create the predicate element
+              let pLvl1 = this.createElByBestNS(ptObj.propertyURI);
+              // Create the Hub bnode directly
+              let hubBnode = this.createBnode(userValue, ptObj.propertyURI);
+              // Append Hub to predicate
+              pLvl1.appendChild(hubBnode);
+              // Append to root element
+              rootEl.appendChild(pLvl1);
+              componentXmlLookup[`${rt}-${pt}`] = formatXML(pLvl1.outerHTML);
+              xmlLog.push(`Completed Hub property: ${ptObj.propertyURI}`);
+              
+              // Handle siblings if any
+              if (userValueSiblings.length > 0){
+                xmlLog.push(`Handling ${userValueSiblings.length} sibling Hub nodes`);
+                for (let siblingValue of userValueSiblings) {
+                  if (this.hasUserValue(siblingValue)) {
+                    let siblingPLvl1 = this.createElByBestNS(ptObj.propertyURI);
+                    let siblingHub = this.createBnode(siblingValue, ptObj.propertyURI);
+                    siblingPLvl1.appendChild(siblingHub);
+                    rootEl.appendChild(siblingPLvl1);
+                  }
+                }
+              }
+            }
+            // *** SPECIAL HANDLING FOR bf:geographicCoverage (embed bf:GeographicCoverage with label/code/marcKey) ***
+            else if (ptObj.propertyURI === 'http://id.loc.gov/ontologies/bibframe/geographicCoverage') {
+              const handleGeoValue = (geoVal) => {
+                // Extract parts to compute a stable deduplication key
+                const aboutVal = (geoVal && geoVal['@id']) ? String(geoVal['@id']) : '';
+                const rdfsLabelURI = 'http://www.w3.org/2000/01/rdf-schema#label';
+                let labelText = '';
+                if (geoVal && geoVal[rdfsLabelURI]) {
+                  const labelArr = Array.isArray(geoVal[rdfsLabelURI]) ? geoVal[rdfsLabelURI] : [geoVal[rdfsLabelURI]];
+                  const first = labelArr[0];
+                  if (typeof first === 'string') {
+                    labelText = first;
+                  } else if (first && typeof first === 'object') {
+                    labelText = first['@value'] || first[rdfsLabelURI] || '';
+                  }
+                }
+                const madsCodeURI = 'http://www.loc.gov/mads/rdf/v1#code';
+                let codeText = '';
+                if (geoVal && geoVal[madsCodeURI]) {
+                  const codes = Array.isArray(geoVal[madsCodeURI]) ? geoVal[madsCodeURI] : [geoVal[madsCodeURI]];
+                  const firstCode = codes[0];
+                  if (typeof firstCode === 'string') codeText = firstCode;
+                  else if (firstCode && typeof firstCode === 'object') {
+                    if (typeof firstCode['@value'] === 'string') codeText = firstCode['@value'];
+                    else if (firstCode[madsCodeURI]) {
+                      const inner = firstCode[madsCodeURI];
+                      codeText = typeof inner === 'string' ? inner : (inner && inner['@value']) || '';
+                    }
+                  }
+                }
+                const marcKeyURI = 'http://id.loc.gov/ontologies/bflc/marcKey';
+                let mkText = '';
+                if (geoVal && geoVal[marcKeyURI]) {
+                  const mks = Array.isArray(geoVal[marcKeyURI]) ? geoVal[marcKeyURI] : [geoVal[marcKeyURI]];
+                  const firstMk = mks[0];
+                  mkText = (firstMk && typeof firstMk === 'object') ? (firstMk['@value'] || firstMk[marcKeyURI] || '') : (firstMk || '');
+                }
+
+                const dedupKey = `${aboutVal}||${labelText}||${codeText}||${mkText}`;
+                if (emittedGeoCoverageKeys.has(dedupKey)) {
+                  return '';
+                }
+                emittedGeoCoverageKeys.add(dedupKey);
+
+                // Build XML only after dedup check
+                let pLvl1 = this.createElByBestNS(ptObj.propertyURI);
+                let geoNode = this.createElByBestNS('bf:GeographicCoverage');
+
+                if (aboutVal) {
+                  geoNode.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:about', aboutVal);
+                }
+                if (labelText) {
+                  const lbl = this.createElByBestNS('rdfs:label');
+                  lbl.textContent = labelText;
+                  geoNode.appendChild(lbl);
+                }
+                if (codeText) {
+                  const codeEl = this.createElByBestNS('madsrdf:code');
+                  codeEl.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:datatype', 'http://id.loc.gov/datatypes/codes/gac');
+                  codeEl.textContent = codeText;
+                  geoNode.appendChild(codeEl);
+                }
+                if (mkText) {
+                  const mkEl = this.createElByBestNS('bflc:marcKey');
+                  mkEl.textContent = mkText;
+                  geoNode.appendChild(mkEl);
+                }
+
+                pLvl1.appendChild(geoNode);
+                rootEl.appendChild(pLvl1);
+                return formatXML(pLvl1.outerHTML);
+              };
+
+              let allXMLFragments = '';
+              // Primary value
+              allXMLFragments += handleGeoValue(userValue) || '';
+              // Siblings
+              if (userValueSiblings.length > 0){
+                for (let sibling of userValueSiblings) {
+                  if (this.hasUserValue(sibling)) {
+                    allXMLFragments += `\n${handleGeoValue(sibling) || ''}`;
+                  }
+                }
+              }
+              componentXmlLookup[`${rt}-${pt}`] = allXMLFragments.trim();
+              // Prevent any additional generic processing of this pt from running,
+              // which could result in duplicated geographicCoverage output.
+              // This ensures only the explicit geographicCoverage handler above executes.
+              continue;
+            }
             // *** NEW CONDITIONAL LOGIC FOR bf:source ***
-            if (ptObj.propertyURI === 'http://id.loc.gov/ontologies/bibframe/source' || ptObj.propertyURI === 'bf:source') {
+            else if (ptObj.propertyURI === 'http://id.loc.gov/ontologies/bibframe/source' || ptObj.propertyURI === 'bf:source') {
               xmlLog.push(`Special handling for bf:source property.`);
               // 1. Create the outer predicate element <bf:source>
               let pLvl1 = this.createElByBestNS(ptObj.propertyURI);
@@ -1853,93 +2130,83 @@ const utilsExport = {
                     }
                     pLvl2.appendChild(bnodeLvl2); // Append nested bnode to nested predicate
                   } else if (value1['@id']) {
-                    // Check if this is a Hub relationship that needs special handling
-                    const isHubRelationship = (key1 === 'http://id.loc.gov/ontologies/bibframe/expressionOf' || 
-                                             key1 === 'http://id.loc.gov/ontologies/bibframe/relatedTo') &&
-                                            value1['@id'] && value1['@id'].includes('/hubs/');
-                    
-                    if (isHubRelationship) {
+                    // Safety check: if this is an agent, force it through bnode handling ONLY if not already processed
+                    const isAgent = key1 === 'http://id.loc.gov/ontologies/bibframe/agent' || key1 === 'bf:agent';
+                    if (isAgent) {
+                      xmlLog.push(`[Safety] Agent detected for key: ${key1} with ID: ${value1['@id']}`);
+                      // createBnode now handles deduplication internally
+                      xmlLog.push(`[Safety] Creating agent bnode for: ${value1['@id']}`);
+                      let agentBnode = this.createBnode(value1, key1);
+                      if (agentBnode && agentBnode.nodeType) {
+                        pLvl2.appendChild(agentBnode);
+                      } else {
+                        xmlLog.push(`[Safety] Failed to create agent bnode, falling back to resource`);
+                        pLvl2.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:resource', value1['@id']);
+                      }
+                    } else {
+                      // Check if this is a Hub relationship that needs special handling
+                      const isHubRelationship = (key1 === 'http://id.loc.gov/ontologies/bibframe/expressionOf' || 
+                                               key1 === 'http://id.loc.gov/ontologies/bibframe/relatedTo') &&
+                                              value1['@id'] && value1['@id'].includes('/hubs/');
+                      
+                      if (isHubRelationship) {
                       xmlLog.push(`Creating full Hub structure for nested ${key1} with ID: ${value1['@id']}`);
                       
                       // Create the Hub element with rdf:about attribute
                       let hubElement = this.createElByBestNS('http://id.loc.gov/ontologies/bibframe/Hub');
                       hubElement.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:about', value1['@id']);
                       
-                      // Add rdfs:label if available
-                      if (value1.label || value1['http://www.w3.org/2000/01/rdf-schema#label']) {
-                        let labelElement = this.createElByBestNS('http://www.w3.org/2000/01/rdf-schema#label');
-                        
-                        // Enhanced label text extraction for nested Hub
+                      // Extract label - try short key first, then long key
+                      const labelData = value1.label || value1['http://www.w3.org/2000/01/rdf-schema#label'];
+                      if (labelData) {
+                        console.log('DEBUG Hub labelData:', labelData);
                         let labelText = '';
-                        if (typeof value1.label === 'string') {
-                          labelText = value1.label;
-                        } else if (Array.isArray(value1.label) && value1.label.length > 0) {
-                          const labelObj = value1.label[0];
-                          if (typeof labelObj === 'string') {
-                            labelText = labelObj;
-                          } else if (labelObj && labelObj['http://www.w3.org/2000/01/rdf-schema#label']) {
-                            labelText = labelObj['http://www.w3.org/2000/01/rdf-schema#label'];
-                          } else if (labelObj && labelObj['@value']) {
-                            labelText = labelObj['@value'];
+                        
+                        if (typeof labelData === 'string') {
+                          labelText = labelData;
+                        } else if (Array.isArray(labelData) && labelData.length > 0) {
+                          console.log('DEBUG labelData is array with length:', labelData.length);
+                          // Take only the FIRST element to avoid duplicates
+                          const firstLabel = labelData[0];
+                          if (typeof firstLabel === 'string') {
+                            labelText = firstLabel;
+                          } else if (firstLabel && typeof firstLabel === 'object') {
+                            labelText = firstLabel['@value'] || firstLabel['http://www.w3.org/2000/01/rdf-schema#label'] || '';
                           }
-                        } else if (value1['http://www.w3.org/2000/01/rdf-schema#label']) {
-                          const rdfsLabel = value1['http://www.w3.org/2000/01/rdf-schema#label'];
-                          if (typeof rdfsLabel === 'string') {
-                            labelText = rdfsLabel;
-                          } else if (Array.isArray(rdfsLabel) && rdfsLabel.length > 0) {
-                            const labelObj = rdfsLabel[0];
-                            if (typeof labelObj === 'string') {
-                              labelText = labelObj;
-                            } else if (labelObj && labelObj['http://www.w3.org/2000/01/rdf-schema#label']) {
-                              labelText = labelObj['http://www.w3.org/2000/01/rdf-schema#label'];
-                            } else if (labelObj && labelObj['@value']) {
-                              labelText = labelObj['@value'];
-                            }
-                          }
+                        } else if (typeof labelData === 'object' && labelData['@value']) {
+                          labelText = labelData['@value'];
                         }
                         
                         if (labelText && typeof labelText === 'string') {
+                          let labelElement = this.createElByBestNS('http://www.w3.org/2000/01/rdf-schema#label');
                           labelElement.textContent = labelText;
                           hubElement.appendChild(labelElement);
                           xmlLog.push(`Added nested Hub label: ${labelText}`);
                         }
                       }
                       
-                      // Add bflc:marcKey if available and properly formatted
-                      if (value1.marcKey || value1['http://id.loc.gov/ontologies/bflc/marcKey']) {
-                        let marcKeyElement = this.createElByBestNS('http://id.loc.gov/ontologies/bflc/marcKey');
-                        
-                        // Enhanced marcKey text extraction for nested Hub
+                      // Extract marcKey - try short key first, then long key
+                      const marcKeyData = value1.marcKey || value1['http://id.loc.gov/ontologies/bflc/marcKey'];
+                      if (marcKeyData) {
                         let marcKeyText = '';
-                        if (typeof value1.marcKey === 'string') {
-                          marcKeyText = value1.marcKey;
-                        } else if (Array.isArray(value1.marcKey) && value1.marcKey.length > 0) {
-                          const marcKeyObj = value1.marcKey[0];
-                          if (typeof marcKeyObj === 'string') {
-                            marcKeyText = marcKeyObj;
-                          } else if (marcKeyObj && marcKeyObj['http://id.loc.gov/ontologies/bflc/marcKey']) {
-                            marcKeyText = marcKeyObj['http://id.loc.gov/ontologies/bflc/marcKey'];
-                          } else if (marcKeyObj && marcKeyObj['@value']) {
-                            marcKeyText = marcKeyObj['@value'];
+                        
+                        if (typeof marcKeyData === 'string') {
+                          marcKeyText = marcKeyData;
+                        } else if (Array.isArray(marcKeyData) && marcKeyData.length > 0) {
+                          // Take only the FIRST element to avoid duplicates
+                          const firstMarcKey = marcKeyData[0];
+                          if (typeof firstMarcKey === 'string') {
+                            marcKeyText = firstMarcKey;
+                          } else if (firstMarcKey && typeof firstMarcKey === 'object') {
+                            marcKeyText = firstMarcKey['@value'] || firstMarcKey['http://id.loc.gov/ontologies/bflc/marcKey'] || '';
                           }
-                        } else if (value1['http://id.loc.gov/ontologies/bflc/marcKey']) {
-                          const bflcMarcKey = value1['http://id.loc.gov/ontologies/bflc/marcKey'];
-                          if (typeof bflcMarcKey === 'string') {
-                            marcKeyText = bflcMarcKey;
-                          } else if (Array.isArray(bflcMarcKey) && bflcMarcKey.length > 0) {
-                            const marcKeyObj = bflcMarcKey[0];
-                            if (typeof marcKeyObj === 'string') {
-                              marcKeyText = marcKeyObj;
-                            } else if (marcKeyObj && marcKeyObj['http://id.loc.gov/ontologies/bflc/marcKey']) {
-                              marcKeyText = marcKeyObj['http://id.loc.gov/ontologies/bflc/marcKey'];
-                            } else if (marcKeyObj && marcKeyObj['@value']) {
-                              marcKeyText = marcKeyObj['@value'];
-                            }
-                          }
+                        } else if (typeof marcKeyData === 'object' && marcKeyData['@value']) {
+                          marcKeyText = marcKeyData['@value'];
                         }
                         
                         // Only add marcKey if it's in proper MARC format (contains $ subfields)
                         if (marcKeyText && typeof marcKeyText === 'string' && marcKeyText.includes('$')) {
+                          let marcKeyElement = this.createElByBestNS('http://id.loc.gov/ontologies/bflc/marcKey');
                           marcKeyElement.textContent = marcKeyText;
                           hubElement.appendChild(marcKeyElement);
                           xmlLog.push(`Added nested Hub marcKey: ${marcKeyText}`);
@@ -1948,9 +2215,10 @@ const utilsExport = {
                       
                       pLvl2.appendChild(hubElement);
                       xmlLog.push(`Created full nested Hub structure for ${key1}`);
-                    } else {
-                      xmlLog.push(`Resource found for key: ${key1}`);
-                      pLvl2.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:resource', value1['@id']);
+                      } else {
+                        xmlLog.push(`Resource found for key: ${key1}`);
+                        pLvl2.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:resource', value1['@id']);
+                      }
                     }
                   } else {
                     // Handle literal values inside the bnode
@@ -2026,86 +2294,58 @@ const utilsExport = {
                                      let hubElement = this.createElByBestNS('http://id.loc.gov/ontologies/bibframe/Hub');
                                      hubElement.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:about', value2['@id']);
                                      
-                                     // Add rdfs:label if available
-                                     if (value2.label || value2['http://www.w3.org/2000/01/rdf-schema#label']) {
-                                       let labelElement = this.createElByBestNS('http://www.w3.org/2000/01/rdf-schema#label');
-                                       
-                                       // Enhanced label text extraction for nested sibling Hub
+                                     // Extract label - try short key first, then long key
+                                     const labelData = value2.label || value2['http://www.w3.org/2000/01/rdf-schema#label'];
+                                     if (labelData) {
                                        let labelText = '';
-                                       if (typeof value2.label === 'string') {
-                                         labelText = value2.label;
-                                       } else if (Array.isArray(value2.label) && value2.label.length > 0) {
-                                         const labelObj = value2.label[0];
-                                         if (typeof labelObj === 'string') {
-                                           labelText = labelObj;
-                                         } else if (labelObj && labelObj['http://www.w3.org/2000/01/rdf-schema#label']) {
-                                           labelText = labelObj['http://www.w3.org/2000/01/rdf-schema#label'];
-                                         } else if (labelObj && labelObj['@value']) {
-                                           labelText = labelObj['@value'];
+                                       
+                                       if (typeof labelData === 'string') {
+                                         labelText = labelData;
+                                       } else if (Array.isArray(labelData) && labelData.length > 0) {
+                                         // Take only the FIRST element to avoid duplicates
+                                         const firstLabel = labelData[0];
+                                         if (typeof firstLabel === 'string') {
+                                           labelText = firstLabel;
+                                         } else if (firstLabel && typeof firstLabel === 'object') {
+                                           labelText = firstLabel['@value'] || firstLabel['http://www.w3.org/2000/01/rdf-schema#label'] || '';
                                          }
-                                       } else if (value2['http://www.w3.org/2000/01/rdf-schema#label']) {
-                                         const rdfsLabel = value2['http://www.w3.org/2000/01/rdf-schema#label'];
-                                         if (typeof rdfsLabel === 'string') {
-                                           labelText = rdfsLabel;
-                                         } else if (Array.isArray(rdfsLabel) && rdfsLabel.length > 0) {
-                                           const labelObj = rdfsLabel[0];
-                                           if (typeof labelObj === 'string') {
-                                             labelText = labelObj;
-                                           } else if (labelObj && labelObj['http://www.w3.org/2000/01/rdf-schema#label']) {
-                                             labelText = labelObj['http://www.w3.org/2000/01/rdf-schema#label'];
-                                           } else if (labelObj && labelObj['@value']) {
-                                             labelText = labelObj['@value'];
-                                           }
-                                         }
+                                       } else if (typeof labelData === 'object' && labelData['@value']) {
+                                         labelText = labelData['@value'];
                                        }
                                        
                                        if (labelText && typeof labelText === 'string') {
+                                         let labelElement = this.createElByBestNS('http://www.w3.org/2000/01/rdf-schema#label');
                                          labelElement.textContent = labelText;
                                          hubElement.appendChild(labelElement);
                                          xmlLog.push(`Added nested sibling Hub label: ${labelText}`);
                                        }
                                      }
                                      
-                                     // Add bflc:marcKey if available and properly formatted
-                                     if (value2.marcKey || value2['http://id.loc.gov/ontologies/bflc/marcKey']) {
-                                       let marcKeyElement = this.createElByBestNS('http://id.loc.gov/ontologies/bflc/marcKey');
-                                       
-                                       // Enhanced marcKey text extraction for nested sibling Hub
+                                     // Extract marcKey - try short key first, then long key
+                                     const marcKeyData = value2.marcKey || value2['http://id.loc.gov/ontologies/bflc/marcKey'];
+                                     if (marcKeyData) {
                                        let marcKeyText = '';
-                                       if (typeof value2.marcKey === 'string') {
-                                         marcKeyText = value2.marcKey;
-                                       } else if (Array.isArray(value2.marcKey) && value2.marcKey.length > 0) {
-                                         const marcKeyObj = value2.marcKey[0];
-                                         if (typeof marcKeyObj === 'string') {
-                                           marcKeyText = marcKeyObj;
-                                         } else if (marcKeyObj && marcKeyObj['http://id.loc.gov/ontologies/bflc/marcKey']) {
-                                           marcKeyText = marcKeyObj['http://id.loc.gov/ontologies/bflc/marcKey'];
-                                         } else if (marcKeyObj && marcKeyObj['@value']) {
-                                           marcKeyText = marcKeyObj['@value'];
+                                       
+                                       if (typeof marcKeyData === 'string') {
+                                         marcKeyText = marcKeyData;
+                                       } else if (Array.isArray(marcKeyData) && marcKeyData.length > 0) {
+                                         // Take only the FIRST element to avoid duplicates
+                                         const firstMarcKey = marcKeyData[0];
+                                         if (typeof firstMarcKey === 'string') {
+                                           marcKeyText = firstMarcKey;
+                                         } else if (firstMarcKey && typeof firstMarcKey === 'object') {
+                                           marcKeyText = firstMarcKey['@value'] || firstMarcKey['http://id.loc.gov/ontologies/bflc/marcKey'] || '';
                                          }
-                                       } else if (value2['http://id.loc.gov/ontologies/bflc/marcKey']) {
-                                         const bflcMarcKey = value2['http://id.loc.gov/ontologies/bflc/marcKey'];
-                                         if (typeof bflcMarcKey === 'string') {
-                                           marcKeyText = bflcMarcKey;
-                                         } else if (Array.isArray(bflcMarcKey) && bflcMarcKey.length > 0) {
-                                           const marcKeyObj = bflcMarcKey[0];
-                                           if (typeof marcKeyObj === 'string') {
-                                             marcKeyText = marcKeyObj;
-                                           } else if (marcKeyObj && marcKeyObj['http://id.loc.gov/ontologies/bflc/marcKey']) {
-                                             marcKeyText = marcKeyObj['http://id.loc.gov/ontologies/bflc/marcKey'];
-                                           } else if (marcKeyObj && marcKeyObj['@value']) {
-                                             marcKeyText = marcKeyObj['@value'];
-                                           }
-                                         }
+                                       } else if (typeof marcKeyData === 'object' && marcKeyData['@value']) {
+                                         marcKeyText = marcKeyData['@value'];
                                        }
                                        
                                        // Only add marcKey if it's in proper MARC format (contains $ subfields)
                                        if (marcKeyText && typeof marcKeyText === 'string' && marcKeyText.includes('$')) {
+                                         let marcKeyElement = this.createElByBestNS('http://id.loc.gov/ontologies/bflc/marcKey');
                                          marcKeyElement.textContent = marcKeyText;
                                          hubElement.appendChild(marcKeyElement);
                                          xmlLog.push(`Added nested sibling Hub marcKey: ${marcKeyText}`);
-                                       } else {
-                                         xmlLog.push(`Skipping invalid nested sibling marcKey format: ${marcKeyText}`);
                                        }
                                      }
                                      
@@ -2126,98 +2366,84 @@ const utilsExport = {
                              }
                              pLvl2.appendChild(bnodeLvl2); // Append nested bnode to nested predicate
                            } else if (value1['@id']) {
-                             // Check if this is a Hub relationship that needs special handling
-                             const isHubRelationship = (key1 === 'http://id.loc.gov/ontologies/bibframe/expressionOf' || 
-                                                      key1 === 'http://id.loc.gov/ontologies/bibframe/relatedTo') &&
-                                                     value1['@id'] && value1['@id'].includes('/hubs/');
-                             
-                             if (isHubRelationship) {
+                             // Safety check: if this is an agent, force it through bnode handling ONLY if not already processed
+                             const isAgent = key1 === 'http://id.loc.gov/ontologies/bibframe/agent' || key1 === 'bf:agent';
+                             if (isAgent) {
+                               xmlLog.push(`[Safety-Sibling] Agent detected for key: ${key1} with ID: ${value1['@id']}`);
+                               // createBnode now handles deduplication internally
+                               xmlLog.push(`[Safety-Sibling] Creating agent bnode for: ${value1['@id']}`);
+                               let agentBnode = this.createBnode(value1, key1);
+                               if (agentBnode && agentBnode.nodeType) {
+                                 pLvl2.appendChild(agentBnode);
+                               } else {
+                                 xmlLog.push(`[Safety-Sibling] Failed to create agent bnode, falling back to resource`);
+                                 pLvl2.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:resource', value1['@id']);
+                               }
+                             } else {
+                               // Check if this is a Hub relationship that needs special handling
+                               const isHubRelationship = (key1 === 'http://id.loc.gov/ontologies/bibframe/expressionOf' || 
+                                                        key1 === 'http://id.loc.gov/ontologies/bibframe/relatedTo') &&
+                                                       value1['@id'] && value1['@id'].includes('/hubs/');
+                               
+                               if (isHubRelationship) {
                                xmlLog.push(`Creating full Hub structure for sibling ${key1} with ID: ${value1['@id']}`);
                                
                                // Create the Hub element with rdf:about attribute
                                let hubElement = this.createElByBestNS('http://id.loc.gov/ontologies/bibframe/Hub');
                                hubElement.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:about', value1['@id']);
                                
-                               // Add rdfs:label if available
-                               if (value1.label || value1['http://www.w3.org/2000/01/rdf-schema#label']) {
-                                 let labelElement = this.createElByBestNS('http://www.w3.org/2000/01/rdf-schema#label');
-                                 
-                                 // Enhanced label text extraction for sibling Hub
+                               // Extract label - try short key first, then long key
+                               const labelData = value1.label || value1['http://www.w3.org/2000/01/rdf-schema#label'];
+                               if (labelData) {
                                  let labelText = '';
-                                 if (typeof value1.label === 'string') {
-                                   labelText = value1.label;
-                                 } else if (Array.isArray(value1.label) && value1.label.length > 0) {
-                                   const labelObj = value1.label[0];
-                                   if (typeof labelObj === 'string') {
-                                     labelText = labelObj;
-                                   } else if (labelObj && labelObj['http://www.w3.org/2000/01/rdf-schema#label']) {
-                                     labelText = labelObj['http://www.w3.org/2000/01/rdf-schema#label'];
-                                   } else if (labelObj && labelObj['@value']) {
-                                     labelText = labelObj['@value'];
+                                 
+                                 if (typeof labelData === 'string') {
+                                   labelText = labelData;
+                                 } else if (Array.isArray(labelData) && labelData.length > 0) {
+                                   // Take only the FIRST element to avoid duplicates
+                                   const firstLabel = labelData[0];
+                                   if (typeof firstLabel === 'string') {
+                                     labelText = firstLabel;
+                                   } else if (firstLabel && typeof firstLabel === 'object') {
+                                     labelText = firstLabel['@value'] || firstLabel['http://www.w3.org/2000/01/rdf-schema#label'] || '';
                                    }
-                                 } else if (value1['http://www.w3.org/2000/01/rdf-schema#label']) {
-                                   const rdfsLabel = value1['http://www.w3.org/2000/01/rdf-schema#label'];
-                                   if (typeof rdfsLabel === 'string') {
-                                     labelText = rdfsLabel;
-                                   } else if (Array.isArray(rdfsLabel) && rdfsLabel.length > 0) {
-                                     const labelObj = rdfsLabel[0];
-                                     if (typeof labelObj === 'string') {
-                                       labelText = labelObj;
-                                     } else if (labelObj && labelObj['http://www.w3.org/2000/01/rdf-schema#label']) {
-                                       labelText = labelObj['http://www.w3.org/2000/01/rdf-schema#label'];
-                                     } else if (labelObj && labelObj['@value']) {
-                                       labelText = labelObj['@value'];
-                                     }
-                                   }
+                                 } else if (typeof labelData === 'object' && labelData['@value']) {
+                                   labelText = labelData['@value'];
                                  }
                                  
                                  if (labelText && typeof labelText === 'string') {
+                                   let labelElement = this.createElByBestNS('http://www.w3.org/2000/01/rdf-schema#label');
                                    labelElement.textContent = labelText;
                                    hubElement.appendChild(labelElement);
                                    xmlLog.push(`Added sibling Hub label: ${labelText}`);
                                  }
                                }
                                
-                               // Add bflc:marcKey if available and properly formatted
-                               if (value1.marcKey || value1['http://id.loc.gov/ontologies/bflc/marcKey']) {
-                                 let marcKeyElement = this.createElByBestNS('http://id.loc.gov/ontologies/bflc/marcKey');
-                                 
-                                 // Enhanced marcKey text extraction for sibling Hub
+                               // Extract marcKey - try short key first, then long key
+                               const marcKeyData = value1.marcKey || value1['http://id.loc.gov/ontologies/bflc/marcKey'];
+                               if (marcKeyData) {
                                  let marcKeyText = '';
-                                 if (typeof value1.marcKey === 'string') {
-                                   marcKeyText = value1.marcKey;
-                                 } else if (Array.isArray(value1.marcKey) && value1.marcKey.length > 0) {
-                                   const marcKeyObj = value1.marcKey[0];
-                                   if (typeof marcKeyObj === 'string') {
-                                     marcKeyText = marcKeyObj;
-                                   } else if (marcKeyObj && marcKeyObj['http://id.loc.gov/ontologies/bflc/marcKey']) {
-                                     marcKeyText = marcKeyObj['http://id.loc.gov/ontologies/bflc/marcKey'];
-                                   } else if (marcKeyObj && marcKeyObj['@value']) {
-                                     marcKeyText = marcKeyObj['@value'];
+                                 
+                                 if (typeof marcKeyData === 'string') {
+                                   marcKeyText = marcKeyData;
+                                 } else if (Array.isArray(marcKeyData) && marcKeyData.length > 0) {
+                                   // Take only the FIRST element to avoid duplicates
+                                   const firstMarcKey = marcKeyData[0];
+                                   if (typeof firstMarcKey === 'string') {
+                                     marcKeyText = firstMarcKey;
+                                   } else if (firstMarcKey && typeof firstMarcKey === 'object') {
+                                     marcKeyText = firstMarcKey['@value'] || firstMarcKey['http://id.loc.gov/ontologies/bflc/marcKey'] || '';
                                    }
-                                 } else if (value1['http://id.loc.gov/ontologies/bflc/marcKey']) {
-                                   const bflcMarcKey = value1['http://id.loc.gov/ontologies/bflc/marcKey'];
-                                   if (typeof bflcMarcKey === 'string') {
-                                     marcKeyText = bflcMarcKey;
-                                   } else if (Array.isArray(bflcMarcKey) && bflcMarcKey.length > 0) {
-                                     const marcKeyObj = bflcMarcKey[0];
-                                     if (typeof marcKeyObj === 'string') {
-                                       marcKeyText = marcKeyObj;
-                                     } else if (marcKeyObj && marcKeyObj['http://id.loc.gov/ontologies/bflc/marcKey']) {
-                                       marcKeyText = marcKeyObj['http://id.loc.gov/ontologies/bflc/marcKey'];
-                                     } else if (marcKeyObj && marcKeyObj['@value']) {
-                                       marcKeyText = marcKeyObj['@value'];
-                                     }
-                                   }
+                                 } else if (typeof marcKeyData === 'object' && marcKeyData['@value']) {
+                                   marcKeyText = marcKeyData['@value'];
                                  }
                                  
                                  // Only add marcKey if it's in proper MARC format (contains $ subfields)
                                  if (marcKeyText && typeof marcKeyText === 'string' && marcKeyText.includes('$')) {
+                                   let marcKeyElement = this.createElByBestNS('http://id.loc.gov/ontologies/bflc/marcKey');
                                    marcKeyElement.textContent = marcKeyText;
                                    hubElement.appendChild(marcKeyElement);
                                    xmlLog.push(`Added sibling Hub marcKey: ${marcKeyText}`);
-                                 } else {
-                                   xmlLog.push(`Skipping invalid sibling marcKey format: ${marcKeyText}`);
                                  }
                                }
                                
@@ -2226,6 +2452,7 @@ const utilsExport = {
                              } else {
                                pLvl2.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:resource', value1['@id']);
                              }
+                             } // Close else from isAgent check
                            } else {
                             let literalEl = this.createLiteral(key1, value1);
                             if (literalEl) {
@@ -2314,88 +2541,58 @@ const utilsExport = {
                       let hubElement = this.createElByBestNS('http://id.loc.gov/ontologies/bibframe/Hub');
                       hubElement.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:about', userValueItem['@id']);
                       
-                      // Add rdfs:label if available
-                      if (userValueItem.label || userValueItem['http://www.w3.org/2000/01/rdf-schema#label']) {
-                        let labelElement = this.createElByBestNS('http://www.w3.org/2000/01/rdf-schema#label');
-                        
-                        // Enhanced label text extraction
+                      // Extract label - try short key first, then long key
+                      const labelData = userValueItem.label || userValueItem['http://www.w3.org/2000/01/rdf-schema#label'];
+                      if (labelData) {
                         let labelText = '';
-                        if (typeof userValueItem.label === 'string') {
-                          labelText = userValueItem.label;
-                        } else if (Array.isArray(userValueItem.label) && userValueItem.label.length > 0) {
-                          const labelObj = userValueItem.label[0];
-                          if (typeof labelObj === 'string') {
-                            labelText = labelObj;
-                          } else if (labelObj && labelObj['http://www.w3.org/2000/01/rdf-schema#label']) {
-                            labelText = labelObj['http://www.w3.org/2000/01/rdf-schema#label'];
-                          } else if (labelObj && labelObj['@value']) {
-                            labelText = labelObj['@value'];
+                        
+                        if (typeof labelData === 'string') {
+                          labelText = labelData;
+                        } else if (Array.isArray(labelData) && labelData.length > 0) {
+                          // Take only the FIRST element to avoid duplicates
+                          const firstLabel = labelData[0];
+                          if (typeof firstLabel === 'string') {
+                            labelText = firstLabel;
+                          } else if (firstLabel && typeof firstLabel === 'object') {
+                            labelText = firstLabel['@value'] || firstLabel['http://www.w3.org/2000/01/rdf-schema#label'] || '';
                           }
-                        } else if (userValueItem['http://www.w3.org/2000/01/rdf-schema#label']) {
-                          const rdfsLabel = userValueItem['http://www.w3.org/2000/01/rdf-schema#label'];
-                          if (typeof rdfsLabel === 'string') {
-                            labelText = rdfsLabel;
-                          } else if (Array.isArray(rdfsLabel) && rdfsLabel.length > 0) {
-                            const labelObj = rdfsLabel[0];
-                            if (typeof labelObj === 'string') {
-                              labelText = labelObj;
-                            } else if (labelObj && labelObj['http://www.w3.org/2000/01/rdf-schema#label']) {
-                                labelText = labelObj['http://www.w3.org/2000/01/rdf-schema#label'];
-                            } else if (labelObj && labelObj['@value']) {
-                              labelText = labelObj['@value'];
-                            }
-                          }
+                        } else if (typeof labelData === 'object' && labelData['@value']) {
+                          labelText = labelData['@value'];
                         }
                         
                         if (labelText && typeof labelText === 'string') {
+                          let labelElement = this.createElByBestNS('http://www.w3.org/2000/01/rdf-schema#label');
                           labelElement.textContent = labelText;
                           hubElement.appendChild(labelElement);
                           xmlLog.push(`Added Hub label: ${labelText}`);
-                        } else {
-                          xmlLog.push(`Skipping invalid label data: ${JSON.stringify(userValueItem.label || userValueItem['http://www.w3.org/2000/01/rdf-schema#label'])}`);
                         }
                       }
                       
-                      // Add bflc:marcKey if available and properly formatted
-                      if (userValueItem.marcKey || userValueItem['http://id.loc.gov/ontologies/bflc/marcKey']) {
-                        let marcKeyElement = this.createElByBestNS('http://id.loc.gov/ontologies/bflc/marcKey');
-                        
-                        // Enhanced marcKey text extraction
+                      // Extract marcKey - try short key first, then long key
+                      const marcKeyData = userValueItem.marcKey || userValueItem['http://id.loc.gov/ontologies/bflc/marcKey'];
+                      if (marcKeyData) {
                         let marcKeyText = '';
-                        if (typeof userValueItem.marcKey === 'string') {
-                          marcKeyText = userValueItem.marcKey;
-                        } else if (Array.isArray(userValueItem.marcKey) && userValueItem.marcKey.length > 0) {
-                          const marcKeyObj = userValueItem.marcKey[0];
-                          if (typeof marcKeyObj === 'string') {
-                            marcKeyText = marcKeyObj;
-                          } else if (marcKeyObj && marcKeyObj['http://id.loc.gov/ontologies/bflc/marcKey']) {
-                            marcKeyText = marcKeyObj['http://id.loc.gov/ontologies/bflc/marcKey'];
-                          } else if (marcKeyObj && marcKeyObj['@value']) {
-                            marcKeyText = marcKeyObj['@value'];
+                        
+                        if (typeof marcKeyData === 'string') {
+                          marcKeyText = marcKeyData;
+                        } else if (Array.isArray(marcKeyData) && marcKeyData.length > 0) {
+                          // Take only the FIRST element to avoid duplicates
+                          const firstMarcKey = marcKeyData[0];
+                          if (typeof firstMarcKey === 'string') {
+                            marcKeyText = firstMarcKey;
+                          } else if (firstMarcKey && typeof firstMarcKey === 'object') {
+                            marcKeyText = firstMarcKey['@value'] || firstMarcKey['http://id.loc.gov/ontologies/bflc/marcKey'] || '';
                           }
-                        } else if (userValueItem['http://id.loc.gov/ontologies/bflc/marcKey']) {
-                          const bflcMarcKey = userValueItem['http://id.loc.gov/ontologies/bflc/marcKey'];
-                          if (typeof bflcMarcKey === 'string') {
-                            marcKeyText = bflcMarcKey;
-                          } else if (Array.isArray(bflcMarcKey) && bflcMarcKey.length > 0) {
-                            const marcKeyObj = bflcMarcKey[0];
-                            if (typeof marcKeyObj === 'string') {
-                              marcKeyText = marcKeyObj;
-                            } else if (marcKeyObj && marcKeyObj['http://id.loc.gov/ontologies/bflc/marcKey']) {
-                              marcKeyText = marcKeyObj['http://id.loc.gov/ontologies/bflc/marcKey'];
-                            } else if (marcKeyObj && marcKeyObj['@value']) {
-                              marcKeyText = marcKeyObj['@value'];
-                            }
-                          }
+                        } else if (typeof marcKeyData === 'object' && marcKeyData['@value']) {
+                          marcKeyText = marcKeyData['@value'];
                         }
                         
                         // Only add marcKey if it's in proper MARC format (contains $ subfields)
                         if (marcKeyText && typeof marcKeyText === 'string' && marcKeyText.includes('$')) {
+                          let marcKeyElement = this.createElByBestNS('http://id.loc.gov/ontologies/bflc/marcKey');
                           marcKeyElement.textContent = marcKeyText;
                           hubElement.appendChild(marcKeyElement);
                           xmlLog.push(`Added Hub marcKey: ${marcKeyText}`);
-                        } else {
-                          xmlLog.push(`Skipping invalid marcKey format: ${JSON.stringify(userValueItem.marcKey || userValueItem['http://id.loc.gov/ontologies/bflc/marcKey'])}`);
                         }
                       }
                       
@@ -2407,6 +2604,55 @@ const utilsExport = {
                       xmlLog.push(`Failed to create element for Hub relationship ${ptObj.propertyURI}`);
                     }
                   } else {
+                    // Special-case: bf:geographicCoverage with a controlled @id should still nest bf:GeographicCoverage
+                    if (ptObj.propertyURI === 'http://id.loc.gov/ontologies/bibframe/geographicCoverage') {
+                      // Dedup guard for non-bnode flow
+                      const rdfsLabelURI = 'http://www.w3.org/2000/01/rdf-schema#label';
+                      const madsCodeURI = 'http://www.loc.gov/mads/rdf/v1#code';
+                      const mkURI = 'http://id.loc.gov/ontologies/bflc/marcKey';
+                      const aboutVal = userValueItem['@id'] || '';
+                      let labelText = '';
+                      const lab = userValueItem[rdfsLabelURI];
+                      if (lab) {
+                        const first = Array.isArray(lab) ? lab[0] : lab;
+                        if (typeof first === 'string') labelText = first;
+                        else if (first && typeof first === 'object') labelText = first['@value'] || first[rdfsLabelURI] || '';
+                      }
+                      let codeText = '';
+                      const code = userValueItem[madsCodeURI];
+                      if (code) {
+                        const first = Array.isArray(code) ? code[0] : code;
+                        if (typeof first === 'string') codeText = first;
+                        else if (first && typeof first === 'object') {
+                          if (typeof first['@value'] === 'string') codeText = first['@value'];
+                          else if (first[madsCodeURI]) {
+                            const inner = first[madsCodeURI];
+                            codeText = typeof inner === 'string' ? inner : (inner && inner['@value']) || '';
+                          }
+                        }
+                      }
+                      let mkText = '';
+                      const mk = userValueItem[mkURI];
+                      if (mk) {
+                        const first = Array.isArray(mk) ? mk[0] : mk;
+                        mkText = (first && typeof first === 'object') ? (first['@value'] || first[mkURI] || '') : (first || '');
+                      }
+                      const dedupKey = `${aboutVal}||${labelText}||${codeText}||${mkText}`;
+                      if (emittedGeoCoverageKeys.has(dedupKey)) {
+                        // Already emitted – skip
+                      } else {
+                        emittedGeoCoverageKeys.add(dedupKey);
+                        let p = this.createElByBestNS(ptObj.propertyURI);
+                        let geoEl = this.createElByBestNS('bf:GeographicCoverage');
+                        if (aboutVal) geoEl.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:about', aboutVal);
+                        if (labelText) { const lbl = this.createElByBestNS('rdfs:label'); lbl.textContent = labelText; geoEl.appendChild(lbl); }
+                        if (codeText) { const codeEl = this.createElByBestNS('madsrdf:code'); codeEl.setAttributeNS(utilsRDF.namespace.rdf,'rdf:datatype','http://id.loc.gov/datatypes/codes/gac'); codeEl.textContent = codeText; geoEl.appendChild(codeEl); }
+                        if (mkText) { const mkEl = this.createElByBestNS('bflc:marcKey'); mkEl.textContent = mkText; geoEl.appendChild(mkEl); }
+                        p.appendChild(geoEl);
+                        rootEl.appendChild(p);
+                        componentXmlLookup[`${rt}-${pt}`] = formatXML(p.outerHTML);
+                      }
+                    } else {
                     // Handle simple URI references with special-case for bf:genreForm to ensure nested bf:GenreForm
                     const isGenreProp = ptObj.propertyURI === 'http://id.loc.gov/ontologies/bibframe/genreForm' || ptObj.propertyURI === 'bf:genreForm';
                     if (isGenreProp) {
@@ -2427,6 +2673,7 @@ const utilsExport = {
                       } else {
                          xmlLog.push(`Failed to create element for URI reference ${ptObj.propertyURI}`);
                       }
+                    }
                     }
                   }
                 } else if (ptObj.propertyURI == 'http://www.w3.org/2000/01/rdf-schema#label'){
@@ -2904,6 +3151,9 @@ const utilsExport = {
       tleLookup[rootElName][profile.rt[rt].URI] = rootEl;
       xmlLog.push(`Finished building ${rootElName}`);
     } // <-- This closes the `for (let rt of profile.rtOrder)` loop
+    
+    // NOTE: DO NOT clear processedAgents here - buildXMLProcess may be called multiple times
+    // The Set will be cleared in buildXML() after ALL processing is complete
 
     // Add admin metadata to Work and Instance elements
     // Add in adminMetadata to the resources with this user ID
@@ -2912,76 +3162,271 @@ const utilsExport = {
     let user = `${userInitial} (${catCode})`;
     profile.user = user;
 
-    // Create admin metadata elements
-    let bf_adminMetadata = this.createElByBestNS("bf:adminMetadata");
-    let bf_AdminMetadtat = this.createElByBestNS("bf:AdminMetadata");
-
-    // Add status information
-    let bf_status = this.createElByBestNS("bf:status");
-    let bf_Status = this.createElByBestNS("bf:Status");
-    bf_Status.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:about','http://id.loc.gov/vocabulary/mstatus/c');
-    let bf_StatusLabel = this.createElByBestNS("rdfs:label");
-    bf_StatusLabel.innerHTML = "changed";
-
-    // Add cataloger information
-    let bf_catalogerId = this.createElByBestNS("bflc:catalogerId");
-    bf_catalogerId.innerHTML = escapeHTML(catCode);
-    let bf_date = this.createElByBestNS("bf:date");
-    bf_date.innerHTML = new Date().toISOString();
-
-    bf_AdminMetadtat.appendChild(bf_date);
-    bf_AdminMetadtat.appendChild(bf_catalogerId);
-
-    // Also add the cataloger in the format needed for the history feed
-    let bf_cataloger = this.createElByBestNS("bflc:catalogerId");
-    let catalogerData = this.createElByBestNS("bflc:Cataloger");
-    let catalogerLabel = this.createRdfsLabel(`${userInitial} (${catCode})`);
-    catalogerData.appendChild(catalogerLabel);
-    bf_cataloger.appendChild(catalogerData);
-    bf_AdminMetadtat.appendChild(bf_cataloger);
-
-    // Remove any existing assigner before adding a new one
-    if (bf_AdminMetadtat.querySelector("bf\\:assigner")) {
-      bf_AdminMetadtat.removeChild(bf_AdminMetadtat.querySelector("bf\\:assigner"));
-    }
-
-    // Add default assigner if enabled in configuration
-    let includeDefaultAssigner = useConfigStore().includeDefaultAssigner;
-    if (includeDefaultAssigner) {
-      let bf_assigner = this.buildDefaultAssignerElement();
-      // Only add if no existing organization is found
-      if (!bf_AdminMetadtat.querySelector('bf\\:Organization[rdf\\:about="http://id.loc.gov/vocabulary/organizations/dlc"], bf\\:agent[rdf\\:about="http://id.loc.gov/vocabulary/organizations/dlc"]')) {
-        bf_AdminMetadtat.appendChild(bf_assigner);
-      }
-    }
-
-    bf_Status.appendChild(bf_StatusLabel);
-    bf_status.appendChild(bf_Status);
-    bf_AdminMetadtat.appendChild(bf_status);
-    bf_adminMetadata.appendChild(bf_AdminMetadtat);
-
-    // Always add assigner to bf:AdminMetadata if not present, and ensure it is fully populated
-    // (This is now handled by deduplicateAssignersInAdminMetadata)
-    this.deduplicateAssignersInAdminMetadata(bf_AdminMetadtat);
-
-    let adminMetadataText = (new XMLSerializer()).serializeToString(bf_adminMetadata);
-
-    // Add admin metadata to Work and Instance elements
+    // Add or update admin metadata for each Work (Penn-specific targeting)
     for (let URI in tleLookup['Work']){
-      // Create a fresh copy of admin metadata for each Work
-      const adminCopy = xmlParser.parseFromString(adminMetadataText, "text/xml").children[0];
-      // Only add if the Work doesn't already have admin metadata
-      if (!tleLookup['Work'][URI].querySelector('bf\\:adminMetadata')) {
-        tleLookup['Work'][URI].appendChild(adminCopy);
+      let workEl = tleLookup['Work'][URI];
+
+      // Collect all adminMetadata wrappers and inner elements
+      const adminMetadataWrappers = Array.from(workEl.getElementsByTagNameNS(utilsRDF.namespace.bf, 'adminMetadata'));
+      const innerAdmins = adminMetadataWrappers
+        .map(w => ({ wrapper: w, inner: w.getElementsByTagNameNS(utilsRDF.namespace.bf, 'AdminMetadata')[0] }))
+        .filter(p => !!p.inner);
+
+      // Find Penn-specific AdminMetadata (assigner bf:Organization rdf:about=".../pu")
+      const PENN_ORG = 'http://id.loc.gov/vocabulary/organizations/pu';
+      let pennBlocks = innerAdmins.filter(p => {
+        const assigners = Array.from(p.inner.getElementsByTagNameNS(utilsRDF.namespace.bf, 'assigner'));
+        return assigners.some(a => {
+          const org = a.getElementsByTagNameNS(utilsRDF.namespace.bf, 'Organization')[0];
+          const about = org ? (org.getAttributeNS(utilsRDF.namespace.rdf, 'about') || org.getAttribute('rdf:about')) : null;
+          return about === PENN_ORG;
+        });
+      });
+
+      // If multiple Penn blocks exist, keep the first and remove the rest to avoid duplication
+      if (pennBlocks.length > 1) {
+        for (let i = 1; i < pennBlocks.length; i++) {
+          const toRemove = pennBlocks[i].wrapper;
+          if (toRemove && toRemove.parentNode === workEl) {
+            workEl.removeChild(toRemove);
+          }
+        }
+        pennBlocks = [pennBlocks[0]];
+      }
+
+      let targetAdminMetadata = pennBlocks.length === 1 ? pennBlocks[0].inner : null;
+
+      if (!targetAdminMetadata) {
+        // Create a new Penn AdminMetadata block
+        console.log(`[AdminMetadata] Creating new Penn AdminMetadata for Work ${URI}`);
+        const bf_adminMetadata = this.createElByBestNS('bf:adminMetadata');
+        const bf_AdminMetadata = this.createElByBestNS('bf:AdminMetadata');
+
+        // date
+        const bf_date = this.createElByBestNS('bf:date');
+        bf_date.textContent = new Date().toISOString();
+        bf_AdminMetadata.appendChild(bf_date);
+
+        // cataloger (structured)
+        const bf_cataloger = this.createElByBestNS('bflc:catalogerId');
+        const catalogerData = this.createElByBestNS('bflc:Cataloger');
+        const catalogerLabel = this.createRdfsLabel(`${userInitial} (${catCode})`);
+        catalogerData.appendChild(catalogerLabel);
+        bf_cataloger.appendChild(catalogerData);
+        bf_AdminMetadata.appendChild(bf_cataloger);
+
+        // status changed
+        const bf_status = this.createElByBestNS('bf:status');
+        const bf_Status = this.createElByBestNS('bf:Status');
+        bf_Status.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:about', 'http://id.loc.gov/vocabulary/mstatus/c');
+        const bf_StatusLabel = this.createElByBestNS('rdfs:label');
+        bf_StatusLabel.textContent = 'changed';
+        bf_Status.appendChild(bf_StatusLabel);
+        bf_status.appendChild(bf_Status);
+        bf_AdminMetadata.appendChild(bf_status);
+
+        // Ensure assigner exists (always add default Penn assigner on creation, then dedupe)
+        const bf_assigner = this.buildDefaultAssignerElement();
+        bf_AdminMetadata.appendChild(bf_assigner);
+        // Normalize/deduplicate assigner structure
+        this.deduplicateAssignersInAdminMetadata(bf_AdminMetadata);
+
+        bf_adminMetadata.appendChild(bf_AdminMetadata);
+        workEl.appendChild(bf_adminMetadata);
+        targetAdminMetadata = bf_AdminMetadata;
+      } else {
+        // Update existing Penn AdminMetadata
+        console.log(`[AdminMetadata] Updating existing Penn AdminMetadata for Work ${URI}`);
+        // date
+        const dateEls = targetAdminMetadata.getElementsByTagNameNS(utilsRDF.namespace.bf, 'date');
+        if (dateEls.length > 0) {
+          dateEls[0].textContent = new Date().toISOString();
+        } else {
+          const dateEl = this.createElByBestNS('bf:date');
+          dateEl.textContent = new Date().toISOString();
+          targetAdminMetadata.insertBefore(dateEl, targetAdminMetadata.firstChild);
+        }
+
+        // Remove any legacy simple literal catalogerId nodes (no bflc:Cataloger child)
+        try {
+          const legacyCats = Array.from(targetAdminMetadata.getElementsByTagNameNS('http://id.loc.gov/ontologies/bflc/', 'catalogerId'))
+            .filter(el => el.getElementsByTagNameNS('http://id.loc.gov/ontologies/bflc/', 'Cataloger').length === 0);
+          legacyCats.forEach(el => el.parentNode && el.parentNode.removeChild(el));
+        } catch (_) {}
+
+        // cataloger IDs (structured-only; add only if new)
+        let hasCataloger = false;
+        const catEls = Array.from(targetAdminMetadata.getElementsByTagNameNS('http://id.loc.gov/ontologies/bflc/', 'catalogerId'));
+        for (const el of catEls) {
+          const catalogerNodes = el.getElementsByTagNameNS('http://id.loc.gov/ontologies/bflc/', 'Cataloger');
+          if (catalogerNodes.length > 0) {
+            const labelNodes = catalogerNodes[0].getElementsByTagNameNS(utilsRDF.namespace.rdfs, 'label');
+            if (labelNodes.length > 0) {
+              const txt = (labelNodes[0].textContent || '').trim();
+              if (txt.includes(`(${catCode})`)) {
+                hasCataloger = true;
+                break;
+              }
+            }
+          }
+        }
+        if (!hasCataloger) {
+          // Insert before status if present, else append
+          const statusEls = targetAdminMetadata.getElementsByTagNameNS(utilsRDF.namespace.bf, 'status');
+          const insertBefore = statusEls.length > 0 ? statusEls[0] : null;
+
+          const bf_cataloger2 = this.createElByBestNS('bflc:catalogerId');
+          const catalogerData2 = this.createElByBestNS('bflc:Cataloger');
+          const catalogerLabel2 = this.createRdfsLabel(`${userInitial} (${catCode})`);
+          catalogerData2.appendChild(catalogerLabel2);
+          bf_cataloger2.appendChild(catalogerData2);
+          insertBefore ? targetAdminMetadata.insertBefore(bf_cataloger2, insertBefore)
+                       : targetAdminMetadata.appendChild(bf_cataloger2);
+        }
+
+        // Ensure status exists and is changed
+        const statusCheck = targetAdminMetadata.getElementsByTagNameNS(utilsRDF.namespace.bf, 'status');
+        if (statusCheck.length === 0) {
+          const s = this.createElByBestNS('bf:status');
+          const S = this.createElByBestNS('bf:Status');
+          S.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:about', 'http://id.loc.gov/vocabulary/mstatus/c');
+          const SL = this.createElByBestNS('rdfs:label');
+          SL.textContent = 'changed';
+          S.appendChild(SL);
+          s.appendChild(S);
+          targetAdminMetadata.appendChild(s);
+        }
+
+        // Ensure/normalize assigner: add default if missing and deduplicate
+        this.deduplicateAssignersInAdminMetadata(targetAdminMetadata);
       }
     }
 
+    // Add or update admin metadata for each Instance (Penn-specific targeting)
     for (let URI in tleLookup['Instance']){
-      // Create a fresh copy of admin metadata for each Instance
-      const adminCopy = xmlParser.parseFromString(adminMetadataText, "text/xml").children[0];
-      // Only add if the Instance doesn't already have admin metadata
-      if (!tleLookup['Instance'][URI].querySelector('bf\\:adminMetadata')) {
-        tleLookup['Instance'][URI].appendChild(adminCopy);
+      let instanceEl = tleLookup['Instance'][URI];
+
+      const adminMetadataWrappers = Array.from(instanceEl.getElementsByTagNameNS(utilsRDF.namespace.bf, 'adminMetadata'));
+      const innerAdmins = adminMetadataWrappers
+        .map(w => ({ wrapper: w, inner: w.getElementsByTagNameNS(utilsRDF.namespace.bf, 'AdminMetadata')[0] }))
+        .filter(p => !!p.inner);
+
+      const PENN_ORG = 'http://id.loc.gov/vocabulary/organizations/pu';
+      let pennBlocks = innerAdmins.filter(p => {
+        const assigners = Array.from(p.inner.getElementsByTagNameNS(utilsRDF.namespace.bf, 'assigner'));
+        return assigners.some(a => {
+          const org = a.getElementsByTagNameNS(utilsRDF.namespace.bf, 'Organization')[0];
+          const about = org ? (org.getAttributeNS(utilsRDF.namespace.rdf, 'about') || org.getAttribute('rdf:about')) : null;
+          return about === PENN_ORG;
+        });
+      });
+
+      if (pennBlocks.length > 1) {
+        for (let i = 1; i < pennBlocks.length; i++) {
+          const toRemove = pennBlocks[i].wrapper;
+          if (toRemove && toRemove.parentNode === instanceEl) {
+            instanceEl.removeChild(toRemove);
+          }
+        }
+        pennBlocks = [pennBlocks[0]];
+      }
+
+      let targetAdminMetadata = pennBlocks.length === 1 ? pennBlocks[0].inner : null;
+
+      if (!targetAdminMetadata) {
+        console.log(`[AdminMetadata] Creating new Penn AdminMetadata for Instance ${URI}`);
+        const bf_adminMetadata = this.createElByBestNS('bf:adminMetadata');
+        const bf_AdminMetadata = this.createElByBestNS('bf:AdminMetadata');
+
+  const bf_date = this.createElByBestNS('bf:date');
+        bf_date.textContent = new Date().toISOString();
+        bf_AdminMetadata.appendChild(bf_date);
+
+        const bf_cataloger = this.createElByBestNS('bflc:catalogerId');
+        const catalogerData = this.createElByBestNS('bflc:Cataloger');
+        const catalogerLabel = this.createRdfsLabel(`${userInitial} (${catCode})`);
+        catalogerData.appendChild(catalogerLabel);
+        bf_cataloger.appendChild(catalogerData);
+        bf_AdminMetadata.appendChild(bf_cataloger);
+
+        const bf_status = this.createElByBestNS('bf:status');
+        const bf_Status = this.createElByBestNS('bf:Status');
+        bf_Status.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:about', 'http://id.loc.gov/vocabulary/mstatus/c');
+        const bf_StatusLabel = this.createElByBestNS('rdfs:label');
+        bf_StatusLabel.textContent = 'changed';
+        bf_Status.appendChild(bf_StatusLabel);
+        bf_status.appendChild(bf_Status);
+        bf_AdminMetadata.appendChild(bf_status);
+
+        // Ensure assigner exists (always add default Penn assigner on creation, then dedupe)
+        const bf_assigner2 = this.buildDefaultAssignerElement();
+        bf_AdminMetadata.appendChild(bf_assigner2);
+        // Normalize/deduplicate assigner structure
+        this.deduplicateAssignersInAdminMetadata(bf_AdminMetadata);
+
+        bf_adminMetadata.appendChild(bf_AdminMetadata);
+        instanceEl.appendChild(bf_adminMetadata);
+        targetAdminMetadata = bf_AdminMetadata;
+      } else {
+        console.log(`[AdminMetadata] Updating existing Penn AdminMetadata for Instance ${URI}`);
+        const dateEls = targetAdminMetadata.getElementsByTagNameNS(utilsRDF.namespace.bf, 'date');
+        if (dateEls.length > 0) {
+          dateEls[0].textContent = new Date().toISOString();
+        } else {
+          const dateEl = this.createElByBestNS('bf:date');
+          dateEl.textContent = new Date().toISOString();
+          targetAdminMetadata.insertBefore(dateEl, targetAdminMetadata.firstChild);
+        }
+
+        // Remove any legacy simple literal catalogerId nodes (no bflc:Cataloger child)
+        try {
+          const legacyCats = Array.from(targetAdminMetadata.getElementsByTagNameNS('http://id.loc.gov/ontologies/bflc/', 'catalogerId'))
+            .filter(el => el.getElementsByTagNameNS('http://id.loc.gov/ontologies/bflc/', 'Cataloger').length === 0);
+          legacyCats.forEach(el => el.parentNode && el.parentNode.removeChild(el));
+        } catch (_) {}
+
+        let hasCataloger = false;
+        const catEls = Array.from(targetAdminMetadata.getElementsByTagNameNS('http://id.loc.gov/ontologies/bflc/', 'catalogerId'));
+        for (const el of catEls) {
+          const catalogerNodes = el.getElementsByTagNameNS('http://id.loc.gov/ontologies/bflc/', 'Cataloger');
+          if (catalogerNodes.length > 0) {
+            const labelNodes = catalogerNodes[0].getElementsByTagNameNS(utilsRDF.namespace.rdfs, 'label');
+            if (labelNodes.length > 0) {
+              const txt = (labelNodes[0].textContent || '').trim();
+              if (txt.includes(`(${catCode})`)) {
+                hasCataloger = true;
+                break;
+              }
+            }
+          }
+        }
+        if (!hasCataloger) {
+          const statusEls = targetAdminMetadata.getElementsByTagNameNS(utilsRDF.namespace.bf, 'status');
+          const insertBefore = statusEls.length > 0 ? statusEls[0] : null;
+
+          const bf_cataloger2 = this.createElByBestNS('bflc:catalogerId');
+          const catalogerData2 = this.createElByBestNS('bflc:Cataloger');
+          const catalogerLabel2 = this.createRdfsLabel(`${userInitial} (${catCode})`);
+          catalogerData2.appendChild(catalogerLabel2);
+          bf_cataloger2.appendChild(catalogerData2);
+          insertBefore ? targetAdminMetadata.insertBefore(bf_cataloger2, insertBefore)
+                       : targetAdminMetadata.appendChild(bf_cataloger2);
+        }
+
+        const statusCheck = targetAdminMetadata.getElementsByTagNameNS(utilsRDF.namespace.bf, 'status');
+        if (statusCheck.length === 0) {
+          const s = this.createElByBestNS('bf:status');
+          const S = this.createElByBestNS('bf:Status');
+          S.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:about', 'http://id.loc.gov/vocabulary/mstatus/c');
+          const SL = this.createElByBestNS('rdfs:label');
+          SL.textContent = 'changed';
+          S.appendChild(SL);
+          s.appendChild(S);
+          targetAdminMetadata.appendChild(s);
+        }
+
+        // Ensure/normalize assigner: add default if missing and deduplicate
+        this.deduplicateAssignersInAdminMetadata(targetAdminMetadata);
       }
     }
 
@@ -3154,23 +3599,83 @@ const utilsExport = {
       }
     }
     
-    // Add before datasetDescriptionEl is created
-
-    // Make sure critical metadata is populated from profile
-    if (!xmlVoidDataTitle && profile.title) {
-        xmlVoidDataTitle = profile.title;
-        console.log(`DEBUG: Set xmlVoidDataTitle from profile: ${xmlVoidDataTitle}`);
+    // Extract metadata from rdfBasic DOM for DatasetDescription
+    
+    // Extract title from bf:mainTitle or bfsimple:prefTitle
+    if (rdfBasic.getElementsByTagName("bf:mainTitle").length > 0) {
+      xmlVoidDataTitle = rdfBasic.getElementsByTagName("bf:mainTitle")[0].innerHTML || rdfBasic.getElementsByTagName("bf:mainTitle")[0].textContent;
+      console.log(`DEBUG: Extracted xmlVoidDataTitle from bf:mainTitle: ${xmlVoidDataTitle}`);
+    } else if (rdfBasic.getElementsByTagName("bfsimple:prefTitle").length > 0) {
+      xmlVoidDataTitle = rdfBasic.getElementsByTagName("bfsimple:prefTitle")[0].innerHTML || rdfBasic.getElementsByTagName("bfsimple:prefTitle")[0].textContent;
+      console.log(`DEBUG: Extracted xmlVoidDataTitle from bfsimple:prefTitle: ${xmlVoidDataTitle}`);
+    } else if (!xmlVoidDataTitle && profile.title) {
+      xmlVoidDataTitle = profile.title;
+      console.log(`DEBUG: Fallback - Set xmlVoidDataTitle from profile: ${xmlVoidDataTitle}`);
+    } else {
+      console.warn('No title found for DatasetDescription');
     }
-
-    if (!xmlVoidDataContributor) {
-        // Try to find a contributor value or set a default
-        xmlVoidDataContributor = profile.contributor || "contributor";
-        console.log(`DEBUG: Set xmlVoidDataContributor: ${xmlVoidDataContributor}`);
+    
+    // Note: xmlVoidDataContributor removed - no longer used in DatasetDescription
+    
+    // Extract LCCN from bf:Lccn
+    if (rdfBasic.getElementsByTagName("bf:Instance").length > 0) {
+      let instanceEl = rdfBasic.getElementsByTagName("bf:Instance")[0];
+      
+      // Make sure we're looking at the top-level Instance, not a nested one
+      if (instanceEl.parentNode.tagName != 'RDF') {
+        // Find the top-level Instance
+        for (let inst of rdfBasic.getElementsByTagName("bf:Instance")) {
+          if (inst.parentNode.tagName == 'RDF' || inst.parentNode.nodeName == 'RDF' || inst.parentNode.tagName.toLowerCase() == 'rdf:rdf') {
+            instanceEl = inst;
+            break;
+          }
+        }
+      }
+      
+      // Look for LCCN within bf:identifiedBy
+      for (let child of instanceEl.children) {
+        if (child.tagName === 'bf:identifiedBy') {
+          // Check if this contains a bf:Lccn
+          if (child.getElementsByTagName("bf:Lccn").length > 0) {
+            let lccnEl = child.getElementsByTagName("bf:Lccn")[0];
+            
+            // Check if it has a status - skip if canceled
+            if (lccnEl.getElementsByTagName("bf:Status").length > 0) {
+              let statusEl = lccnEl.getElementsByTagName("bf:Status")[0];
+              if (statusEl.hasAttribute('rdf:about') && 
+                  statusEl.getAttribute('rdf:about') === 'http://id.loc.gov/vocabulary/mstatus/cancinv') {
+                console.log(`DEBUG: Skipping canceled LCCN`);
+                continue; // Skip canceled LCCNs
+              }
+            }
+            
+            // Extract the LCCN value
+            for (let lccnChild of lccnEl.children) {
+              if (lccnChild.tagName === 'rdf:value') {
+                xmlVoidDataLccn = lccnChild.innerHTML || lccnChild.textContent;
+                console.log(`DEBUG: Extracted xmlVoidDataLccn from rdf:value: ${xmlVoidDataLccn}`);
+                break;
+              }
+            }
+            
+            // If no rdf:value, try direct text content
+            if (!xmlVoidDataLccn) {
+              xmlVoidDataLccn = lccnEl.innerText || lccnEl.textContent;
+              console.log(`DEBUG: Extracted xmlVoidDataLccn from textContent: ${xmlVoidDataLccn}`);
+            }
+            
+            if (xmlVoidDataLccn) break; // Found LCCN, stop looking
+          }
+        }
+      }
     }
-
+    
+    // Fallback for LCCN
     if (!xmlVoidDataLccn && profile.lccn) {
-        xmlVoidDataLccn = profile.lccn;
-        console.log(`DEBUG: Set xmlVoidDataLccn from profile: ${xmlVoidDataLccn}`);
+      xmlVoidDataLccn = profile.lccn;
+      console.log(`DEBUG: Fallback - Set xmlVoidDataLccn from profile: ${xmlVoidDataLccn}`);
+    } else if (!xmlVoidDataLccn) {
+      console.warn('No LCCN found for DatasetDescription');
     }
 
     // Ensure the user field is properly populated
@@ -3184,7 +3689,6 @@ const utilsExport = {
     // Log what's going into the DatasetDescription
     console.log("DEBUG: DatasetDescription metadata:", {
         title: xmlVoidDataTitle,
-        contributor: xmlVoidDataContributor,
         lccn: xmlVoidDataLccn,
         rtsused: xmlVoidDataRtsUsed,
         profiletypes: xmlVoidDataType,
@@ -3217,9 +3721,7 @@ const utilsExport = {
     el = document.createElementNS(utilsRDF.namespace.lclocal, 'lclocal:title');
     el.innerHTML = escapeHTML(xmlVoidDataTitle);
     datasetDescriptionEl.appendChild(el);
-    el = document.createElementNS(utilsRDF.namespace.lclocal, 'lclocal:contributor');
-    el.innerHTML = escapeHTML(xmlVoidDataContributor);
-    datasetDescriptionEl.appendChild(el);
+    // Note: lclocal:contributor removed - contributor data belongs in Work bf:contribution, not in DatasetDescription
     el = document.createElementNS(utilsRDF.namespace.lclocal, 'lclocal:lccn');
     el.innerHTML = escapeHTML(xmlVoidDataLccn);
     datasetDescriptionEl.appendChild(el);
@@ -3255,6 +3757,28 @@ const utilsExport = {
     // Format XML output
     // Only serialize after ALL elements have been added to the DOM
     console.log(`DEBUG: Serializing final RDF document`);
+    
+    // Deduplicate agent labels/marcKeys before serialization
+    rdf = this.deduplicateAgentLabels(rdf);
+    rdfBasic = this.deduplicateAgentLabels(rdfBasic);
+
+    // Ensure assigners exist and are deduplicated BEFORE serialization
+    const deduplicateAllAdminMetadataAssigners = (xmlDoc) => {
+      if (!xmlDoc) return;
+      try {
+        const admins = Array.from(xmlDoc.getElementsByTagNameNS(utilsRDF.namespace.bf, 'AdminMetadata'));
+        admins.forEach(admin => this.deduplicateAssignersInAdminMetadata(admin));
+      } catch (e) {
+        console.warn('[deduplicateAllAdminMetadataAssigners] Namespace-aware traversal failed, attempting fallback');
+        try {
+          const admins = Array.from(xmlDoc.querySelectorAll('bf\\:AdminMetadata'));
+          admins.forEach(admin => this.deduplicateAssignersInAdminMetadata(admin));
+        } catch (_) {}
+      }
+    };
+    deduplicateAllAdminMetadataAssigners(rdf);
+    deduplicateAllAdminMetadataAssigners(rdfBasic);
+
     let strXml = this.serializePreservingNamespaces(rdf);
     let strXmlBasic = this.serializePreservingNamespaces(rdfBasic);
     let strXmlFormatted = strXml;
@@ -3270,6 +3794,10 @@ const utilsExport = {
     for (let el of rdfBasic.getElementsByTagName("bf:Work")){ bf2MarcXmlElRdf.appendChild(el); }
     for (let el of rdfBasic.getElementsByTagName("bf:Instance")){ bf2MarcXmlElRdf.appendChild(el); }
     for (let el of rdfBasic.getElementsByTagName("bf:Item")){ bf2MarcXmlElRdf.appendChild(el); }
+    
+    // Deduplicate agent labels/marcKeys in BF2MARC package too
+    bf2MarcXmlElRdf = this.deduplicateAgentLabels(bf2MarcXmlElRdf);
+    
     let strBf2MarcXmlElBib = (new XMLSerializer()).serializeToString(bf2MarcXmlElRdf);
 
     // clean it up a bit for the component
@@ -3287,26 +3815,7 @@ const utilsExport = {
       strBf2MarcXmlElBib = this.ensureOrganizationLabels(strBf2MarcXmlElBib);
     }
 
-    // After all XML is built, deduplicate assigners in all AdminMetadata elements in the final DOM trees
-    const deduplicateAllAdminMetadataAssigners = (xmlDoc) => {
-      if (!xmlDoc) return;
-      // Use TreeWalker to traverse all nodes, including nested ones
-      const walker = document.createTreeWalker(
-        xmlDoc,
-        NodeFilter.SHOW_ELEMENT,
-        {
-          acceptNode: (node) => node.nodeName === 'bf:AdminMetadata' ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP
-        },
-        false
-      );
-      let node = walker.nextNode();
-      while (node) {
-        this.deduplicateAssignersInAdminMetadata(node);
-        node = walker.nextNode();
-      }
-    };
-    deduplicateAllAdminMetadataAssigners(rdf);
-    deduplicateAllAdminMetadataAssigners(rdfBasic);
+    // After all XML is built, also ensure BF2MARC package assigners are deduplicated
     deduplicateAllAdminMetadataAssigners(bf2MarcXmlElRdf);
 
   // Remove any stray XHTML/HTML elements that may have sneaked into the RDF DOMs
@@ -3397,61 +3906,56 @@ const utilsExport = {
    */
   deduplicateAssignersInAdminMetadata: function(adminMetadata) {
     if (!adminMetadata) return;
-    
+
     try {
-      const assigners = adminMetadata.querySelectorAll('bf\\:assigner');
-      
+      // Use namespace-aware selection for robustness
+      const assigners = Array.from(adminMetadata.getElementsByTagNameNS(utilsRDF.namespace.bf, 'assigner'));
+
       // If no assigners, add a default one
       if (assigners.length === 0) {
         const defaultAssigner = this.buildDefaultAssignerElement();
         adminMetadata.appendChild(defaultAssigner);
-        return; // Exit after adding default
+        return;
       }
-      
-      // Find the best assigner (one with proper Organization structure)
-      let bestAssigner = null;
-      
-      for (let i = 0; i < assigners.length; i++) {
-        const assigner = assigners[i];
-        const org = assigner.querySelector('bf\\:Organization[rdf\\:about]');
-        if (org && org.querySelector('rdfs\\:label')) {
-          bestAssigner = assigner;
-          break;
-        }
-      }
-      
-      // If we found a good assigner, remove others and make sure it's properly structured
-      if (bestAssigner) {
-        // Ensure the best assigner has the correct structure
-        this.cleanAssignerElement(bestAssigner);
-        // Remove all other assigners
+
+      if (assigners.length > 1) {
+        console.log(`[deduplicateAssignersInAdminMetadata] Found ${assigners.length} assigners, deduplicating...`);
+
+        const seenAssigners = new Map(); // aboutUri -> Element
+        const toRemove = [];
+
         assigners.forEach(assigner => {
-          if (assigner !== bestAssigner && assigner.parentNode === adminMetadata) {
-             adminMetadata.removeChild(assigner);
+          const orgEl = assigner.getElementsByTagNameNS(utilsRDF.namespace.bf, 'Organization')[0];
+          if (orgEl) {
+            const aboutUri = orgEl.getAttributeNS(utilsRDF.namespace.rdf, 'about') || orgEl.getAttribute('rdf:about');
+            if (aboutUri) {
+              if (seenAssigners.has(aboutUri)) {
+                // Duplicate for same organization
+                toRemove.push(assigner);
+                console.log(`[deduplicateAssignersInAdminMetadata] Marking duplicate assigner for removal: ${aboutUri}`);
+              } else {
+                // Keep first, clean it
+                seenAssigners.set(aboutUri, assigner);
+                this.cleanAssignerElement(assigner);
+              }
+            }
           }
         });
-      } else {
-        // No ideal assigner found, pick the first one and try to fix it or add default
-        const firstAssigner = assigners[0];
-        this.cleanAssignerElement(firstAssigner); // Try cleaning the first one
-        // Remove all other assigners
-        assigners.forEach(assigner => {
-          if (assigner !== firstAssigner && assigner.parentNode === adminMetadata) {
-             adminMetadata.removeChild(assigner);
+
+        // Remove duplicates
+        toRemove.forEach(assigner => {
+          if (assigner.parentNode === adminMetadata) {
+            adminMetadata.removeChild(assigner);
+            console.log(`[deduplicateAssignersInAdminMetadata] Removed duplicate assigner`);
           }
         });
-        // If the cleaned first assigner still lacks an org/label, replace with default
-        const org = firstAssigner.querySelector('bf\\:Organization[rdf\\:about]');
-        if (!org || !org.querySelector('rdfs\\:label')) {
-           console.warn("[deduplicateAssigners] First assigner couldn't be fixed, replacing with default.");
-           if (firstAssigner.parentNode === adminMetadata) {
-               adminMetadata.removeChild(firstAssigner);
-           }
-           const defaultAssigner = this.buildDefaultAssignerElement();
-           adminMetadata.appendChild(defaultAssigner);
-        }
+
+        console.log(`[deduplicateAssignersInAdminMetadata] Deduplication complete. ${assigners.length - toRemove.length} assigners remain.`);
+      } else if (assigners.length === 1) {
+        // Single assigner: ensure it's clean/properly structured
+        this.cleanAssignerElement(assigners[0]);
       }
-    } catch (error) { 
+    } catch (error) {
       console.error("[deduplicateAssignersInAdminMetadata] Error:", error);
     }
   },
@@ -3615,6 +4119,125 @@ const utilsExport = {
     } catch (error) {
       console.error("Error sanitizing XML:", error);
       return xmlString; // Return original if error occurs
+    }
+  },
+
+  /**
+   * Deduplicates rdfs:label and bflc:marcKey elements within Agent bnodes
+   * This ensures agents only have one label/marcKey regardless of how many times
+   * they were processed during export
+   * @param {Document} xmlDoc - The XML document to clean up
+   * @returns {Document} - The same document with deduplicated labels
+   */
+  deduplicateAgentLabels: function(xmlDoc) {
+    if (!xmlDoc) return xmlDoc;
+    
+    try {
+      // Try multiple methods to find agents
+      let agents = [];
+      
+      // Method 1: Try with namespace-aware query
+      try {
+        agents = Array.from(xmlDoc.getElementsByTagNameNS('http://id.loc.gov/ontologies/bibframe/', 'Agent'));
+      } catch (e) {
+        console.warn('[deduplicateAgentLabels] getElementsByTagNameNS failed:', e.message);
+      }
+      
+      // Method 2: Fallback to querySelectorAll with different escaping
+      if (agents.length === 0) {
+        try {
+          agents = Array.from(xmlDoc.querySelectorAll('bf\\:Agent'));
+        } catch (e) {
+          console.warn('[deduplicateAgentLabels] querySelectorAll failed:', e.message);
+        }
+      }
+      
+      // Method 3: Try getElementsByTagName without namespace
+      if (agents.length === 0) {
+        try {
+          agents = Array.from(xmlDoc.getElementsByTagName('bf:Agent'));
+        } catch (e) {
+          console.warn('[deduplicateAgentLabels] getElementsByTagName failed:', e.message);
+        }
+      }
+      
+      console.log(`[deduplicateAgentLabels] Found ${agents.length} agents to process`);
+      
+      agents.forEach(agent => {
+        const agentUri = agent.getAttributeNS('http://www.w3.org/1999/02/22-rdf-syntax-ns#', 'about') || 
+                         agent.getAttribute('rdf:about') || 
+                         'unknown';
+        
+        // Deduplicate rdfs:label elements - try multiple methods
+        let labels = [];
+        try {
+          labels = Array.from(agent.getElementsByTagNameNS('http://www.w3.org/2000/01/rdf-schema#', 'label'));
+        } catch (e) {
+          try {
+            labels = Array.from(agent.querySelectorAll('rdfs\\:label'));
+          } catch (e2) {
+            labels = Array.from(agent.getElementsByTagName('rdfs:label'));
+          }
+        }
+        
+        if (labels.length > 1) {
+          console.log(`[deduplicateAgentLabels] Agent ${agentUri} has ${labels.length} labels, removing duplicates`);
+          
+          const uniqueLabels = new Map();
+          
+          // Keep only the first occurrence of each unique label text
+          labels.forEach(label => {
+            const text = label.textContent.trim();
+            if (!uniqueLabels.has(text)) {
+              uniqueLabels.set(text, label);
+              console.log(`[deduplicateAgentLabels] Keeping label: "${text}"`);
+            } else {
+              // Remove duplicate
+              if (label.parentNode) {
+                label.parentNode.removeChild(label);
+                console.log(`[deduplicateAgentLabels] Removed duplicate label: "${text}"`);
+              }
+            }
+          });
+        }
+        
+        // Deduplicate bflc:marcKey elements
+        let marcKeys = [];
+        try {
+          marcKeys = Array.from(agent.getElementsByTagNameNS('http://id.loc.gov/ontologies/bflc/', 'marcKey'));
+        } catch (e) {
+          try {
+            marcKeys = Array.from(agent.querySelectorAll('bflc\\:marcKey'));
+          } catch (e2) {
+            marcKeys = Array.from(agent.getElementsByTagName('bflc:marcKey'));
+          }
+        }
+        
+        if (marcKeys.length > 1) {
+          console.log(`[deduplicateAgentLabels] Agent ${agentUri} has ${marcKeys.length} marcKeys, removing duplicates`);
+          
+          const uniqueKeys = new Map();
+          
+          // Keep only the first occurrence of each unique marcKey text
+          marcKeys.forEach(marcKey => {
+            const text = marcKey.textContent.trim();
+            if (!uniqueKeys.has(text)) {
+              uniqueKeys.set(text, marcKey);
+            } else {
+              // Remove duplicate
+              if (marcKey.parentNode) {
+                marcKey.parentNode.removeChild(marcKey);
+                console.log(`[deduplicateAgentLabels] Removed duplicate marcKey: "${text}"`);
+              }
+            }
+          });
+        }
+      });
+      
+      return xmlDoc;
+    } catch (error) {
+      console.warn("[deduplicateAgentLabels] Non-fatal error:", error.message);
+      return xmlDoc;
     }
   }
 };

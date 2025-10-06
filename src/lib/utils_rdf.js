@@ -284,6 +284,11 @@ const utilsRDF = {
       return "http://id.loc.gov/ontologies/bibframe/Hub";
     }
 
+    // Geographic coverage should create a bf:GeographicCoverage resource
+    if (propertyURI === 'http://id.loc.gov/ontologies/bibframe/geographicCoverage') {
+      return 'http://id.loc.gov/ontologies/bibframe/GeographicCoverage';
+    }
+
     if (propertyURI==='http://www.w3.org/1999/02/22-rdf-syntax-ns#value'){
       return 'http://www.w3.org/2000/01/rdf-schema#Literal'
     }
