@@ -899,14 +899,49 @@ const utilsExport = {
         }
       }
       
+      // Merge any explicit rdf:type property values into @type before creating element
+      const explicitTypeProp = userValue['http://www.w3.org/1999/02/22-rdf-syntax-ns#type'];
+      if (explicitTypeProp) {
+        const pushType = (t) => {
+          const tUri = typeof t === 'string' ? t : (t && t['@id']);
+          if (!tUri) return;
+          if (!userValue['@type']) {
+            userValue['@type'] = tUri;
+          } else if (Array.isArray(userValue['@type'])) {
+            if (!userValue['@type'].includes(tUri)) userValue['@type'].push(tUri);
+          } else if (typeof userValue['@type'] === 'object' && userValue['@type']['@id']) {
+            const arr = [userValue['@type']['@id']];
+            if (userValue['@type']['@id'] !== tUri) arr.push(tUri);
+            userValue['@type'] = arr;
+          } else if (userValue['@type'] !== tUri) {
+            userValue['@type'] = [userValue['@type'], tUri];
+          }
+        };
+        const vals = Array.isArray(explicitTypeProp) ? explicitTypeProp : [explicitTypeProp];
+        for (const v of vals) pushType(v);
+      }
+
       // Original code path when @type exists
       try {
-        let bnode = this.createElByBestNS(userValue['@type']);
+        // If multiple types are present, use the first as the element name and add the rest as rdf:type
+        const rawTypes = userValue['@type'];
+        const typeArr = Array.isArray(rawTypes) ? rawTypes : [rawTypes];
+        const primaryType = typeof typeArr[0] === 'string' ? typeArr[0] : (typeArr[0] && typeArr[0]['@id']);
+        let bnode = this.createElByBestNS(primaryType || userValue['@type']);
         if (userValue['@id']) {
           bnode.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:about', userValue['@id']);
         }
         if (userValue['@parseType']) {
           bnode.setAttribute('rdf:parseType', userValue['@parseType']);
+        }
+        // Append additional rdf:type elements for secondary types (starting from index 1)
+        for (let i = 1; i < typeArr.length; i++) {
+          const t = typeArr[i];
+          const tUri = typeof t === 'string' ? t : (t && t['@id']);
+          if (!tUri) continue;
+          const typeEl = this.createElByBestNS('rdf:type');
+          typeEl.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:resource', tUri);
+          bnode.appendChild(typeEl);
         }
         return bnode;
       } catch(e) {
@@ -1635,10 +1670,17 @@ const utilsExport = {
       }
 
       if (profile.rt[rt]['@type']){
-        let type = this.createElByBestNS('http://www.w3.org/1999/02/22-rdf-syntax-ns#type');
-        type.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:resource', profile.rt[rt]['@type']);
-        xmlLog.push(`Setting URI for this resource rdf:resource to: ${profile.rt[rt]['@type']}`);
-        rootEl.appendChild(type);
+        const typeValues = Array.isArray(profile.rt[rt]['@type'])
+          ? profile.rt[rt]['@type']
+          : [profile.rt[rt]['@type']];
+        for (const tv of typeValues) {
+          const typeUri = typeof tv === 'string' ? tv : (tv && tv['@id']);
+          if (!typeUri) continue;
+          let type = this.createElByBestNS('http://www.w3.org/1999/02/22-rdf-syntax-ns#type');
+          type.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:resource', typeUri);
+          xmlLog.push(`Setting URI for this resource rdf:resource to: ${typeUri}`);
+          rootEl.appendChild(type);
+        }
       }
 
       xmlLog.push(`Looping through the PTs`);
@@ -2053,6 +2095,11 @@ const utilsExport = {
 
               // Process all properties in this blank node
               for (let key1 of Object.keys(userValue).filter(k => (!k.includes('@') ? true : false))){
+                // Special-case: do not serialize rdf:type here; createBnode handles types
+                if (key1 === 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type') {
+                  xmlLog.push('Skipping nested rdf:type property; handled in createBnode');
+                  continue;
+                }
                 let value1Array = userValue[key1];
                 if (!Array.isArray(value1Array)) {
                   value1Array = [value1Array];
@@ -2091,6 +2138,10 @@ const utilsExport = {
 
                     // Recursively process properties of the nested bnode
                     for (let key2 of Object.keys(value1).filter(k => (!k.includes('@') ? true : false))){
+                      if (key2 === 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type') {
+                        xmlLog.push('Skipping deeper nested rdf:type property; handled in createBnode');
+                        continue;
+                      }
                       let value2Array = value1[key2];
                       if (!Array.isArray(value2Array)) {
                         value2Array = [value2Array];

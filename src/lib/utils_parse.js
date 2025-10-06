@@ -757,7 +757,20 @@ const utilsParse = {
       for (let child of xml.children){
         if (child.tagName == 'rdf:type'){
           if (child.attributes['rdf:resource']){
-            profile.rt[pkey]['@type'] = child.attributes['rdf:resource'].value
+            // Preserve multiple rdf:type values; accumulate as array when needed
+            const tVal = child.attributes['rdf:resource'].value
+            const existing = profile.rt[pkey]['@type']
+            if (!existing) {
+              profile.rt[pkey]['@type'] = tVal
+            } else if (Array.isArray(existing)) {
+              if (!existing.includes(tVal)) profile.rt[pkey]['@type'].push(tVal)
+            } else if (typeof existing === 'object' && existing['@id']) {
+              const arr = [existing['@id']]
+              if (existing['@id'] !== tVal) arr.push(tVal)
+              profile.rt[pkey]['@type'] = arr
+            } else if (existing !== tVal) {
+              profile.rt[pkey]['@type'] = [existing, tVal]
+            }
             // remove it from the XML since we haev the data
             child.parentNode.removeChild(child)
           }
@@ -955,10 +968,17 @@ const utilsParse = {
         // took that piece of data out eariler and set it at the RT level, so fake that userValue for this piece of
         // data in the properties because el will be empty
         if (profile.rt[pkey]['@type'] && propertyURI == 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type'){
+          // Choose a primary type if multiple; prefer first
+          let primaryType = profile.rt[pkey]['@type']
+          if (Array.isArray(primaryType)) {
+            primaryType = primaryType[0]
+          } else if (typeof primaryType === 'object' && primaryType['@id']) {
+            primaryType = primaryType['@id']
+          }
           ptk.userValue={
             '@root': 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type',
             '@guid': short.generate() ,
-            '@id': profile.rt[pkey]['@type'],
+            '@id': primaryType,
           }
           pt[k] = ptk
           continue
@@ -1099,7 +1119,19 @@ const utilsParse = {
 
               if (this.isClass(e.tagName)){
 
-                userValue['@type'] = this.UriNamespace(e.tagName)
+                // Add base class type; accumulate if multiple
+                const baseType = this.UriNamespace(e.tagName)
+                if (!userValue['@type']) {
+                  userValue['@type'] = baseType
+                } else if (Array.isArray(userValue['@type'])) {
+                  if (!userValue['@type'].includes(baseType)) userValue['@type'].push(baseType)
+                } else if (typeof userValue['@type'] === 'object' && userValue['@type']['@id']) {
+                  const arr = [userValue['@type']['@id']]
+                  if (userValue['@type']['@id'] !== baseType) arr.push(baseType)
+                  userValue['@type'] = arr
+                } else if (userValue['@type'] !== baseType) {
+                  userValue['@type'] = [userValue['@type'], baseType]
+                }
 
                 // check for URI
                 if (e.attributes && e.attributes['rdf:about']){
@@ -1118,9 +1150,31 @@ const utilsParse = {
                 // if there is a RDF type node here it is the parent's type
                 // overwrite the basic type that was set via the bnode type
                 if (e.attributes && e.attributes['rdf:about']){
-                  userValue['@type'] = e.attributes['rdf:about'].value
+                  const tVal = e.attributes['rdf:about'].value
+                  if (!userValue['@type']) {
+                    userValue['@type'] = tVal
+                  } else if (Array.isArray(userValue['@type'])) {
+                    if (!userValue['@type'].includes(tVal)) userValue['@type'].push(tVal)
+                  } else if (typeof userValue['@type'] === 'object' && userValue['@type']['@id']) {
+                    const arr = [userValue['@type']['@id']]
+                    if (userValue['@type']['@id'] !== tVal) arr.push(tVal)
+                    userValue['@type'] = arr
+                  } else if (userValue['@type'] !== tVal) {
+                    userValue['@type'] = [userValue['@type'], tVal]
+                  }
                 }else if (e.attributes && e.attributes['rdf:resource']){
-                  userValue['@type'] = e.attributes['rdf:resource'].value
+                  const tVal = e.attributes['rdf:resource'].value
+                  if (!userValue['@type']) {
+                    userValue['@type'] = tVal
+                  } else if (Array.isArray(userValue['@type'])) {
+                    if (!userValue['@type'].includes(tVal)) userValue['@type'].push(tVal)
+                  } else if (typeof userValue['@type'] === 'object' && userValue['@type']['@id']) {
+                    const arr = [userValue['@type']['@id']]
+                    if (userValue['@type']['@id'] !== tVal) arr.push(tVal)
+                    userValue['@type'] = arr
+                  } else if (userValue['@type'] !== tVal) {
+                    userValue['@type'] = [userValue['@type'], tVal]
+                  }
                 }else{
                   console.warn('---------------------------------------------')
                   console.warn('There was a e RDF Type node but could not extract the type')
@@ -1213,8 +1267,19 @@ const utilsParse = {
                 // the inital bnode
                 userValue['@guid'] = short.generate()
 
-                // set the type of this bnode
-                userValue['@type'] = this.UriNamespace(child.tagName)
+                // set the type of this bnode, preserving any later rdf:type augmentation
+                const baseType2 = this.UriNamespace(child.tagName)
+                if (!userValue['@type']) {
+                  userValue['@type'] = baseType2
+                } else if (Array.isArray(userValue['@type'])) {
+                  if (!userValue['@type'].includes(baseType2)) userValue['@type'].push(baseType2)
+                } else if (typeof userValue['@type'] === 'object' && userValue['@type']['@id']) {
+                  const arr = [userValue['@type']['@id']]
+                  if (userValue['@type']['@id'] !== baseType2) arr.push(baseType2)
+                  userValue['@type'] = arr
+                } else if (userValue['@type'] !== baseType2) {
+                  userValue['@type'] = [userValue['@type'], baseType2]
+                }
 
                 // does this thing have a URI?
                 // <bf:title><bf:Title rdf:about="http://....">
@@ -1276,9 +1341,31 @@ const utilsParse = {
                       // if there is a RDF type node here it is the parent's type
                       // overwrite the basic type that was set via the bnode type
                       if (gChild.attributes && gChild.attributes['rdf:about']){
-                        userValue['@type'] = gChild.attributes['rdf:about'].value
+                        const tVal2 = gChild.attributes['rdf:about'].value
+                        if (!userValue['@type']) {
+                          userValue['@type'] = tVal2
+                        } else if (Array.isArray(userValue['@type'])) {
+                          if (!userValue['@type'].includes(tVal2)) userValue['@type'].push(tVal2)
+                        } else if (typeof userValue['@type'] === 'object' && userValue['@type']['@id']) {
+                          const arr = [userValue['@type']['@id']]
+                          if (userValue['@type']['@id'] !== tVal2) arr.push(tVal2)
+                          userValue['@type'] = arr
+                        } else if (userValue['@type'] !== tVal2) {
+                          userValue['@type'] = [userValue['@type'], tVal2]
+                        }
                       }else if (gChild.attributes && gChild.attributes['rdf:resource']){
-                        userValue['@type'] = gChild.attributes['rdf:resource'].value
+                        const tVal2 = gChild.attributes['rdf:resource'].value
+                        if (!userValue['@type']) {
+                          userValue['@type'] = tVal2
+                        } else if (Array.isArray(userValue['@type'])) {
+                          if (!userValue['@type'].includes(tVal2)) userValue['@type'].push(tVal2)
+                        } else if (typeof userValue['@type'] === 'object' && userValue['@type']['@id']) {
+                          const arr = [userValue['@type']['@id']]
+                          if (userValue['@type']['@id'] !== tVal2) arr.push(tVal2)
+                          userValue['@type'] = arr
+                        } else if (userValue['@type'] !== tVal2) {
+                          userValue['@type'] = [userValue['@type'], tVal2]
+                        }
                       }else{
                         console.warn('---------------------------------------------')
                         console.warn('There was a gChild RDF Type node but could not extract the type')
@@ -1371,7 +1458,19 @@ const utilsParse = {
 
 
 
-                        gChildData['@type'] = this.UriNamespace(ggChild.tagName)
+                        // Base class type for nested bnode
+                        const baseType3 = this.UriNamespace(ggChild.tagName)
+                        if (!gChildData['@type']) {
+                          gChildData['@type'] = baseType3
+                        } else if (Array.isArray(gChildData['@type'])) {
+                          if (!gChildData['@type'].includes(baseType3)) gChildData['@type'].push(baseType3)
+                        } else if (typeof gChildData['@type'] === 'object' && gChildData['@type']['@id']) {
+                          const arr = [gChildData['@type']['@id']]
+                          if (gChildData['@type']['@id'] !== baseType3) arr.push(baseType3)
+                          gChildData['@type'] = arr
+                        } else if (gChildData['@type'] !== baseType3) {
+                          gChildData['@type'] = [gChildData['@type'], baseType3]
+                        }
 
                         // check for URI
                         if (ggChild.attributes && ggChild.attributes['rdf:about']){
@@ -1392,9 +1491,31 @@ const utilsParse = {
 
 
                             if (gggChild.attributes && gggChild.attributes['rdf:about']){
-                              gChildData['@type'] = gggChild.attributes['rdf:about'].value
+                              const tVal3 = gggChild.attributes['rdf:about'].value
+                              if (!gChildData['@type']) {
+                                gChildData['@type'] = tVal3
+                              } else if (Array.isArray(gChildData['@type'])) {
+                                if (!gChildData['@type'].includes(tVal3)) gChildData['@type'].push(tVal3)
+                              } else if (typeof gChildData['@type'] === 'object' && gChildData['@type']['@id']) {
+                                const arr = [gChildData['@type']['@id']]
+                                if (gChildData['@type']['@id'] !== tVal3) arr.push(tVal3)
+                                gChildData['@type'] = arr
+                              } else if (gChildData['@type'] !== tVal3) {
+                                gChildData['@type'] = [gChildData['@type'], tVal3]
+                              }
                             }else if (gggChild.attributes && gggChild.attributes['rdf:resource']){
-                              gChildData['@type'] = gggChild.attributes['rdf:resource'].value
+                              const tVal3 = gggChild.attributes['rdf:resource'].value
+                              if (!gChildData['@type']) {
+                                gChildData['@type'] = tVal3
+                              } else if (Array.isArray(gChildData['@type'])) {
+                                if (!gChildData['@type'].includes(tVal3)) gChildData['@type'].push(tVal3)
+                              } else if (typeof gChildData['@type'] === 'object' && gChildData['@type']['@id']) {
+                                const arr = [gChildData['@type']['@id']]
+                                if (gChildData['@type']['@id'] !== tVal3) arr.push(tVal3)
+                                gChildData['@type'] = arr
+                              } else if (gChildData['@type'] !== tVal3) {
+                                gChildData['@type'] = [gChildData['@type'], tVal3]
+                              }
                             }else{
                               console.warn('---------------------------------------------')
                               console.warn('There was a gggChild RDF Type node but could not extract the type')
@@ -1493,7 +1614,18 @@ const utilsParse = {
                                 //   </bf:GenreForm>
                                 // </bf:genreForm>
 
-                                gggData['@type'] = this.UriNamespace(ggggChild.tagName)
+                                const baseType4 = this.UriNamespace(ggggChild.tagName)
+                                if (!gggData['@type']) {
+                                  gggData['@type'] = baseType4
+                                } else if (Array.isArray(gggData['@type'])) {
+                                  if (!gggData['@type'].includes(baseType4)) gggData['@type'].push(baseType4)
+                                } else if (typeof gggData['@type'] === 'object' && gggData['@type']['@id']) {
+                                  const arr = [gggData['@type']['@id']]
+                                  if (gggData['@type']['@id'] !== baseType4) arr.push(baseType4)
+                                  gggData['@type'] = arr
+                                } else if (gggData['@type'] !== baseType4) {
+                                  gggData['@type'] = [gggData['@type'], baseType4]
+                                }
 
                                 // check for URI
                                 if (ggggChild.attributes && ggggChild.attributes['rdf:about']){
@@ -1509,9 +1641,31 @@ const utilsParse = {
                                 for (let gggggChild of ggggChild.children){
                                   if (this.UriNamespace(gggggChild.tagName) == 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type'){
                                     if (gggggChild.attributes && gggggChild.attributes['rdf:about']){
-                                      gggData['@type'] = gggggChild.attributes['rdf:about'].value
+                                      const tVal4 = gggggChild.attributes['rdf:about'].value
+                                      if (!gggData['@type']) {
+                                        gggData['@type'] = tVal4
+                                      } else if (Array.isArray(gggData['@type'])) {
+                                        if (!gggData['@type'].includes(tVal4)) gggData['@type'].push(tVal4)
+                                      } else if (typeof gggData['@type'] === 'object' && gggData['@type']['@id']) {
+                                        const arr = [gggData['@type']['@id']]
+                                        if (gggData['@type']['@id'] !== tVal4) arr.push(tVal4)
+                                        gggData['@type'] = arr
+                                      } else if (gggData['@type'] !== tVal4) {
+                                        gggData['@type'] = [gggData['@type'], tVal4]
+                                      }
                                     }else if (gggggChild.attributes && gggggChild.attributes['rdf:resource']){
-                                      gggData['@type'] = gggggChild.attributes['rdf:resource'].value
+                                      const tVal4 = gggggChild.attributes['rdf:resource'].value
+                                      if (!gggData['@type']) {
+                                        gggData['@type'] = tVal4
+                                      } else if (Array.isArray(gggData['@type'])) {
+                                        if (!gggData['@type'].includes(tVal4)) gggData['@type'].push(tVal4)
+                                      } else if (typeof gggData['@type'] === 'object' && gggData['@type']['@id']) {
+                                        const arr = [gggData['@type']['@id']]
+                                        if (gggData['@type']['@id'] !== tVal4) arr.push(tVal4)
+                                        gggData['@type'] = arr
+                                      } else if (gggData['@type'] !== tVal4) {
+                                        gggData['@type'] = [gggData['@type'], tVal4]
+                                      }
                                     }else{
                                       console.warn('---------------------------------------------')
                                       console.warn('There was a gggChild RDF Type node but could not extract the type')
@@ -1581,7 +1735,18 @@ const utilsParse = {
 
                                         // console.log("Build resource for", g6Child.tagName)
 
-                                        g5ChildData['@type'] = this.UriNamespace(g6Child.tagName)
+                                        const baseType5 = this.UriNamespace(g6Child.tagName)
+                                        if (!g5ChildData['@type']) {
+                                          g5ChildData['@type'] = baseType5
+                                        } else if (Array.isArray(g5ChildData['@type'])) {
+                                          if (!g5ChildData['@type'].includes(baseType5)) g5ChildData['@type'].push(baseType5)
+                                        } else if (typeof g5ChildData['@type'] === 'object' && g5ChildData['@type']['@id']) {
+                                          const arr = [g5ChildData['@type']['@id']]
+                                          if (g5ChildData['@type']['@id'] !== baseType5) arr.push(baseType5)
+                                          g5ChildData['@type'] = arr
+                                        } else if (g5ChildData['@type'] !== baseType5) {
+                                          g5ChildData['@type'] = [g5ChildData['@type'], baseType5]
+                                        }
 
                                         // check for URI
                                         if (g6Child.attributes && g6Child.attributes['rdf:about']){
@@ -1599,9 +1764,31 @@ const utilsParse = {
 
 
                                             if (g7Child.attributes && g7Child.attributes['rdf:about']){
-                                              g5ChildData['@type'] = g7Child.attributes['rdf:about'].value
+                                              const tVal5 = g7Child.attributes['rdf:about'].value
+                                              if (!g5ChildData['@type']) {
+                                                g5ChildData['@type'] = tVal5
+                                              } else if (Array.isArray(g5ChildData['@type'])) {
+                                                if (!g5ChildData['@type'].includes(tVal5)) g5ChildData['@type'].push(tVal5)
+                                              } else if (typeof g5ChildData['@type'] === 'object' && g5ChildData['@type']['@id']) {
+                                                const arr = [g5ChildData['@type']['@id']]
+                                                if (g5ChildData['@type']['@id'] !== tVal5) arr.push(tVal5)
+                                                g5ChildData['@type'] = arr
+                                              } else if (g5ChildData['@type'] !== tVal5) {
+                                                g5ChildData['@type'] = [g5ChildData['@type'], tVal5]
+                                              }
                                             }else if (g7Child.attributes && g7Child.attributes['rdf:resource']){
-                                              g5ChildData['@type'] = g7Child.attributes['rdf:resource'].value
+                                              const tVal5 = g7Child.attributes['rdf:resource'].value
+                                              if (!g5ChildData['@type']) {
+                                                g5ChildData['@type'] = tVal5
+                                              } else if (Array.isArray(g5ChildData['@type'])) {
+                                                if (!g5ChildData['@type'].includes(tVal5)) g5ChildData['@type'].push(tVal5)
+                                              } else if (typeof g5ChildData['@type'] === 'object' && g5ChildData['@type']['@id']) {
+                                                const arr = [g5ChildData['@type']['@id']]
+                                                if (g5ChildData['@type']['@id'] !== tVal5) arr.push(tVal5)
+                                                g5ChildData['@type'] = arr
+                                              } else if (g5ChildData['@type'] !== tVal5) {
+                                                g5ChildData['@type'] = [g5ChildData['@type'], tVal5]
+                                              }
                                             }else{
                                               console.warn('---------------------------------------------')
                                               console.warn('There was a gggChild RDF Type node but could not extract the type')
@@ -1805,9 +1992,31 @@ const utilsParse = {
                         // its something else
                         if (this.UriNamespace(ggChild.tagName) == 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type'){
                           if (ggChild.attributes && ggChild.attributes['rdf:about']){
-                            gChildData['@type'] = ggChild.attributes['rdf:about'].value
+                            const tVal6 = ggChild.attributes['rdf:about'].value
+                            if (!gChildData['@type']) {
+                              gChildData['@type'] = tVal6
+                            } else if (Array.isArray(gChildData['@type'])) {
+                              if (!gChildData['@type'].includes(tVal6)) gChildData['@type'].push(tVal6)
+                            } else if (typeof gChildData['@type'] === 'object' && gChildData['@type']['@id']) {
+                              const arr = [gChildData['@type']['@id']]
+                              if (gChildData['@type']['@id'] !== tVal6) arr.push(tVal6)
+                              gChildData['@type'] = arr
+                            } else if (gChildData['@type'] !== tVal6) {
+                              gChildData['@type'] = [gChildData['@type'], tVal6]
+                            }
                           }else if (ggChild.attributes && ggChild.attributes['rdf:resource']){
-                            gChildData['@type'] = ggChild.attributes['rdf:resource'].value
+                            const tVal6 = ggChild.attributes['rdf:resource'].value
+                            if (!gChildData['@type']) {
+                              gChildData['@type'] = tVal6
+                            } else if (Array.isArray(gChildData['@type'])) {
+                              if (!gChildData['@type'].includes(tVal6)) gChildData['@type'].push(tVal6)
+                            } else if (typeof gChildData['@type'] === 'object' && gChildData['@type']['@id']) {
+                              const arr = [gChildData['@type']['@id']]
+                              if (gChildData['@type']['@id'] !== tVal6) arr.push(tVal6)
+                              gChildData['@type'] = arr
+                            } else if (gChildData['@type'] !== tVal6) {
+                              gChildData['@type'] = [gChildData['@type'], tVal6]
+                            }
                           }else{
                             console.warn('---------------------------------------------')
                             console.warn('There was a ggChild RDF Type node but could not extract the type')
