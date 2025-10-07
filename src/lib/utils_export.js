@@ -493,6 +493,9 @@ const utilsExport = {
                 labelValue = labelItem;
               } else if (labelItem && labelItem['@value']) {
                 labelValue = labelItem['@value'];
+              } else if (labelItem && labelItem['http://www.w3.org/2000/01/rdf-schema#label']) {
+                // Handle Penn's nested label structure
+                labelValue = labelItem['http://www.w3.org/2000/01/rdf-schema#label'];
               }
               
               if (labelValue) {
@@ -553,6 +556,9 @@ const utilsExport = {
               labelValue = labelItem;
             } else if (labelItem && labelItem['@value']) {
               labelValue = labelItem['@value'];
+            } else if (labelItem && labelItem['http://www.w3.org/2000/01/rdf-schema#label']) {
+              // Handle Penn's nested label structure
+              labelValue = labelItem['http://www.w3.org/2000/01/rdf-schema#label'];
             }
             
             if (labelValue) {
