@@ -210,7 +210,8 @@ export const useConfigStore = defineStore('config', {
   useSubjectEditor: [
     'http://www.loc.gov/mads/rdf/v1#Topic',
     'http://www.loc.gov/mads/rdf/v1#componentList',
-    'http://www.loc.gov/mads/rdf/v1#Geographic'
+    'http://www.loc.gov/mads/rdf/v1#Geographic',
+    'http://id.loc.gov/ontologies/bibframe/subject'
   ],
 
   // Do not enable deepHierarchy flags on these properties regardless of how complicated

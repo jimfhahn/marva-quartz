@@ -1495,22 +1495,44 @@ const utilsNetwork = {
 
     // Generates MARC preview from MARC XML
     marcPreview: async function(marcXml, htmlFormat = false) {
-      if (!marcXml) return [];
-      const fallbackPreview = (xml) => [{ marc: xml, preview: htmlFormat ? `<div class="marc-preview">${xml}</div>` : xml }];
+      console.log('[marcPreview] Starting with XML:', marcXml ? marcXml.substring(0, 200) + '...' : 'null');
+      
+      if (!marcXml) {
+        console.warn('[marcPreview] No marcXml provided');
+        return [];
+      }
+      
+      const fallbackPreview = (xml) => [{ 
+        marc: xml, 
+        preview: htmlFormat ? `<div class="marc-preview">${xml}</div>` : xml,
+        version: 'fallback',
+        name: 'Local Fallback'
+      }];
 
       try {
         const returnUrls = useConfigStore().returnUrls || {};
+        console.log('[marcPreview] Using config:', {
+          util: returnUrls.util,
+          env: returnUrls.env
+        });
+        
         if (returnUrls.util) {
           let url = returnUrls.util + 'marcpreview';
           url = url + (htmlFormat ? '/html' : '/text');
+          console.log('[marcPreview] Attempting to fetch:', url);
+          
           const rawResponse = await fetch(url, {
             method: 'POST',
             headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
             body: JSON.stringify({ rdfxml: marcXml })
           });
 
+          console.log('[marcPreview] Response status:', rawResponse.status, rawResponse.statusText);
+
           if (!rawResponse.ok) {
-            console.warn('[marcPreview] non-OK response', rawResponse.status);
+            console.warn('[marcPreview] non-OK response', rawResponse.status, rawResponse.statusText);
+            console.warn('[marcPreview] Using fallback due to HTTP error');
+            return fallbackPreview(marcXml);
           } else {
             // Try to safely extract content in multiple ways
             let content = null;
@@ -1584,12 +1606,18 @@ const utilsNetwork = {
               return [normalizeItem(content)];
             }
           }
+        } else {
+          console.warn('[marcPreview] No util URL configured, using fallback');
+          return fallbackPreview(marcXml);
         }
       } catch (err) {
-        console.error('[marcPreview] error', err);
+        console.error('[marcPreview] Network/parsing error:', err);
+        console.warn('[marcPreview] Using fallback due to error');
+        return fallbackPreview(marcXml);
       }
 
       // fallback
+      console.warn('[marcPreview] Reaching final fallback');
       return fallbackPreview(marcXml);
     },
 
@@ -2203,7 +2231,128 @@ const utilsNetwork = {
      * @param {string} searchMode - The search mode
      * @returns {Promise<Object>} Search results
      */
-    subjectSearch: async function(searchString, searchStringFull, searchMode) {
+    subjectSearch: async function(searchString, searchStringFull, complexSubOrMode = [], maybeSearchMode = null) {
+      // Backward/forward compatible parameter handling:
+      // - Legacy calls: subjectSearch(term, fullTerm, 'LCSHNAF')
+      // - Upstream calls: subjectSearch(term, fullTerm, [complexSub], 'LCSHNAF')
+      let complexSub = Array.isArray(complexSubOrMode) ? complexSubOrMode : []
+      let searchMode = Array.isArray(complexSubOrMode) ? maybeSearchMode : complexSubOrMode
+
+      if (!Array.isArray(complexSub)) {
+        complexSub = []
+      }
+
+      if (typeof searchMode !== 'string' || !searchMode) {
+        searchMode = 'LCSHNAF'
+      }
+
+      const normalizeSimpleHit = (hit, options = {}) => {
+        if (!hit || typeof hit !== 'object') {
+          return null
+        }
+
+        const {
+          subdivision = false,
+          literal = false,
+          rdfType = null
+        } = options
+
+        const more = (hit.more && typeof hit.more === 'object') ? hit.more : {}
+        const existingExtra = (hit.extra && typeof hit.extra === 'object') ? hit.extra : {}
+        const extra = { ...more, ...existingExtra }
+
+        const ensureArray = (value) => {
+          if (Array.isArray(value)) {
+            return value
+          }
+          if (typeof value === 'string' && value.trim().length) {
+            return [value.trim()]
+          }
+          if (typeof value === 'number') {
+            return [value]
+          }
+          return []
+        }
+
+        const arrayKeys = [
+          'notes',
+          'identifiers',
+          'rdftypes',
+          'collections',
+          'gacs',
+          'variantLabels',
+          'relateds',
+          'sources',
+          'genres',
+          'languages',
+          'occupations',
+          'activityfields',
+          'locales',
+          'birthplaces',
+          'birthdates',
+          'deathdates',
+          'lcclasss',
+          'lcclasses',
+          'hasRelatedAuthoritys',
+          'broaders',
+          'sees',
+          'hasEarlierEstablishedForms',
+          'hasLaterEstablishedForms',
+          'useFors',
+          'marcKeys'
+        ]
+
+        arrayKeys.forEach((key) => {
+          extra[key] = ensureArray(extra[key])
+        })
+
+        if (extra.marcKeys.length === 0 && typeof extra.marcKey === 'string') {
+          extra.marcKeys = ensureArray(extra.marcKey)
+        }
+
+        if (!extra.collections.length && Array.isArray(hit.collections)) {
+          extra.collections = ensureArray(hit.collections)
+        }
+        if (!extra.gacs.length && Array.isArray(more.gacs)) {
+          extra.gacs = ensureArray(more.gacs)
+        }
+
+        extra.notes = extra.notes.length ? extra.notes : ensureArray(more.notes)
+        extra.identifiers = extra.identifiers.length ? extra.identifiers : ensureArray(more.identifiers)
+        extra.rdftypes = extra.rdftypes.length ? extra.rdftypes : ensureArray(more.rdftypes)
+        extra.collections = extra.collections.length ? extra.collections : ensureArray(more.collections)
+
+        const priorityTypes = ['Topic', 'Geographic', 'GenreForm', 'Temporal', 'PersonalName', 'CorporateName', 'MeetingName', 'UniformTitle', 'FamilyName', 'ComplexSubject', 'ComplexType']
+        const candidate = extra.rdftypes.find((t) => priorityTypes.includes(t))
+
+        if (typeof extra.type !== 'string' || !extra.type.trim()) {
+          if (extra.rdftypes.includes('Hub')) {
+            extra.type = 'bf:Hub'
+          } else if (extra.rdftypes.includes('Work')) {
+            extra.type = 'bf:Work'
+          } else if (candidate === 'ComplexSubject' || candidate === 'ComplexType') {
+            extra.type = 'madsrdf:Topic'
+          } else if (candidate) {
+            extra.type = `madsrdf:${candidate}`
+          } else {
+            extra.type = 'madsrdf:Topic'
+          }
+        }
+
+        delete hit.more
+
+        hit.extra = extra
+        hit.collections = Array.isArray(hit.collections) && hit.collections.length ? hit.collections : extra.collections
+        hit.literal = literal
+
+        const existingHeading = (hit.heading && typeof hit.heading === 'object') ? hit.heading : {}
+        hit.heading = {
+          subdivision,
+          rdfType: rdfType || existingHeading.rdfType || (typeof extra.type === 'string' ? extra.type.replace('madsrdf:', '') : null)
+        }
+
+        return hit
+      }
       let nafResults = {
         names: [],
         subjectsComplex: [],
@@ -2236,21 +2385,26 @@ const utilsNetwork = {
         // Get LCSH results
         const lcshData = await this.fetchSimpleLookup(url, true);
         console.log("🔍 LCSH API response:", lcshData);
-        if (lcshData && lcshData.hits) {
+        if (lcshData && Array.isArray(lcshData.hits)) {
           console.log("🔍 Processing", lcshData.hits.length, "LCSH hits");
           for (let h of lcshData.hits) {
-            console.log("🔍 LCSH hit:", h.suggestLabel, "URI:", h.uri);
+            // Normalize optional fields for downstream consumers
+            h.label = typeof h.label === 'string' && h.label.length > 0 ? h.label : (h.suggestLabel || h.aLabel || h.vLabel || '');
+            const normalizedHit = normalizeSimpleHit(h, { subdivision: false, literal: false });
+            if (!normalizedHit) {
+              continue;
+            }
+
+            console.log("🔍 LCSH hit:", normalizedHit.suggestLabel, "URI:", normalizedHit.uri);
             // Check for complex subjects (with subdivisions)
-            if (h.suggestLabel.includes(' -- ') || h.suggestLabel.includes('--')) {
-              h.heading = { subdivision: false };
-              h.literal = false;
-              nafResults.subjectsComplex.push(h);
-              console.log("🔍 Added to subjectsComplex:", h.suggestLabel);
+            if (normalizedHit.suggestLabel.includes(' -- ') || normalizedHit.suggestLabel.includes('--')) {
+              normalizedHit.complex = true;
+              nafResults.subjectsComplex.push(normalizedHit);
+              console.log("🔍 Added to subjectsComplex:", normalizedHit.suggestLabel);
             } else {
-              h.heading = { subdivision: false };
-              h.literal = false;
-              nafResults.subjectsSimple.push(h);
-              console.log("🔍 Added to subjectsSimple:", h.suggestLabel);
+              normalizedHit.complex = false;
+              nafResults.subjectsSimple.push(normalizedHit);
+              console.log("🔍 Added to subjectsSimple:", normalizedHit.suggestLabel);
             }
           }
         }
@@ -2260,18 +2414,18 @@ const utilsNetwork = {
         console.log("🔍 Calling NAF API:", url);
         const nafData = await this.fetchSimpleLookup(url, true);
         console.log("🔍 NAF API response:", nafData);
-        if (nafData && nafData.hits) {
+        if (nafData && Array.isArray(nafData.hits)) {
           console.log("🔍 Processing", nafData.hits.length, "NAF hits");
           for (let h of nafData.hits) {
-            console.log("🔍 NAF hit:", h.suggestLabel, "URI:", h.uri);
-            h.rdfType = 'Topic';
-            h.heading = {
-              rdfType: h.rdfType,
-              subdivision: false
-            };
-            h.literal = false;
-            nafResults.names.push(h);
-            console.log("🔍 Added to names:", h.suggestLabel);
+            h.label = typeof h.label === 'string' && h.label.length > 0 ? h.label : (h.suggestLabel || h.aLabel || h.vLabel || '');
+            const normalizedHit = normalizeSimpleHit(h, { subdivision: false, literal: false, rdfType: 'Topic' });
+            if (!normalizedHit) {
+              continue;
+            }
+
+            console.log("🔍 NAF hit:", normalizedHit.suggestLabel, "URI:", normalizedHit.uri);
+            nafResults.names.push(normalizedHit);
+            console.log("🔍 Added to names:", normalizedHit.suggestLabel);
           }
         }
       } else if (searchMode === 'CHILD') {
@@ -2281,24 +2435,35 @@ const utilsNetwork = {
         }
 
         const childData = await this.fetchSimpleLookup(url, true);
-        if (childData && childData.hits) {
+        if (childData && Array.isArray(childData.hits)) {
           for (let h of childData.hits) {
-            if (h.suggestLabel.includes(' -- ') || h.suggestLabel.includes('--')) {
-              h.heading = { subdivision: false };
-              h.literal = false;
-              nafResults.subjectsChildrenComplex.push(h);
+            h.label = typeof h.label === 'string' && h.label.length > 0 ? h.label : (h.suggestLabel || h.aLabel || h.vLabel || '');
+            const normalizedHit = normalizeSimpleHit(h, { subdivision: false, literal: false });
+            if (!normalizedHit) {
+              continue;
+            }
+            if (normalizedHit.suggestLabel.includes(' -- ') || normalizedHit.suggestLabel.includes('--')) {
+              normalizedHit.complex = true;
+              nafResults.subjectsChildrenComplex.push(normalizedHit);
             } else {
-              h.heading = { subdivision: false };
-              h.literal = false;
-              nafResults.subjectsChildren.push(h);
+              normalizedHit.complex = false;
+              nafResults.subjectsChildren.push(normalizedHit);
             }
           }
         }
       } else if (searchMode === 'GEO') {
         const url = 'https://id.loc.gov/authorities/subjects/suggest2/?q=' + searchStringUse + '&filter=scheme:http://id.loc.gov/authorities/subjects/collection_GeographicSubdivisions';
         const geoData = await this.fetchSimpleLookup(url, true);
-        if (geoData && geoData.hits) {
+        if (geoData && Array.isArray(geoData.hits)) {
           for (let h of geoData.hits) {
+            h.label = typeof h.label === 'string' && h.label.length > 0 ? h.label : (h.suggestLabel || h.aLabel || h.vLabel || '');
+            if (!h.extra || typeof h.extra !== 'object') {
+              h.extra = { notes: [], identifiers: [] };
+            } else {
+              if (!Array.isArray(h.extra.notes)) h.extra.notes = [];
+              if (!Array.isArray(h.extra.identifiers)) h.extra.identifiers = [];
+            }
+            if (!Array.isArray(h.collections)) h.collections = [];
             h.heading = { subdivision: true };
             h.literal = false;
             nafResults.hierarchicalGeographic.push(h);
@@ -2311,8 +2476,16 @@ const utilsNetwork = {
         const url = `${endpoint}suggest2/?q=${searchString}&count=25`;
         
         const worksData = await this.fetchSimpleLookup(url, true);
-        if (worksData && worksData.hits) {
+        if (worksData && Array.isArray(worksData.hits)) {
           for (let h of worksData.hits) {
+            h.label = typeof h.label === 'string' && h.label.length > 0 ? h.label : (h.suggestLabel || h.aLabel || h.vLabel || '');
+            if (!h.extra || typeof h.extra !== 'object') {
+              h.extra = { notes: [], identifiers: [] };
+            } else {
+              if (!Array.isArray(h.extra.notes)) h.extra.notes = [];
+              if (!Array.isArray(h.extra.identifiers)) h.extra.identifiers = [];
+            }
+            if (!Array.isArray(h.collections)) h.collections = [];
             h.rdfType = 'Work';
             h.heading = {
               rdfType: h.rdfType,
@@ -2329,8 +2502,16 @@ const utilsNetwork = {
         const url = `${endpoint}suggest2/?q=${searchString}&count=25`;
         
         const hubsData = await this.fetchSimpleLookup(url, true);
-        if (hubsData && hubsData.hits) {
+        if (hubsData && Array.isArray(hubsData.hits)) {
           for (let h of hubsData.hits) {
+            h.label = typeof h.label === 'string' && h.label.length > 0 ? h.label : (h.suggestLabel || h.aLabel || h.vLabel || '');
+            if (!h.extra || typeof h.extra !== 'object') {
+              h.extra = { notes: [], identifiers: [] };
+            } else {
+              if (!Array.isArray(h.extra.notes)) h.extra.notes = [];
+              if (!Array.isArray(h.extra.identifiers)) h.extra.identifiers = [];
+            }
+            if (!Array.isArray(h.collections)) h.collections = [];
             h.rdfType = 'Hub';
             h.heading = {
               rdfType: h.rdfType,

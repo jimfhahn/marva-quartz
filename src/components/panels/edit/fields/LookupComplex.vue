@@ -107,7 +107,7 @@
 
 
         <template v-if="configStore.useSubjectEditor.includes(structure.propertyURI)">
-
+          <!-- DEBUG: If you see this comment in browser dev tools, SubjectEditor template is being used -->
           <div class="marc-deliminated-lcsh-mode-container" v-if="marcDeliminatedLCSHModeResults && marcDeliminatedLCSHModeResults.hit && Array.isArray(marcDeliminatedLCSHModeResults.hit)">
             <template v-for="heading in marcDeliminatedLCSHModeResults.hit">
               <span v-if="heading.literal==false" class="marc-deliminated-lcsh-mode-entity"> <span class="material-icons marc-deliminated-lcsh-mode-icon">check_circle</span> <a :href="heading.uri" target="_blank">{{ heading.label }}</a></span>
@@ -281,8 +281,12 @@ export default {
     cammBehaviorDisplayEntities(){
 
       console.log('structure',this.structure)
+      console.log('🔍 DEBUG: propertyURI =', this.structure.propertyURI)
+      console.log('🔍 DEBUG: useSubjectEditor array =', this.configStore.useSubjectEditor)
+      console.log('🔍 DEBUG: Should use SubjectEditor?', this.configStore.useSubjectEditor.includes(this.structure.propertyURI))
 
       if (this.configStore.useSubjectEditor.includes(this.structure.propertyURI)){
+        console.log('✅ Using SubjectEditor for', this.structure.propertyURI)
         return 'text'
       }
       if (this.structure.propertyURI == "http://id.loc.gov/ontologies/bibframe/contribution"){

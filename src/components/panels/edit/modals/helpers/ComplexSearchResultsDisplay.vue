@@ -1,82 +1,88 @@
 <template>
-  <div class="search-results" v-if="searchResults">
-    <!-- Debug info - only show counts, not raw data -->
-    <div v-if="showDebugInfo" class="debug-info">
-      🔍 Debug: searchResults exists - Simple: {{subjectsSimple.length}}, Complex: {{subjectsComplex.length}}, Names: {{names.length}}
-    </div>
+    <div class="search-results" v-if="searchResults">
+        <div v-if="searchResults !== null" style="height: inherit">
 
-    <!-- Subject Simple Results -->
-    <div v-if="subjectsSimple && subjectsSimple.length > 0" class="subject-section">
-      <h3>Subject Headings</h3>
-      <div class="scrollable-subjects" :class="containerClass">
-        <SearchResultOption
-          v-for="(result, index) in subjectsSimple"
-          :key="'simple-' + index"
-          :result="result"
-          :searchType="'subjectsSimple'"
-          @selectContext="selectContext"
-          @selectSubject="selectSubject"
-          @emitLoadContext="emitLoadContext"
-        />
-      </div>
-    </div>
+            <div v-if="searchResults && searchResults.exact.length > 0" class="subject-section"
+                :class="{ 'scrollable-subjects': preferenceStore.returnValue('--b-edit-complex-scroll-independently') }">
+                <span class="subject-results-heading">Known Label</span>
+                <div v-for="(subject, idx) in searchResults.exact"
+                    @click="$emit('selectContext', (searchResults.names.length - idx) * -1 - 2)"
+                    @mouseover="setPickPosition((searchResults.names.length - idx) * -1 - 2)"
+                    :data-id="((searchResults.names.length - idx) * -1 - 2)" :key="subject.uri"
+                    :class="['fake-option', { 'unselected': (pickPostion != (searchResults.names.length - idx) * -1 - 2), 'selected': (pickPostion == (searchResults.names.length - idx) * -1 - 2), 'picked': (pickLookup[(searchResults.names.length - idx) * -1 - 2] && pickLookup[(searchResults.names.length - idx) * -1 - 2].picked) }]">
+                    <template v-if="subject.label == activeComponent.label.replaceAll('‑', '-')">
+                        {{ subject.label }}
+                    </template>
+                    <template v-else>
+                        {{ subject.label }}
+                        <span class="subject-variant">
+                            ((VARIANT))
+                        </span>
+                    </template>
+                    <span v-if="subject.collections && subject.collections.includes('LCNAF')"> [LCNAF]</span>
+                    <span v-if="subject.collections">
+                        {{ this.buildAddtionalInfo(subject.collections) }}
+                    </span>
+                    <div class="may-sub-container" style="display: inline;">
+                        <AuthTypeIcon
+                            v-if="subject.collections && subject.collections.includes('http://id.loc.gov/authorities/subjects/collection_SubdivideGeographically')"
+                            :type="'may subd geog'"></AuthTypeIcon>
+                    </div>
+                </div>
+            </div>
 
-    <!-- Subject Complex Results -->
-    <div v-if="subjectsComplex && subjectsComplex.length > 0" class="subject-section">
-      <h3>Subject Headings (Complex)</h3>
-      <div class="scrollable-subjects" :class="containerClass">
-        <SearchResultOption
-          v-for="(result, index) in subjectsComplex"
-          :key="'complex-' + index"
-          :result="result"
-          :searchType="'subjectsComplex'"
-          @selectContext="selectContext"
-          @selectSubject="selectSubject"
-          @emitLoadContext="emitLoadContext"
-        />
-      </div>
+            <SearchResultOption
+                searchType="subjectsSimple"
+                :label="searchMode == 'HUBS' ? 'Left Anchored' : 'Simple'"
+                index="searchResults.subjectsComplex.length + ix"
+                :searchResults="searchResults"
+                :pickLookup="pickLookup"
+                @selectContext="selectContext"
+                @emitLoadContext="loadContext"
+            />
+            <SearchResultOption
+                searchType="names"
+                label="LCNAF"
+                index="(searchResults.names.length - ix) * - 1"
+                :searchResults="searchResults"
+                :pickLookup="pickLookup"
+                @selectContext="selectContext"
+                @emitLoadContext="loadContext"
+            />
+            <SearchResultOption
+                searchType="subjectsComplex"
+                :label="searchMode == 'HUBS' ? 'Keyword' : 'Complex'"
+                index="ix"
+                :searchResults="searchResults"
+                :pickLookup="pickLookup"
+                @selectContext="selectContext"
+                @emitLoadContext="loadContext"
+            />
+            <SearchResultOption
+                searchType="subjectsChildrenComplex"
+                label="CYAC Complex"
+                index="ix"
+                :searchResults="searchResults"
+                :pickLookup="pickLookup"
+                @selectContext="selectContext"
+                @emitLoadContext="loadContext"
+            />
+            <SearchResultOption
+                searchType="subjectsChildren"
+                label="CYAC Simple"
+                index="searchResults.subjectsChildrenComplex.length + ix"
+                :searchResults="searchResults"
+                :pickLookup="pickLookup"
+                @selectContext="selectContext"
+                @emitLoadContext="loadContext"
+            />
+        </div>
     </div>
-
-    <!-- Names Results -->
-    <div v-if="names && names.length > 0" class="subject-section">
-      <h3>Name Headings</h3>
-      <div class="scrollable-subjects" :class="containerClass">
-        <SearchResultOption
-          v-for="(result, index) in names"
-          :key="'names-' + index"
-          :result="result"
-          :searchType="'names'"
-          @selectContext="selectContext"
-          @selectSubject="selectSubject"
-          @emitLoadContext="emitLoadContext"
-        />
-      </div>
-    </div>
-
-    <!-- Subject Children Results -->
-    <div v-if="subjectsChildren && subjectsChildren.length > 0" class="subject-section">
-      <h3>Children's Subject Headings</h3>
-      <div class="scrollable-subjects" :class="containerClass">
-        <SearchResultOption
-          v-for="(result, index) in subjectsChildren"
-          :key="'children-' + index"
-          :result="result"
-          :searchType="'subjectsChildren'"
-          @selectContext="selectContext"
-          @selectSubject="selectSubject"
-          @emitLoadContext="emitLoadContext"
-        />
-      </div>
-    </div>
-
-    <!-- No Results Message -->
-    <div v-if="!hasAnyResults" class="no-results">
-      No results found
-    </div>
-  </div>
 </template>
 
+
 <script>
+
 import { usePreferenceStore } from '@/stores/preference'
 import { useProfileStore } from '@/stores/profile'
 import { useConfigStore } from '@/stores/config'
@@ -94,310 +100,217 @@ import SearchResultOption from './SearchResultOption.vue'
 const debounce = (callback, wait) => {
     let timeoutId = null;
     return (...args) => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        callback.apply(null, args);
-      }, wait);
+        window.clearTimeout(timeoutId);
+        timeoutId = window.setTimeout(() => {
+            callback.apply(null, args);
+        }, wait);
     };
 }
 
+
+
+
+
 export default {
-    name: "ComplexSearchResultsDisplay",
+    name: "SubjectEditor2",
     components: {
+        VueFinalModal,
+        AuthTypeIcon,
+        AccordionList,
+        AccordionItem,
         SearchResultOption
     },
     props: {
+        searchResults: Object,
+        pickLookup: Object,
         searchMode: String,
-        searchResults: Object
     },
 
-    computed: {
-        ...mapStores(useConfigStore, usePreferenceStore, useProfileStore),
-        
-        showDebugInfo() {
-            return false; // Turn off debug info that was showing raw JSON
-        },
-        
-        subjectsSimple() {
-            // Access the actual array from the searchResults object
-            return this.searchResults?.subjectsSimple || [];
-        },
-        
-        subjectsComplex() {
-            // Access the actual array from the searchResults object
-            return this.searchResults?.subjectsComplex || [];
-        },
-        
-        names() {
-            // Access the actual array from the searchResults object
-            return this.searchResults?.names || [];
-        },
-        
-        subjectsChildren() {
-            // Access the actual array from the searchResults object
-            return this.searchResults?.subjectsChildren || [];
-        },
-        
-        hasAnyResults() {
-            return (this.subjectsSimple.length > 0) ||
-                   (this.subjectsComplex.length > 0) ||
-                   (this.names.length > 0) ||
-                   (this.subjectsChildren.length > 0);
-        },
-        
-        containerClass() {
-            const totalResults = (this.subjectsSimple?.length || 0) + 
-                               (this.subjectsComplex?.length || 0) + 
-                               (this.names?.length || 0) +
-                               (this.subjectsChildren?.length || 0);
-                               
-            if (totalResults <= 5) return 'small-container';
-            if (totalResults <= 10) return 'medium-container';
-            return 'large-container';
-        }
-    },
-
-    watch: {
-        searchResults: {
-            handler(newVal) {
-                console.log('ComplexSearchResultsDisplay received new results:', newVal);
-                if (newVal) {
-                    console.log('- subjectsSimple:', newVal.subjectsSimple?.length || 0);
-                    console.log('- subjectsComplex:', newVal.subjectsComplex?.length || 0);
-                    console.log('- names:', newVal.names?.length || 0);
-                }
-            },
-            deep: true
-        }
-    },
-
-    methods: {
-        selectContext: function(data) {
-            console.log('ComplexSearchResultsDisplay - selectContext:', data);
-            this.$emit('selectContext', data);
-        },
-        
-        selectSubject: function(data) {
-            console.log('ComplexSearchResultsDisplay - selectSubject:', data);
-            this.$emit('selectSubject', data);
-        },
-        
-        emitLoadContext: function(result) {
-            console.log('🔍 ComplexSearchResultsDisplay - emitLoadContext received:', result);
-            console.log('🔍 Result details - URI:', result.uri, 'Label:', result.label);
-            console.log('🔍 Result properties:', Object.keys(result));
-            console.log('🔍 Full result object:', JSON.stringify(result, null, 2));
-            
-            // Debug: Log what's in each array
-            console.log('🔍 subjectsComplex length:', this.subjectsComplex.length);
-            console.log('🔍 subjectsChildrenComplex length:', this.searchResults?.subjectsChildrenComplex?.length || 0);
-            console.log('🔍 subjectsSimple length:', this.subjectsSimple.length);
-            console.log('🔍 subjectsChildren length:', this.searchResults?.subjectsChildren?.length || 0);
-            
-            // Log a few sample items from each array
-            if (this.subjectsComplex.length > 0) {
-                console.log('🔍 Sample subjectsComplex[0]:', this.subjectsComplex[0]);
-                console.log('🔍 Sample subjectsComplex[0] properties:', Object.keys(this.subjectsComplex[0]));
-            }
-            if (this.subjectsSimple.length > 0) {
-                console.log('🔍 Sample subjectsSimple[0]:', this.subjectsSimple[0]);
-                console.log('🔍 Sample subjectsSimple[0] properties:', Object.keys(this.subjectsSimple[0]));
-            }
-            
-            // Find the position of this result by searching through all result arrays
-            let position = null;
-            
-            // Create a flat array of all results to search through - INCLUDING names and exact arrays
-            const allResults = [
-                ...this.subjectsComplex,
-                ...(this.searchResults?.subjectsChildrenComplex || []),
-                ...this.subjectsSimple,
-                ...(this.searchResults?.subjectsChildren || [])
-            ];
-            
-            // Also need to check names and exact arrays which have negative positions
-            const namesResults = this.searchResults?.names || [];
-            const exactResults = this.searchResults?.exact || [];
-            
-            console.log('🔍 Total allResults length:', allResults.length);
-            console.log('🔍 Names results length:', namesResults.length);
-            console.log('🔍 Exact results length:', exactResults.length);
-            
-            // First try to find in the positive-position arrays
-            position = allResults.findIndex((item, index) => {
-                console.log(`🔍 Comparing result URI: "${result.uri}" with item[${index}] URI: "${item.uri}"`);
-                if (item.uri === result.uri) {
-                    console.log('🔍 Found URI match at position', index, 'with item:', item);
-                    return true;
-                }
-                return false;
-            });
-            
-            // If not found in positive arrays, check names array (negative positions)
-            if (position === -1) {
-                const namesIndex = namesResults.findIndex((item, index) => {
-                    console.log(`🔍 Comparing result URI: "${result.uri}" with names[${index}] URI: "${item.uri}"`);
-                    if (item.uri === result.uri) {
-                        console.log('🔍 Found URI match in names at index', index, 'with item:', item);
-                        return true;
-                    }
-                    return false;
-                });
-                
-                if (namesIndex !== -1) {
-                    // Names use negative positions: (names.length - index) * -1
-                    position = (namesResults.length - namesIndex) * -1;
-                    console.log('🔍 Calculated negative position for names:', position);
-                }
-            }
-            
-            // If still not found, check exact array (even more negative positions)
-            if (position === -1) {
-                const exactIndex = exactResults.findIndex((item, index) => {
-                    console.log(`🔍 Comparing result URI: "${result.uri}" with exact[${index}] URI: "${item.uri}"`);
-                    if (item.uri === result.uri) {
-                        console.log('🔍 Found URI match in exact at index', index, 'with item:', item);
-                        return true;
-                    }
-                    return false;
-                });
-                
-                if (exactIndex !== -1) {
-                    // Exact uses even more negative positions: (names.length - index) * -1 - 2
-                    position = (namesResults.length - exactIndex) * -1 - 2;
-                    console.log('🔍 Calculated negative position for exact:', position);
-                }
-            }
-            
-            console.log('🔍 Found position for hover:', position);
-            if (position !== -1) {
-                this.$emit('loadContext', position);
-            } else {
-                console.warn('🔍 Could not find result in allResults array');
-            }
-        }
-    },
+    watch: {},
 
     data: function () {
         return {
-            
+            pickPostion: 0,
+            pickCurrent: null,
         }
     },
 
+    computed: {
+        ...mapStores(usePreferenceStore),
+        ...mapState(usePreferenceStore, ['diacriticUseValues', 'diacriticUse', 'diacriticPacks']),
+        ...mapState(useProfileStore, ['returnComponentByPropertyLabel']),
+        ...mapWritableState(useProfileStore, ['activeProfile', 'setValueLiteral', 'subjectEditor2']),
+    },
+
+    methods: {
+        selectContext: function(idx){
+            this.$emit('selectContext', idx)
+        },
+        loadContext:function(pickPosition){
+            if (this.pickCurrent == null) {
+                this.pickPostion = pickPosition
+            }
+            this.$emit('loadContext', pickPosition)
+        },
+        // Functions for searchResults
+
+        // Return the number of search results that are populated.
+        // Used to determine how tall to make each set of search results
+        numPopulatedResults: function () {
+            let count = 0
+            for (let key of Object.keys(this.searchResults)) {
+                if (this.searchResults[key].length >= 1) {
+                    count++
+                }
+            }
+            return count
+        },
+
+        checkUsable: function (data) {
+            let notes = data.extra.notes || []
+            if (notes.includes("THIS 1XX FIELD CANNOT BE USED UNDER RDA UNTIL THIS RECORD HAS BEEN REVIEWED AND/OR UPDATED")) {
+                return false
+            }
+            return true
+        },
+        checkFromRda: function (data) {
+            let notes = data.extra.notes || []
+            let isRda = false
+
+            for (let note of notes) {
+                if (note.includes("$erda")) {
+                    isRda = true
+                }
+            }
+
+            return isRda
+        },
+        checkFromAuth: function (data) {
+            let notes = data.extra.notes || []
+            let identifiers = data.extra.identifiers || []
+
+            let looksLikeLccn = identifiers.filter((i) => i.startsWith("n")).length > 0 ? true : false
+
+            return looksLikeLccn
+        },
+
+        activeSearchInd: function () {
+            let ti = window.setInterval(() => { that.activeSearch = ((!that.activeSearch) ? '' : that.activeSearch) + '.' }, 100)
+
+            // a backup here just in case the search times out or takes forever
+            let tiBackup = window.setTimeout(() => {
+                window.clearInterval(ti)
+                that.activeSearch = false
+
+            }, 10000)
+        },
+
+        setPickPosition: function(pickPosition){
+            if (this.pickCurrent == null) {
+                this.pickPostion = pickPosition
+            }
+
+            this.$emit('loadContext', pickPosition)
+        },
+    },
+
+    created: function () { },
+    before: function () { },
+    mounted: function () { },
+    updated: function () { }
 }
 </script>
 
-<style scoped>
-.subject-section {
-    margin-bottom: 1em;
-}
 
-.subject-section h3 {
-    margin: 0.5em 0;
-    font-size: 1.1em;
-    color: #333;
+<style>
+.subject-section {
+    border-top: solid black;
+    border-bottom: solid-black;
 }
 
 .scrollable-subjects {
-    max-height: 300px;
-    overflow-y: auto;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    padding: 0.5em;
-    background: #fafafa;
+    overflow-y: scroll;
 }
 
 .small-container {
-    max-height: 150px;
+    height: 33%;
 }
 
 .medium-container {
-    max-height: 250px;
+    height: 50%;
 }
 
 .large-container {
-    max-height: 400px;
+    height: 90%;
 }
 
 /* document.documentElement.clientHeight */
 .scroll-all {
-    max-height: 85vh;
-    overflow-y: auto;
+    overflow-y: scroll;
 }
 
 .subject-container-outer {
-    padding: 1em;
+    /* height: v-bind('returnBrowserHeight()'); */
+    height: 100%;
 }
 
 .subject-variant {
-    font-style: italic;
-    color: #666;
+    color: #ffc107;
+    font-weight: bold;
 }
 
 .from-rda,
 .from-auth {
-    color: #666;
-    font-size: 0.9em;
+    font-weight: bold;
 }
 
 .unusable {
-    opacity: 0.5;
-    cursor: not-allowed;
+    color: red;
 }
 
 .fake-option {
-    padding: 0.5em;
+    font-size: 1em;
     cursor: pointer;
-    border-bottom: 1px solid #eee;
+    text-indent: 2em hanging;
 }
 
 .fake-option:hover {
-    background-color: #e8f4f8;
+    background-color: whitesmoke;
 }
 
 .literal-option {
     font-style: italic;
-    color: #666;
 }
 
 .unselected::before {
-    content: "○ ";
+    content: "• ";
+    color: #999999;
 }
 
 .selected {
-    background-color: #e8f4f8;
+    background-color: whitesmoke;
 }
 
 .selected::before {
-    content: "● ";
-    color: #007bff;
+    content: "> ";
+    color: #999999;
 }
 
 .picked {
-    background-color: #d4edda;
+    font-weight: bold;
 }
 
 .picked::before {
-    content: "✓ ";
-    color: #28a745;
+    content: "✓ " !important;
+    transition-property: all;
+    transition-duration: 500ms;
+    font-weight: bold;
+    color: green;
+    font-size: larger;
 }
 
 .search-results {
-    padding: 1em;
+    height: inherit;
 }
 
-.no-results {
-    text-align: center;
-    padding: 2em;
-    color: #666;
-}
-
-.debug-info {
-    background: #f0f0f0;
-    padding: 0.5em;
-    margin-bottom: 1em;
-    border-radius: 4px;
-    font-family: monospace;
-    font-size: 0.9em;
-}
 </style>

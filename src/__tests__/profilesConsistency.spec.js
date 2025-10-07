@@ -56,4 +56,50 @@ describe('Profiles and starting points consistency', () => {
     const refs = geoPt?.valueConstraint?.valueTemplateRefs || []
     expect(refs.includes('lc:RT:bf2:Form:Geog'), 'Monograph Work geographicCoverage should reference lc:RT:bf2:Form:Geog').toBe(true)
   })
+
+  it('Penn Item templates retain physical location and sublocation fields', () => {
+    const pennItemTemplateIds = [
+      'lc:RT:bf2:Monograph:Item',
+      'lc:RT:bf2:PrintPhoto:Item',
+      'lc:RT:bf2:RareMat:Item',
+      'lc:RT:bf2:35mmFeatureFilm:Item',
+      'lc:RT:bf2:MIBluRayDVD:Item',
+      'lc:RT:bf2:Cartographic:Item',
+      'lc:RT:bf2:Analog:Item',
+      'lc:RT:bf2:Serial:Item',
+      'lc:RT:bf2:SoundCDR:Item',
+      'lc:RT:bf2:SoundRecording:Item',
+      'lc:RT:bf2:SoundCassette:Item',
+      'lc:RT:bf2:NotatedMusic:Item'
+    ]
+
+    expect(allRTIds.has('lc:RT:bf2:Item:physicalLocation')).toBe(true)
+    expect(allRTIds.has('lc:RT:bf2:Item:Location')).toBe(true)
+
+    for (const rtId of pennItemTemplateIds) {
+      const rt = rtById.get(rtId)
+      expect(rt, `${rtId} template not found`).toBeTruthy()
+
+      const propertyTemplates = rt?.propertyTemplates || []
+      const physicalLocationPt = propertyTemplates.find(
+        p => p.propertyURI === 'http://id.loc.gov/ontologies/bibframe/physicalLocation'
+      )
+      expect(physicalLocationPt, `${rtId} missing physicalLocation property`).toBeTruthy()
+      const physicalRefs = physicalLocationPt?.valueConstraint?.valueTemplateRefs || []
+      expect(
+        physicalRefs.includes('lc:RT:bf2:Item:physicalLocation'),
+        `${rtId} physicalLocation must reference lc:RT:bf2:Item:physicalLocation`
+      ).toBe(true)
+
+      const sublocationPt = propertyTemplates.find(
+        p => p.propertyURI === 'http://id.loc.gov/ontologies/bibframe/sublocation'
+      )
+      expect(sublocationPt, `${rtId} missing sublocation property`).toBeTruthy()
+      const sublocationRefs = sublocationPt?.valueConstraint?.valueTemplateRefs || []
+      expect(
+        sublocationRefs.includes('lc:RT:bf2:Item:Location'),
+        `${rtId} sublocation must reference lc:RT:bf2:Item:Location`
+      ).toBe(true)
+    }
+  })
 })
