@@ -687,46 +687,6 @@ export const useProfileStore = defineStore('profile', {
 
 
       // FLAG: NEEDS_PROFILE_ALIGNMENT
-      // TEMP HACK ADD IN HUBS
-
-      if (startingPointData[0]){
-          startingPointData[0].json.push(
-              {
-                  "menuGroup": "Hub",
-                  "menuItems": [
-                      {
-                          "label": "Hub",
-                          "type": [
-                              "http://id.loc.gov/ontologies/bibframe/Hub"
-                          ],
-                          "useResourceTemplates": [
-                              "lc:RT:bf2:Hub:Hub"
-                          ]
-                      }
-                  ]
-              }
-          )
-      }else if (startingPointData.json){
-          startingPointData.json.push(
-              {
-                  "menuGroup": "Hub",
-                  "menuItems": [
-                      {
-                          "label": "Hub",
-                          "type": [
-                              "http://id.loc.gov/ontologies/bibframe/Hub"
-                          ],
-                          "useResourceTemplates": [
-                              "lc:RT:bf2:Hub:Hub"
-                          ]
-                      }
-                  ]
-              }
-          )
-      }
-
-
-      // FLAG: NEEDS_PROFILE_ALIGNMENT
       // TEMP HACK, striping RDA fields for some things for the new editor
       for (let p of profileData){
 
@@ -1031,59 +991,6 @@ export const useProfileStore = defineStore('profile', {
       if (Array.isArray(startingPointData)){
           startingPointData = startingPointData[0]
       }
-
-
-
-      // HACKHACKHACKHACK
-      if (config.returnUrls.env != 'production'){
-          startingPointData.json.splice(2,0,{
-              "menuGroup": "GPO Monograph",
-              "menuItems": [
-                  {
-                      "label": "Instance",
-                      "type": [
-                          "http://id.loc.gov/ontologies/bibframe/Instance"
-                      ],
-                      "useResourceTemplates": [
-                          "lc:RT:bf2:GPOMono:Instance"
-                      ]
-                  },
-                  {
-                      "label": "Work",
-                      "type": [
-                          "http://id.loc.gov/ontologies/bibframe/Work"
-                      ],
-                      "useResourceTemplates": [
-                          "lc:RT:bf2:GPOMono:Work"
-                      ]
-                  }
-              ]
-          })
-          startingPointData.json.splice(3,0,{
-              "menuGroup": "GPO Serial",
-              "menuItems": [
-                  {
-                      "label": "Instance",
-                      "type": [
-                          "http://id.loc.gov/ontologies/bibframe/Instance"
-                      ],
-                      "useResourceTemplates": [
-                          "lc:RT:bf2:GPOSerial:Instance"
-                      ]
-                  },
-                  {
-                      "label": "Work",
-                      "type": [
-                          "http://id.loc.gov/ontologies/bibframe/Work"
-                      ],
-                      "useResourceTemplates": [
-                          "lc:RT:bf2:GPOSerial:Work"
-                      ]
-                  }
-              ]
-          })
-      }
-
 
       startingPointData.json.forEach((sp)=>{
 

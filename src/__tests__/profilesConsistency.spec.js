@@ -57,7 +57,7 @@ describe('Profiles and starting points consistency', () => {
     expect(refs.includes('lc:RT:bf2:Form:Geog'), 'Monograph Work geographicCoverage should reference lc:RT:bf2:Form:Geog').toBe(true)
   })
 
-  it('Penn Item templates retain physical location and sublocation fields', () => {
+  it('Penn Item templates have all required fields (location, classification, barcode, policies)', () => {
     const pennItemTemplateIds = [
       'lc:RT:bf2:Monograph:Item',
       'lc:RT:bf2:PrintPhoto:Item',
@@ -70,17 +70,26 @@ describe('Profiles and starting points consistency', () => {
       'lc:RT:bf2:SoundCDR:Item',
       'lc:RT:bf2:SoundRecording:Item',
       'lc:RT:bf2:SoundCassette:Item',
-      'lc:RT:bf2:NotatedMusic:Item'
+      'lc:RT:bf2:NotatedMusic:Item',
+      'lc:RT:bf2:Item:Digital',
+      'lc:RT:bf2:Ibc:Item'
     ]
 
+    // Verify lookup templates exist
     expect(allRTIds.has('lc:RT:bf2:Item:physicalLocation')).toBe(true)
     expect(allRTIds.has('lc:RT:bf2:Item:Location')).toBe(true)
+    expect(allRTIds.has('lc:RT:bf2:Item:Access')).toBe(true)
+    expect(allRTIds.has('lc:RT:bf2:Item:Use')).toBe(true)
+    expect(allRTIds.has('lc:RT:bf2:Item:LCC')).toBe(true)
+    expect(allRTIds.has('lc:RT:bf2:Identifiers:Barcode')).toBe(true)
 
     for (const rtId of pennItemTemplateIds) {
       const rt = rtById.get(rtId)
       expect(rt, `${rtId} template not found`).toBeTruthy()
 
       const propertyTemplates = rt?.propertyTemplates || []
+
+      // 1. Physical Location
       const physicalLocationPt = propertyTemplates.find(
         p => p.propertyURI === 'http://id.loc.gov/ontologies/bibframe/physicalLocation'
       )
@@ -91,6 +100,7 @@ describe('Profiles and starting points consistency', () => {
         `${rtId} physicalLocation must reference lc:RT:bf2:Item:physicalLocation`
       ).toBe(true)
 
+      // 2. Sublocation
       const sublocationPt = propertyTemplates.find(
         p => p.propertyURI === 'http://id.loc.gov/ontologies/bibframe/sublocation'
       )
@@ -100,6 +110,41 @@ describe('Profiles and starting points consistency', () => {
         sublocationRefs.includes('lc:RT:bf2:Item:Location'),
         `${rtId} sublocation must reference lc:RT:bf2:Item:Location`
       ).toBe(true)
+
+      // 3. Classification
+      const classificationPt = propertyTemplates.find(
+        p => p.propertyURI === 'http://id.loc.gov/ontologies/bibframe/classification'
+      )
+      expect(classificationPt, `${rtId} missing classification property`).toBeTruthy()
+      // RareMat may use a different classification template (vocabulary-free)
+      if (rtId !== 'lc:RT:bf2:RareMat:Item') {
+        const classificationRefs = classificationPt?.valueConstraint?.valueTemplateRefs || []
+        expect(
+          classificationRefs.includes('lc:RT:bf2:Item:LCC'),
+          `${rtId} classification must reference lc:RT:bf2:Item:LCC`
+        ).toBe(true)
+      }
+
+      // 4. Barcode
+      const barcodePt = propertyTemplates.find(
+        p => p.propertyURI === 'http://id.loc.gov/ontologies/bibframe/identifiedBy' &&
+            p.valueConstraint?.valueTemplateRefs?.includes('lc:RT:bf2:Identifiers:Barcode')
+      )
+      expect(barcodePt, `${rtId} missing barcode (identifiedBy) property`).toBeTruthy()
+
+      // 5. Item Policy (Access)
+      const itemPolicyPt = propertyTemplates.find(
+        p => p.propertyURI === 'http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy' &&
+            p.valueConstraint?.valueTemplateRefs?.includes('lc:RT:bf2:Item:Access')
+      )
+      expect(itemPolicyPt, `${rtId} missing Item Policy (usageAndAccessPolicy with Access)`).toBeTruthy()
+
+      // 6. Material Type (Use)
+      const materialTypePt = propertyTemplates.find(
+        p => p.propertyURI === 'http://id.loc.gov/ontologies/bibframe/usageAndAccessPolicy' &&
+            p.valueConstraint?.valueTemplateRefs?.includes('lc:RT:bf2:Item:Use')
+      )
+      expect(materialTypePt, `${rtId} missing Material Type (usageAndAccessPolicy with Use)`).toBeTruthy()
     }
   })
 })
