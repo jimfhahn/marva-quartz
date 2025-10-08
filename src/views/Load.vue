@@ -295,7 +295,8 @@
 
         }
 
-        points.push( { "name": "HUB", "work": null, "instance": "lc:RT:bf2:HubBasic:Hub", "item": null },)
+        // Penn customization: Hub removed - Penn doesn't create standalone Hubs
+        // points.push( { "name": "HUB", "work": null, "instance": "lc:RT:bf2:HubBasic:Hub", "item": null },)
 
         console.log(points)
         return points

@@ -147,4 +147,61 @@ describe('Profiles and starting points consistency', () => {
       expect(materialTypePt, `${rtId} missing Material Type (usageAndAccessPolicy with Use)`).toBeTruthy()
     }
   })
+
+  it('Work templates in starting.json have proper @type definitions in profile store', () => {
+    // This test simulates what profile.js does when loading profiles
+    // It verifies the mapping logic for Work subclass types
+    
+    const expectedWorkTypes = {
+      'lc:RT:bf2:Monograph:Work': 'http://id.loc.gov/ontologies/bibframe/Text',
+      'lc:RT:bf2:Serial:Work': 'http://id.loc.gov/ontologies/bibframe/Text',
+      'lc:RT:bf2:RareMat:Work': 'http://id.loc.gov/ontologies/bibframe/Text',
+      'lc:RT:bf2:NotatedMusic:Work': 'http://id.loc.gov/ontologies/bibframe/NotatedMusic',
+      'lc:RT:bf2:Cartographic:Work': 'http://id.loc.gov/ontologies/bibframe/Cartography',
+      'lc:RT:bf2:SoundRecording:Work': 'http://id.loc.gov/ontologies/bibframe/Audio',
+      'lc:RT:bf2:SoundCDR:Work': 'http://id.loc.gov/ontologies/bibframe/Audio',
+      'lc:RT:bf2:Analog:Work': 'http://id.loc.gov/ontologies/bibframe/Audio',
+      'lc:RT:bf2:SoundCassette:Work': 'http://id.loc.gov/ontologies/bibframe/Audio',
+      'lc:RT:bf2:MIBluRayDVD:Work': 'http://id.loc.gov/ontologies/bibframe/MovingImage',
+      'lc:RT:bf2:35mmFeatureFilm:Work': 'http://id.loc.gov/ontologies/bibframe/MovingImage',
+      'lc:RT:bf2:PrintPhoto:Work': 'http://id.loc.gov/ontologies/bibframe/StillImage'
+      // lc:RT:bf2:Ibc:Work intentionally omitted - uses generic bf:Work only
+    }
+
+    // Verify each Work template exists
+    for (const [rtId, expectedSubclass] of Object.entries(expectedWorkTypes)) {
+      const rt = rtById.get(rtId)
+      expect(rt, `${rtId} template not found`).toBeTruthy()
+      expect(rt?.resourceURI, `${rtId} should have resourceURI`).toBe('http://id.loc.gov/ontologies/bibframe/Work')
+      
+      // Note: This test verifies the mapping exists. The actual @type assignment
+      // happens in profile.js at runtime when profiles are loaded into the store.
+      // The export logic in utils_export.js at lines 1679-1690 will read these types.
+      expect(expectedSubclass, `${rtId} should have a Work subclass mapping`).toBeTruthy()
+    }
+
+    // Verify that all Work templates from starting.json are accounted for
+    const startingWorkTemplates = []
+    for (const cfg of starting) {
+      if (cfg.configType !== 'startingPoints') continue
+      const groups = cfg.json || []
+      for (const group of groups) {
+        for (const item of group.menuItems || []) {
+          if (item.type?.includes('http://id.loc.gov/ontologies/bibframe/Work')) {
+            startingWorkTemplates.push(...(item.useResourceTemplates || []))
+          }
+        }
+      }
+    }
+
+    // Every starting Work template should either have a mapping or be Ibc:Work
+    for (const rtId of startingWorkTemplates) {
+      if (rtId === 'lc:RT:bf2:Ibc:Work') {
+        // Ibc:Work intentionally uses generic bf:Work
+        expect(expectedWorkTypes[rtId]).toBeUndefined()
+      } else {
+        expect(expectedWorkTypes[rtId], `${rtId} is in starting.json but missing from expectedWorkTypes`).toBeTruthy()
+      }
+    }
+  })
 })

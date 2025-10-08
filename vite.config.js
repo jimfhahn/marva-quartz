@@ -15,8 +15,12 @@ export default defineConfig({
     dedupe: ['vue'] // Ensure Vue is deduplicated
   },
   server: {
-    // Ensure navigation routes return index.html
-    historyApiFallback: true,
+    // Ensure navigation routes return index.html, but not for static assets
+    historyApiFallback: {
+      rewrites: [
+        { from: /^\/test_files\/.*/, to: context => context.parsedUrl.pathname }
+      ]
+    },
     proxy: {
       '/scriptshifter': {
         target: 'https://quartz.bibframe.app',
