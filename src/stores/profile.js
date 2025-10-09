@@ -687,46 +687,6 @@ export const useProfileStore = defineStore('profile', {
 
 
       // FLAG: NEEDS_PROFILE_ALIGNMENT
-      // TEMP HACK ADD IN HUBS
-
-      if (startingPointData[0]){
-          startingPointData[0].json.push(
-              {
-                  "menuGroup": "Hub",
-                  "menuItems": [
-                      {
-                          "label": "Hub",
-                          "type": [
-                              "http://id.loc.gov/ontologies/bibframe/Hub"
-                          ],
-                          "useResourceTemplates": [
-                              "lc:RT:bf2:Hub:Hub"
-                          ]
-                      }
-                  ]
-              }
-          )
-      }else if (startingPointData.json){
-          startingPointData.json.push(
-              {
-                  "menuGroup": "Hub",
-                  "menuItems": [
-                      {
-                          "label": "Hub",
-                          "type": [
-                              "http://id.loc.gov/ontologies/bibframe/Hub"
-                          ],
-                          "useResourceTemplates": [
-                              "lc:RT:bf2:Hub:Hub"
-                          ]
-                      }
-                  ]
-              }
-          )
-      }
-
-
-      // FLAG: NEEDS_PROFILE_ALIGNMENT
       // TEMP HACK, striping RDA fields for some things for the new editor
       for (let p of profileData){
 
@@ -962,6 +922,36 @@ export const useProfileStore = defineStore('profile', {
                   p.json.Profile.resourceTemplates.forEach((rt)=>{
                       this.profiles[p.json.Profile.id].rtOrder.push(rt.id)
                       this.profiles[p.json.Profile.id].rt[rt.id] = {ptOrder:[],pt:{}}
+
+                      // Penn customization: Add Work subclass rdf:type for starting point templates
+                      // Maps specific Work templates to BIBFRAME Work subclasses for proper RDF export
+                      // Only applies to templates that render in the UI (from starting.json)
+                      if (rt.resourceURI === 'http://id.loc.gov/ontologies/bibframe/Work') {
+                        const workTypeMap = {
+                          'lc:RT:bf2:Monograph:Work': 'http://id.loc.gov/ontologies/bibframe/Text',
+                          'lc:RT:bf2:Serial:Work': 'http://id.loc.gov/ontologies/bibframe/Text',
+                          'lc:RT:bf2:RareMat:Work': 'http://id.loc.gov/ontologies/bibframe/Text',
+                          'lc:RT:bf2:NotatedMusic:Work': 'http://id.loc.gov/ontologies/bibframe/NotatedMusic',
+                          'lc:RT:bf2:Cartographic:Work': 'http://id.loc.gov/ontologies/bibframe/Cartography',
+                          'lc:RT:bf2:SoundRecording:Work': 'http://id.loc.gov/ontologies/bibframe/Audio',
+                          'lc:RT:bf2:SoundCDR:Work': 'http://id.loc.gov/ontologies/bibframe/Audio',
+                          'lc:RT:bf2:Analog:Work': 'http://id.loc.gov/ontologies/bibframe/Audio',
+                          'lc:RT:bf2:SoundCassette:Work': 'http://id.loc.gov/ontologies/bibframe/Audio',
+                          'lc:RT:bf2:MIBluRayDVD:Work': 'http://id.loc.gov/ontologies/bibframe/MovingImage',
+                          'lc:RT:bf2:35mmFeatureFilm:Work': 'http://id.loc.gov/ontologies/bibframe/MovingImage',
+                          'lc:RT:bf2:PrintPhoto:Work': 'http://id.loc.gov/ontologies/bibframe/StillImage'
+                          // lc:RT:bf2:Ibc:Work intentionally omitted - uses generic bf:Work
+                        }
+                        
+                        // Check if this specific Work template has a subclass mapping
+                        if (workTypeMap[rt.id]) {
+                          this.profiles[p.json.Profile.id].rt[rt.id]['@type'] = [
+                            'http://id.loc.gov/ontologies/bibframe/Work',
+                            workTypeMap[rt.id]
+                          ]
+                        }
+                      }
+
                       if (rt.propertyTemplates){
                           rt.propertyTemplates.forEach((pt)=>{
                               pt.parent = p.json.Profile.id + rt.id + p.id
@@ -1031,59 +1021,6 @@ export const useProfileStore = defineStore('profile', {
       if (Array.isArray(startingPointData)){
           startingPointData = startingPointData[0]
       }
-
-
-
-      // HACKHACKHACKHACK
-      if (config.returnUrls.env != 'production'){
-          startingPointData.json.splice(2,0,{
-              "menuGroup": "GPO Monograph",
-              "menuItems": [
-                  {
-                      "label": "Instance",
-                      "type": [
-                          "http://id.loc.gov/ontologies/bibframe/Instance"
-                      ],
-                      "useResourceTemplates": [
-                          "lc:RT:bf2:GPOMono:Instance"
-                      ]
-                  },
-                  {
-                      "label": "Work",
-                      "type": [
-                          "http://id.loc.gov/ontologies/bibframe/Work"
-                      ],
-                      "useResourceTemplates": [
-                          "lc:RT:bf2:GPOMono:Work"
-                      ]
-                  }
-              ]
-          })
-          startingPointData.json.splice(3,0,{
-              "menuGroup": "GPO Serial",
-              "menuItems": [
-                  {
-                      "label": "Instance",
-                      "type": [
-                          "http://id.loc.gov/ontologies/bibframe/Instance"
-                      ],
-                      "useResourceTemplates": [
-                          "lc:RT:bf2:GPOSerial:Instance"
-                      ]
-                  },
-                  {
-                      "label": "Work",
-                      "type": [
-                          "http://id.loc.gov/ontologies/bibframe/Work"
-                      ],
-                      "useResourceTemplates": [
-                          "lc:RT:bf2:GPOSerial:Work"
-                      ]
-                  }
-              ]
-          })
-      }
-
 
       startingPointData.json.forEach((sp)=>{
 
