@@ -41,10 +41,20 @@
 
       async refreshXml() {
 
-
-        let exportResult = await this.profileStore.buildExportXML()
-
-        this.xml = exportResult.xlmStringBasic
+        const exportResult = await this.profileStore.buildExportXML()
+        let xmlStr = (exportResult && exportResult.xlmStringBasic) ? exportResult.xlmStringBasic : ''
+        // Remove XML declaration to avoid ProcessingInstruction nodes in viewer
+        if (xmlStr) {
+          xmlStr = xmlStr.replace(/^<\?xml[^>]*\?>\s*/i, '')
+        }
+        // If export temporarily produced bad HTML or parsererror, defer rendering to avoid error flash
+        const looksBad = !xmlStr || /<parsererror/i.test(xmlStr) || /^\s*<html[\s>]/i.test(xmlStr)
+        if (looksBad) {
+          // Keep empty until a subsequent refresh provides valid RDF/XML
+          this.xml = ''
+        } else {
+          this.xml = xmlStr
+        }
 
         if (this.firstLoad){
           this.$nextTick(()=>{
@@ -118,7 +128,8 @@
 
   <div>
 
-    <XmlViewer ref="xmlviewer" :xml="xml" />
+    <!-- Only render the XML viewer when we actually have RDF/XML to show -->
+    <XmlViewer v-if="xml && xml.includes('<rdf:RDF')" ref="xmlviewer" :xml="xml" />
 
 
 

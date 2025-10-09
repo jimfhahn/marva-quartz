@@ -1383,12 +1383,16 @@ const utilsParse = {
                     // literal or something like that
                     if (this.isClass(gChild.tagName)){
                       let gChildData = {'@guid': short.generate()}
+                      // Ensure destination array exists before pushing
+                      if (!Array.isArray(userValue[gChildProperty])) {
+                        userValue[gChildProperty] = []
+                      }
                       userValue[gChildProperty].push(gChildData)
 
                     }else{
 
 
-                      if (!userValue[gChildProperty]){
+                      if (!Array.isArray(userValue[gChildProperty])){
                         userValue[gChildProperty] = []
                       }
 
@@ -1437,7 +1441,7 @@ const utilsParse = {
                     // if we dont have that property yet add it
                     let gChildProperty = this.UriNamespace(gChild.tagName)
 
-                    if (!userValue[gChildProperty]){
+                    if (!Array.isArray(userValue[gChildProperty])){
                       userValue[gChildProperty] = []
                     }
 
@@ -1710,6 +1714,9 @@ const utilsParse = {
                                           ggggChildData['@parseType'] = gggggChild.attributes['rdf:parseType'].value
                                         }
                                       }
+                                      if (!Array.isArray(gggData[gggggChildProperty])){
+                                        gggData[gggggChildProperty] = []
+                                      }
                                       gggData[gggggChildProperty].push(ggggChildData)
 
 
@@ -1720,7 +1727,7 @@ const utilsParse = {
 
                                     let g5ChildData = {'@guid': short.generate()}
 
-                                    if (!gggData[g5ChildProperty]){
+                                    if (!Array.isArray(gggData[g5ChildProperty])){
                                       gggData[g5ChildProperty] = []
                                     }
 
@@ -1921,6 +1928,9 @@ const utilsParse = {
                                     }
 
 
+                                    if (!Array.isArray(gggData[g5ChildProperty])){
+                                      gggData[g5ChildProperty] = []
+                                    }
                                     gggData[g5ChildProperty].push(g5ChildData)
 
 
@@ -1978,12 +1988,18 @@ const utilsParse = {
                             }
 
                             // last thing is add it to the lat structure
+                            if (!Array.isArray(gChildData[gggChildProperty])){
+                              gChildData[gggChildProperty] = []
+                            }
                             gChildData[gggChildProperty].push(gggData)
 
                           }
 
                         }
 
+                        if (!Array.isArray(userValue[gChildProperty])){
+                          userValue[gChildProperty] = []
+                        }
                         userValue[gChildProperty].push(gChildData)
                         gChildData = false
 
@@ -2342,10 +2358,18 @@ const utilsParse = {
           // if there is no data loaded, add it to the list for ad hoc
           const e = profile.rt[pkey].pt[key]
           if (e.mandatory != 'true'){
-            if (Object.keys(useProfileStore().emptyComponents).includes(pkey)){
-              useProfileStore().emptyComponents[pkey].push(key)
-            } else {
-              useProfileStore().emptyComponents[pkey] = [key]
+            // Ensure the store and container exist
+            const profileStore = useProfileStore()
+            if (!profileStore.emptyComponents || typeof profileStore.emptyComponents !== 'object') {
+              profileStore.emptyComponents = {}
+            }
+            // Initialize array for this RT if needed
+            if (!Array.isArray(profileStore.emptyComponents[pkey])) {
+              profileStore.emptyComponents[pkey] = []
+            }
+            // Avoid duplicates
+            if (!profileStore.emptyComponents[pkey].includes(key)) {
+              profileStore.emptyComponents[pkey].push(key)
             }
           }
 
