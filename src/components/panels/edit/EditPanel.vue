@@ -41,10 +41,24 @@
                             <template v-if="(createLayoutMode && layoutActive) || layoutActive == false || (layoutActive == true && layoutActiveFilter && layoutActiveFilter.properties[profileName] && includeInLayout(activeProfile.rt[profileName].pt[profileCompoent].id, layoutActiveFilter['properties'][profileName])) ">
 
                               <template v-if="(preferenceStore.returnValue('--b-edit-main-splitpane-edit-adhoc-mode') === true && activeProfile.rt[profileName].pt[profileCompoent].canBeHidden === false) || preferenceStore.returnValue('--b-edit-main-splitpane-edit-adhoc-mode') === false">
-                                <div class="component-label 1" :class="{'label-bold': preferenceStore.returnValue('--b-edit-main-splitpane-edit-show-field-labels-bold')}">
+                                <div
+                                  :class="[
+                                    'component-label 1',
+                                    {'label-bold': preferenceStore.returnValue('--b-edit-main-splitpane-edit-show-field-labels-bold')},
+                                    validationHighlightClassForGuid(activeProfile.rt[profileName].pt[profileCompoent]['@guid'])
+                                  ]"
+                                  :title="validationTooltip(activeProfile.rt[profileName].pt[profileCompoent]['@guid'])"
+                                >
                                     <input v-if="!createLayoutMode && preferenceStore.copyMode && !activeProfile.rt[profileName].pt[profileCompoent].propertyLabel.includes('Admin')" type="checkbox" class="copy-selection" :id="activeProfile.rt[profileName].pt[profileCompoent]['@guid']" />
                                     <input v-if="createLayoutMode" type="checkbox" class="layout-selection" :id="activeProfile.rt[profileName].pt[profileCompoent]['@guid']" />
                                     {{activeProfile.rt[profileName].pt[profileCompoent].propertyLabel}}
+                                    <span
+                                      v-if="validationBadgeLabel(activeProfile.rt[profileName].pt[profileCompoent]['@guid'])"
+                                      class="validation-pill"
+                                      :class="validationBadgeClass(activeProfile.rt[profileName].pt[profileCompoent]['@guid'])"
+                                    >
+                                      {{ validationBadgeLabel(activeProfile.rt[profileName].pt[profileCompoent]['@guid']) }}
+                                    </span>
                                 </div>
                                 <Main
                                   :guid="activeProfile.rt[profileName].pt[profileCompoent]['@guid']"
@@ -93,20 +107,48 @@
                             <div v-if="(!preferenceStore.returnValue('--c-general-ad-hoc') || (createLayoutMode && !layoutActive)) || (layoutActive || (preferenceStore.returnValue('--c-general-ad-hoc') && profileStore.emptyComponents[profileName] && !profileStore.emptyComponents[profileName].includes(profileCompoent)))" :class="{ 'inline-mode' : (preferenceStore.returnValue('--b-edit-main-splitpane-edit-inline-mode')), 'edit-panel-scroll-x-child': preferenceStore.returnValue('--b-edit-main-splitpane-edit-scroll-x'), 'read-only': isReadOnly(activeProfile.rt[profileName].pt[profileCompoent])}">
                               <template v-if="this.dualEdit == false">
                                 <template v-if="preferenceStore.returnValue('--b-edit-main-splitpane-edit-shortcode-display-mode') == false && preferenceStore.returnValue('--b-edit-main-splitpane-edit-inline-mode') == false">
-                                  <div class="component-label 2" :class="{'label-bold': preferenceStore.returnValue('--b-edit-main-splitpane-edit-show-field-labels-bold')}">
+                                  <div
+                                    :class="[
+                                      'component-label 2',
+                                      {'label-bold': preferenceStore.returnValue('--b-edit-main-splitpane-edit-show-field-labels-bold')},
+                                      validationHighlightClassForGuid(activeProfile.rt[profileName].pt[profileCompoent]['@guid'])
+                                    ]"
+                                    :title="validationTooltip(activeProfile.rt[profileName].pt[profileCompoent]['@guid'])"
+                                  >
                                     <input v-if="!createLayoutMode && preferenceStore.copyMode && !activeProfile.rt[profileName].pt[profileCompoent].propertyLabel.includes('Admin')" type="checkbox" class="copy-selection" :id="activeProfile.rt[profileName].pt[profileCompoent]['@guid']" />
                                     <input v-if="createLayoutMode" type="checkbox" class="layout-selection" :id="activeProfile.rt[profileName].pt[profileCompoent]['@guid']" :value="profileName" :checked="layoutActiveFilter && layoutActiveFilter['properties'][profileName] && includeInLayout(activeProfile.rt[profileName].pt[profileCompoent].id, layoutActiveFilter['properties'][profileName])" />
                                     {{activeProfile.rt[profileName].pt[profileCompoent].propertyLabel}}
+                                    <span
+                                      v-if="validationBadgeLabel(activeProfile.rt[profileName].pt[profileCompoent]['@guid'])"
+                                      class="validation-pill"
+                                      :class="validationBadgeClass(activeProfile.rt[profileName].pt[profileCompoent]['@guid'])"
+                                    >
+                                      {{ validationBadgeLabel(activeProfile.rt[profileName].pt[profileCompoent]['@guid']) }}
+                                    </span>
                                     <span v-if="isReadOnly(activeProfile.rt[profileName].pt[profileCompoent])"> (HISTORICAL - READ ONLY) <a style="color:black" href="#" @click="showDebug($event,activeProfile.rt[profileName].pt[profileCompoent])">debug</a></span>
                                   </div>
                                 </template>
                             </template>
                             <template v-if="this.dualEdit == true">
                                 <template v-if="preferenceStore.returnValue('--b-edit-main-splitpane-edit-shortcode-display-mode') == false && preferenceStore.returnValue('--b-edit-main-splitpane-edit-inline-mode') == false && (profileName.indexOf(':Instance') == -1 && profileName.indexOf(':Item') == -1 )">
-                                  <div class="component-label 3" :class="{'label-bold': preferenceStore.returnValue('--b-edit-main-splitpane-edit-show-field-labels-bold')}">
+                                  <div
+                                    :class="[
+                                      'component-label 3',
+                                      {'label-bold': preferenceStore.returnValue('--b-edit-main-splitpane-edit-show-field-labels-bold')},
+                                      validationHighlightClassForGuid(activeProfile.rt[profileName].pt[profileCompoent]['@guid'])
+                                    ]"
+                                    :title="validationTooltip(activeProfile.rt[profileName].pt[profileCompoent]['@guid'])"
+                                  >
                                   <input v-if="!createLayoutMode && preferenceStore.copyMode && !activeProfile.rt[profileName].pt[profileCompoent].propertyLabel.includes('Admin')" type="checkbox" class="copy-selection" :id="activeProfile.rt[profileName].pt[profileCompoent]['@guid']" />
                                   <input v-if="createLayoutMode" type="checkbox" class="layout-selection" :id="activeProfile.rt[profileName].pt[profileCompoent]['@guid']" />
                                   {{activeProfile.rt[profileName].pt[profileCompoent].propertyLabel}}
+                                    <span
+                                      v-if="validationBadgeLabel(activeProfile.rt[profileName].pt[profileCompoent]['@guid'])"
+                                      class="validation-pill"
+                                      :class="validationBadgeClass(activeProfile.rt[profileName].pt[profileCompoent]['@guid'])"
+                                    >
+                                      {{ validationBadgeLabel(activeProfile.rt[profileName].pt[profileCompoent]['@guid']) }}
+                                    </span>
                                     <span v-if="isReadOnly(activeProfile.rt[profileName].pt[profileCompoent])"> (HISTORICAL - READ ONLY) <a style="color:black" href="#" @click="showDebug($event,activeProfile.rt[profileName].pt[profileCompoent])">debug</a></span>
                                   </div>
                                 </template>
@@ -238,6 +280,64 @@
     },
 
     methods: {
+
+        resolveValidationHighlight(guid) {
+          if (!guid) {
+            return null;
+          }
+          if (this.profileStore && typeof this.profileStore.getValidationHighlight === 'function') {
+            return this.profileStore.getValidationHighlight(guid);
+          }
+          if (this.profileStore && this.profileStore.validationHighlights) {
+            return this.profileStore.validationHighlights[guid] || null;
+          }
+          return null;
+        },
+
+        validationHighlightClassForGuid(guid) {
+          const highlight = this.resolveValidationHighlight(guid);
+          if (!highlight) {
+            return {};
+          }
+          const severity = (highlight.severity || 'INFO').toUpperCase();
+          return {
+            'validation-highlight': true,
+            'validation-error': severity === 'ERROR',
+            'validation-warning': severity === 'WARNING',
+            'validation-success': severity === 'SUCCESS',
+            'validation-info': severity === 'INFO'
+          };
+        },
+
+        validationBadgeLabel(guid) {
+          const highlight = this.resolveValidationHighlight(guid);
+          if (!highlight || !highlight.severity) {
+            return null;
+          }
+          return highlight.severity.charAt(0);
+        },
+
+        validationBadgeClass(guid) {
+          const highlight = this.resolveValidationHighlight(guid);
+          if (!highlight || !highlight.severity) {
+            return {};
+          }
+          const severity = highlight.severity.toUpperCase();
+          return {
+            'pill-error': severity === 'ERROR',
+            'pill-warning': severity === 'WARNING',
+            'pill-success': severity === 'SUCCESS',
+            'pill-info': severity === 'INFO'
+          };
+        },
+
+        validationTooltip(guid) {
+          const highlight = this.resolveValidationHighlight(guid);
+          if (!highlight || !Array.isArray(highlight.issues) || highlight.issues.length === 0) {
+            return null;
+          }
+            return highlight.issues.map((issue) => `${issue.severity}: ${issue.message}`).join('\n');
+        },
 
 
         showErrors(guid){
@@ -454,6 +554,60 @@
 
 </script>
 <style scoped>
+
+.validation-highlight {
+  border-left: 4px solid #1976d2;
+  padding-left: 0.5rem;
+}
+
+.validation-error {
+  border-color: #b71c1c;
+}
+
+.validation-warning {
+  border-color: #f57c00;
+}
+
+.validation-success {
+  border-color: #2e7d32;
+}
+
+.validation-info {
+  border-color: #1976d2;
+}
+
+.validation-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.validation-pill.pill-error {
+  background-color: rgba(183, 28, 28, 0.12);
+  color: #b71c1c;
+}
+
+.validation-pill.pill-warning {
+  background-color: rgba(245, 124, 0, 0.15);
+  color: #f57c00;
+}
+
+.validation-pill.pill-success {
+  background-color: rgba(46, 125, 50, 0.15);
+  color: #2e7d32;
+}
+
+.validation-pill.pill-info {
+  background-color: rgba(25, 118, 210, 0.12);
+  color: #1976d2;
+}
 
 .inline-mode-error-icon{
   font-size: 16px;

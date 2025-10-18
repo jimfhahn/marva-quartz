@@ -1,7 +1,17 @@
 <template>
 
 
-  <div v-if="componentType != 'META'" :style="'background-color: ' + returnBackgroundColor + ';'" :class="[{'component': (level == 0), 'inline-mode': (preferenceStore.returnValue('--b-edit-main-splitpane-edit-inline-mode'))}]" :id="`edit_${parentId}_${id}`">
+  <div
+    v-if="componentType != 'META'"
+    :style="'background-color: ' + returnBackgroundColor + ';'"
+    :class="[
+      {'component': (level == 0), 'inline-mode': preferenceStore.returnValue('--b-edit-main-splitpane-edit-inline-mode')},
+      validationClassObject
+    ]"
+    :id="`edit_${parentId}_${id}`"
+    :data-validation-severity="validationHighlight ? validationHighlight.severity : null"
+    :title="validationTitle"
+  >
 
 
     <!-- {{guid}} -- {{componentType}} ({{level}}) {{propertyPath}} id: {{id}} -->
@@ -253,8 +263,43 @@ export default {
       }
 
 
-      return 'white'
-    }
+        return 'white'
+      },
+
+      validationHighlight() {
+        if (this.profileStore && typeof this.profileStore.getValidationHighlight === 'function') {
+          return this.profileStore.getValidationHighlight(this.guid);
+        }
+        if (this.profileStore && this.profileStore.validationHighlights) {
+          return this.profileStore.validationHighlights[this.guid] || null;
+        }
+        return null;
+      },
+
+      validationClassObject() {
+        const highlight = this.validationHighlight;
+        if (!highlight) {
+          return {};
+        }
+        const severity = (highlight.severity || 'INFO').toUpperCase();
+        return {
+          'validation-highlight': true,
+          'validation-error': severity === 'ERROR',
+          'validation-warning': severity === 'WARNING',
+          'validation-success': severity === 'SUCCESS',
+          'validation-info': severity === 'INFO'
+        };
+      },
+
+      validationTitle() {
+        const highlight = this.validationHighlight;
+        if (!highlight || !Array.isArray(highlight.issues) || highlight.issues.length === 0) {
+          return null;
+        }
+        return highlight.issues
+          .map((issue) => `${issue.severity}: ${issue.message}`)
+          .join('\n');
+      }
 
 
 
@@ -379,6 +424,28 @@ export default {
 
 
 <style scoped>
+
+.validation-highlight {
+  box-shadow: inset 4px 0 0 0 #1976d2;
+  border-radius: 4px;
+  transition: box-shadow 0.2s ease;
+}
+
+.validation-error {
+  box-shadow: inset 4px 0 0 0 #b71c1c;
+}
+
+.validation-warning {
+  box-shadow: inset 4px 0 0 0 #f57c00;
+}
+
+.validation-success {
+  box-shadow: inset 4px 0 0 0 #2e7d32;
+}
+
+.validation-info {
+  box-shadow: inset 4px 0 0 0 #1976d2;
+}
 
 
 .inline-mode{

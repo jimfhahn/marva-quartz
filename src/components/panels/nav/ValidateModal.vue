@@ -41,7 +41,15 @@
         return this.validationResults?.metadata?.ai_explanation || null
       },
       hasCorrection() {
-        return !!(this.validationResults?.correction?.rdf)
+        const correction = this.validationResults?.correction
+        if (!correction?.rdf) {
+          return false
+        }
+        // Hide passive suggestions when there are no issues to review.
+        if (!correction.applied && (!Array.isArray(this.validationIssues) || this.validationIssues.length === 0)) {
+          return false
+        }
+        return true
       },
       correctionStatusLabel() {
         if (!this.hasCorrection) {
@@ -50,6 +58,54 @@
         return this.validationResults?.correction?.applied
           ? 'The AI applied fixes to create a corrected graph.'
           : 'Suggested corrections are available for review.'
+      },
+      interactiveFallbackDetails() {
+        return this.validationResults?.metadata?.interactiveFallback || null
+      },
+      interactiveFallbackSummary() {
+        const details = this.interactiveFallbackDetails
+        if (!details) {
+          return null
+        }
+        if (details.status) {
+          const statusText = details.statusText ? ` ${details.statusText}` : ''
+          return `Interactive validator is unavailable (${details.status}${statusText}). Showing legacy SHACL results instead.`
+        }
+        if (details.message) {
+          return `Interactive validator is unavailable (${details.message}). Showing legacy SHACL results instead.`
+        }
+        return 'Interactive validator is unavailable. Showing legacy SHACL results instead.'
+      },
+      groupedValidationIssues() {
+        if (!this.interactiveFallbackSummary || !Array.isArray(this.validationIssues) || !this.validationIssues.length) {
+          return []
+        }
+
+        const order = ['ERROR', 'WARNING', 'INFO', 'SUCCESS']
+        const labels = {
+          ERROR: 'Violations',
+          WARNING: 'Warnings',
+          INFO: 'Notices',
+          SUCCESS: 'Successes'
+        }
+
+        const groupMap = {}
+
+        this.validationIssues.forEach((issue) => {
+          const key = (issue?.severity || 'INFO').toUpperCase()
+          if (!groupMap[key]) {
+            groupMap[key] = []
+          }
+          groupMap[key].push(issue)
+        })
+
+        return order
+          .filter((key) => groupMap[key] && groupMap[key].length)
+          .map((key) => ({
+            key,
+            label: labels[key] || key,
+            issues: groupMap[key]
+          }))
       },
       statusClass() {
         const value = (this.status || '').toLowerCase()
@@ -86,6 +142,9 @@
       },
 
       async post() {
+        if (this.validating) {
+          return
+        }
         this.validating = true
         this.validationResults = null
         this.validationIssues = []
@@ -248,84 +307,124 @@
         <button type="button" class="close-button" @click="done">Close</button>
       </header>
 
-      <section v-if="validating" class="validation-loading" aria-live="polite">
-        <span class="spinner" aria-hidden="true"></span>
-        <p>Validating, please wait…</p>
-      </section>
+      <div class="validation-body">
+        <section v-if="validating" class="validation-loading" aria-live="polite">
+          <span class="spinner" aria-hidden="true"></span>
+          <p>Validating, please wait…</p>
+        </section>
 
-      <section v-else class="validation-results">
-        <div v-if="validationError" class="alert level-ERROR">
-          <strong>Validation failed.</strong>
-          <p>{{ validationError }}</p>
-          <p v-if="validationResults?.details">{{ validationResults.details }}</p>
-        </div>
-
-        <div v-else-if="hasValidationResults">
-          <div class="status-banner" :class="statusClass">
-            <span class="status-label">{{ statusLabel }}</span>
-            <span v-if="processingTimeSeconds" class="status-meta">Processed in {{ processingTimeSeconds }}s</span>
-            <span v-if="providerLabel" class="status-provider">{{ providerLabel }}</span>
+        <section v-else class="validation-results">
+          <div v-if="validationError" class="alert level-ERROR">
+            <strong>Validation failed.</strong>
+            <p>{{ validationError }}</p>
+            <p v-if="validationResults?.details">{{ validationResults.details }}</p>
           </div>
 
-          <div v-if="aiExplanation" class="ai-explanation">
-            <h2>AI Explanation</h2>
-            <p>{{ aiExplanation }}</p>
-          </div>
-
-          <div v-if="validationIssues.length" class="validation-issues">
-            <h2>Findings</h2>
-            <ul>
-              <li
-                v-for="issue in validationIssues"
-                :key="issue.id"
-                :class="[severityClass(issue.severity), { 'action-jump': issue.canJump }]"
-                @click="issue.canJump ? jumpToComponent(issue.message) : null"
-              >
-                <span class="issue-severity">{{ issue.severity }}</span>
-                <span class="issue-text">{{ issue.message.text }}</span>
-              </li>
-            </ul>
-          </div>
-
-          <div v-else class="validation-success">
-            <p>🎉 No issues detected. The record conforms to the selected template.</p>
-          </div>
-
-          <div v-if="hasCorrection" class="validation-correction">
-            <h2>Suggested Corrections</h2>
-            <p>
-              {{ correctionStatusLabel }}
-              <span v-if="validationResults.correction.qualityScore !== null">
-                • Quality score: {{ validationResults.correction.qualityScore }}
-              </span>
-            </p>
-            <div class="correction-actions">
-              <button type="button" @click="toggleCorrectionPreview">
-                {{ showCorrectionPreview ? 'Hide' : 'Show' }} corrected RDF/XML
-              </button>
+          <div v-else-if="hasValidationResults">
+            <div class="status-banner" :class="statusClass">
+              <span class="status-label">{{ statusLabel }}</span>
+              <span v-if="processingTimeSeconds" class="status-meta">Processed in {{ processingTimeSeconds }}s</span>
+              <span v-if="providerLabel" class="status-provider">{{ providerLabel }}</span>
             </div>
-            <textarea
-              v-if="showCorrectionPreview"
-              readonly
-              class="copyable-textarea"
-            >{{ validationResults.correction.rdf }}</textarea>
+
+            <div v-if="interactiveFallbackSummary" class="alert level-WARNING fallback-note">
+              <strong>AI validation unavailable.</strong>
+              <p>{{ interactiveFallbackSummary }}</p>
+              <p v-if="interactiveFallbackDetails?.endpoint" class="fallback-endpoint">Service: {{ interactiveFallbackDetails.endpoint }}</p>
+            </div>
+
+            <div v-if="aiExplanation" class="ai-explanation">
+              <h2>AI Explanation</h2>
+              <p>{{ aiExplanation }}</p>
+            </div>
+
+            <div v-if="groupedValidationIssues.length" class="validation-issues grouped">
+              <h2>Findings</h2>
+              <details
+                v-for="group in groupedValidationIssues"
+                :key="group.key"
+                open
+                class="issue-group"
+              >
+                <summary>
+                  <span class="issue-group-label">{{ group.label }}</span>
+                  <span class="issue-count">({{ group.issues.length }})</span>
+                </summary>
+                <ul>
+                  <li
+                    v-for="issue in group.issues"
+                    :key="issue.id"
+                    :class="[severityClass(issue.severity), { 'action-jump': issue.canJump }]"
+                    @click="issue.canJump ? jumpToComponent(issue.message) : null"
+                  >
+                    <span class="issue-severity">{{ issue.severity }}</span>
+                    <span class="issue-text">{{ issue.message.text }}</span>
+                  </li>
+                </ul>
+              </details>
+            </div>
+            <div v-else-if="validationIssues.length" class="validation-issues">
+              <h2>Findings</h2>
+              <ul>
+                <li
+                  v-for="issue in validationIssues"
+                  :key="issue.id"
+                  :class="[severityClass(issue.severity), { 'action-jump': issue.canJump }]"
+                  @click="issue.canJump ? jumpToComponent(issue.message) : null"
+                >
+                  <span class="issue-severity">{{ issue.severity }}</span>
+                  <span class="issue-text">{{ issue.message.text }}</span>
+                </li>
+              </ul>
+            </div>
+
+            <div v-else class="validation-success">
+              <p>No issues detected. The record conforms to the selected template.</p>
+            </div>
+
+            <div v-if="hasCorrection" class="validation-correction">
+              <h2>Suggested Corrections</h2>
+              <p>
+                {{ correctionStatusLabel }}
+                <span v-if="validationResults.correction.qualityScore !== null">
+                  • Quality score: {{ validationResults.correction.qualityScore }}
+                </span>
+              </p>
+              <div class="correction-actions">
+                <button type="button" @click="toggleCorrectionPreview">
+                  {{ showCorrectionPreview ? 'Hide' : 'Show' }} corrected RDF/XML
+                </button>
+              </div>
+              <textarea
+                v-if="showCorrectionPreview"
+                readonly
+                class="copyable-textarea"
+              >{{ validationResults.correction.rdf }}</textarea>
+            </div>
+
+            <div v-if="validationResults.validationProof" class="validation-proof">
+              <details>
+                <summary>View validation proof</summary>
+                <pre>{{ formatValidationProof(validationResults.validationProof) }}</pre>
+              </details>
+            </div>
           </div>
 
-          <div v-if="validationResults.validationProof" class="validation-proof">
-            <details>
-              <summary>View validation proof</summary>
-              <pre>{{ formatValidationProof(validationResults.validationProof) }}</pre>
-            </details>
+          <div v-else class="validation-empty">
+            <p>Click validate to analyze the current record.</p>
           </div>
-        </div>
-
-        <div v-else class="validation-empty">
-          <p>Click validate to analyze the current record.</p>
-        </div>
-      </section>
+        </section>
+      </div>
 
       <footer class="validation-footer">
-        <button type="button" @click="done">Close</button>
+        <button
+          type="button"
+          class="validate-button"
+          @click="post"
+          :disabled="validating"
+        >
+          {{ validating ? 'Validating…' : 'Run Validation' }}
+        </button>
       </footer>
     </div>
   </VueFinalModal>
@@ -340,6 +439,15 @@
     padding: 1.5em;
     border: solid 1px black;
     max-width: 720px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .validation-body {
+    flex: 1;
+    overflow-y: auto;
+    margin-bottom: 1.5rem;
   }
 
   .validation-header {
@@ -347,6 +455,53 @@
     align-items: center;
     justify-content: space-between;
     margin-bottom: 1.25rem;
+  }
+
+  .fallback-note {
+    margin-bottom: 1rem;
+  }
+
+  .fallback-endpoint {
+    font-size: 0.9rem;
+    color: #444;
+  }
+
+  .validation-issues.grouped .issue-group {
+    margin-bottom: 1rem;
+    border: 1px solid #e3e4e6;
+    border-radius: 6px;
+    background-color: #fafbfc;
+    overflow: hidden;
+  }
+
+  .validation-issues.grouped summary {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    font-weight: 600;
+    background-color: #f0f3f7;
+  }
+
+  .validation-issues.grouped summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .validation-issues.grouped .issue-group-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .validation-issues.grouped .issue-count {
+    font-size: 0.9rem;
+    color: #555;
+  }
+
+  .validation-issues.grouped ul {
+    margin: 0;
+    padding: 0.75rem 1rem 1rem 1rem;
   }
 
   .close-button {
@@ -478,6 +633,26 @@
     margin-top: 1.5rem;
     display: flex;
     justify-content: flex-end;
+  }
+
+  .validate-button {
+    background-color: #0078d4;
+    border: none;
+    border-radius: 4px;
+    color: white;
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 0.5rem 1.25rem;
+    transition: background-color 0.15s ease-in-out;
+  }
+
+  .validate-button:disabled {
+    background-color: #a0a0a0;
+    cursor: default;
+  }
+
+  .validate-button:not(:disabled):hover {
+    background-color: #005fa3;
   }
 
   .alert {

@@ -84,7 +84,14 @@ export const useProfileStore = defineStore('profile', {
     activeProfilePosted: false,
     activeProfilePostedTimestamp: false,
 
-  validationSession: null,
+    validationSession: null,
+    validationHighlights: {},
+    validationHighlightCounts: {
+      ERROR: 0,
+      WARNING: 0,
+      INFO: 0,
+      SUCCESS: 0
+    },
 
     // stores the currently selected library for sublocation filtering
     selectedLibrary: null,
@@ -3657,7 +3664,7 @@ export const useProfileStore = defineStore('profile', {
     },
 
   /**
-   * Validate the reocrd
+   * Validate the record
   */
   inferValidationTemplate(templateOverride = null) {
     if (templateOverride) {
@@ -3684,6 +3691,227 @@ export const useProfileStore = defineStore('profile', {
     return templateMap.default || 'Monograph_Instance_Print';
   },
 
+  normalizeValidationSeverity: function(raw, fallback = 'INFO') {
+    const defaultValue = (fallback || 'INFO').toUpperCase();
+    if (!raw || typeof raw !== 'string') {
+      return defaultValue;
+    }
+    const value = raw.toUpperCase();
+    if (value.includes('ERROR')) return 'ERROR';
+    if (value.includes('WARN')) return 'WARNING';
+    if (value.includes('SUCCESS')) return 'SUCCESS';
+    if (value.includes('INFO')) return 'INFO';
+    return defaultValue;
+  },
+
+  extractValidationMessage: function(issue) {
+    if (!issue) {
+      return '';
+    }
+    if (typeof issue.message === 'string') {
+      return issue.message;
+    }
+    if (issue.message && typeof issue.message.value === 'string') {
+      return issue.message.value;
+    }
+    if (typeof issue.detail === 'string') {
+      return issue.detail;
+    }
+    if (typeof issue.explanation === 'string') {
+      return issue.explanation;
+    }
+    try {
+      return JSON.stringify(issue);
+    } catch (_) {
+      return '';
+    }
+  },
+
+  parseValidationMessage: function(message) {
+    const base = {
+      text: typeof message === 'string' ? message : (message ? String(message) : ''),
+      component: null,
+      profile: null
+    };
+
+    if (!base.text || !base.text.includes('**')) {
+      return base;
+    }
+
+    const componentMatch = base.text.match(/\*\*(.+?)\*\*/);
+    const profileMatch = base.text.match(/@(.*?)@/);
+
+    if (componentMatch) {
+      base.text = base.text.replace(componentMatch[0], componentMatch[1]);
+      base.component = componentMatch[1];
+    }
+
+    if (profileMatch) {
+      base.text = base.text.replace(profileMatch[0], profileMatch[1]);
+      base.profile = profileMatch[1];
+    }
+
+    return base;
+  },
+
+  findComponentGuidsByLabel: function(label, profileLabel = null) {
+    if (!label || !this.activeProfile || !this.activeProfile.rt) {
+      return [];
+    }
+
+    const normalizedLabel = label.toLowerCase();
+    const normalizedProfile = profileLabel
+      ? profileLabel.toLowerCase().replace(/[:\s]+/g, '')
+      : null;
+    const matches = [];
+
+    for (const rtKey in this.activeProfile.rt) {
+      if (!Object.prototype.hasOwnProperty.call(this.activeProfile.rt, rtKey)) {
+        continue;
+      }
+
+      if (normalizedProfile) {
+        const normalizedRt = rtKey.toLowerCase().replace(/[:\s]+/g, '');
+        if (!normalizedRt.includes(normalizedProfile)) {
+          continue;
+        }
+      }
+
+      const rt = this.activeProfile.rt[rtKey];
+      if (!rt || !rt.pt) {
+        continue;
+      }
+
+      for (const ptKey in rt.pt) {
+        if (!Object.prototype.hasOwnProperty.call(rt.pt, ptKey)) {
+          continue;
+        }
+
+        const component = rt.pt[ptKey];
+        if (!component || !component['@guid'] || !component.propertyLabel) {
+          continue;
+        }
+
+        if (component.propertyLabel.toLowerCase() === normalizedLabel) {
+          matches.push(component['@guid']);
+        }
+      }
+    }
+
+    return matches;
+  },
+
+  resetValidationHighlights: function() {
+    this.validationHighlights = {};
+    this.validationHighlightCounts = {
+      ERROR: 0,
+      WARNING: 0,
+      INFO: 0,
+      SUCCESS: 0
+    };
+  },
+
+  clearValidationState: function() {
+    this.validationSession = null;
+    this.resetValidationHighlights();
+  },
+
+  getValidationHighlight: function(guid) {
+    if (!guid) {
+      return null;
+    }
+    if (this.validationHighlights && this.validationHighlights[guid]) {
+      return this.validationHighlights[guid];
+    }
+    return null;
+  },
+
+  computeValidationHighlights: function(validationResult) {
+    this.resetValidationHighlights();
+
+    if (!validationResult || validationResult.error) {
+      return;
+    }
+
+    const severityRank = { ERROR: 3, WARNING: 2, INFO: 1, SUCCESS: 0 };
+    const defaultSeverity = validationResult?.conforms ? 'INFO' : 'ERROR';
+    const results = Array.isArray(validationResult?.validation?.results)
+      ? validationResult.validation.results
+      : [];
+
+    results.forEach((item) => {
+      const severity = this.normalizeValidationSeverity(
+        item?.severity || item?.resultSeverity || item?.level || item?.['sh:resultSeverity'],
+        defaultSeverity
+      );
+      if (Object.prototype.hasOwnProperty.call(this.validationHighlightCounts, severity)) {
+        this.validationHighlightCounts[severity] += 1;
+      } else {
+        this.validationHighlightCounts[severity] = 1;
+      }
+
+      const messageText = this.extractValidationMessage(item);
+      const parsed = this.parseValidationMessage(messageText);
+      const targetGuids = new Set();
+
+      const guidCandidates = [
+        item?.componentGuid,
+        item?.component_guid
+      ];
+
+      guidCandidates.forEach((candidate) => {
+        if (typeof candidate === 'string') {
+          targetGuids.add(candidate);
+        } else if (Array.isArray(candidate)) {
+          candidate.forEach((guid) => targetGuids.add(guid));
+        }
+      });
+
+      if (Array.isArray(item?.componentGuids)) {
+        item.componentGuids.forEach((guid) => targetGuids.add(guid));
+      }
+
+      if (Array.isArray(item?.component_guids)) {
+        item.component_guids.forEach((guid) => targetGuids.add(guid));
+      }
+
+      if (parsed.component) {
+        const matches = this.findComponentGuidsByLabel(parsed.component, parsed.profile);
+        matches.forEach((guid) => targetGuids.add(guid));
+      }
+
+      if (targetGuids.size === 0) {
+        return;
+      }
+
+      const preparedMessage = parsed.text || messageText || '';
+
+      targetGuids.forEach((guid) => {
+        if (!guid) {
+          return;
+        }
+
+        if (!this.validationHighlights[guid]) {
+          this.validationHighlights[guid] = {
+            severity,
+            issues: []
+          };
+        } else {
+          const currentSeverity = this.validationHighlights[guid].severity || defaultSeverity;
+          if ((severityRank[severity] ?? 0) > (severityRank[currentSeverity] ?? 0)) {
+            this.validationHighlights[guid].severity = severity;
+          }
+        }
+
+        this.validationHighlights[guid].issues.push({
+          severity,
+          message: preparedMessage,
+          raw: item
+        });
+      });
+    });
+  },
+
   validateRecord: async function(options = {}) {
     const validationOptions = typeof options === 'object' && options !== null ? options : {};
     const xml = await utilsExport.buildXML(this.activeProfile);
@@ -3694,13 +3922,17 @@ export const useProfileStore = defineStore('profile', {
       { ...validationOptions, template }
     );
 
+    this.computeValidationHighlights(response);
+
     this.validationSession = {
       timestamp: Date.now(),
       template,
       autoFix: validationOptions.autoFix !== undefined ? validationOptions.autoFix : true,
       provider: response?.provider || null,
       result: response,
-      originalXml: xml.xlmStringBasic
+      originalXml: xml.xlmStringBasic,
+      highlightCounts: { ...this.validationHighlightCounts },
+      highlightTargets: Object.keys(this.validationHighlights)
     };
 
     return response;
@@ -4173,6 +4405,7 @@ export const useProfileStore = defineStore('profile', {
     */
     loadRecordFromBackend: async function(eid){
 
+      this.clearValidationState();
       this.activeProfile = await utilsProfile.loadRecordFromBackend(eid)
 
     },
@@ -4616,6 +4849,7 @@ export const useProfileStore = defineStore('profile', {
   triggerBadXMLBuildRecovery: function(lastGoodBuild, lastGoodBuildTimetamp){
     this.showRecoveryModal = true
     const timeAgo = new TimeAgo('en-US')
+    this.clearValidationState();
     this.activeProfile = JSON.parse(JSON.stringify(lastGoodBuild))
     this.dataChanged()
   },
@@ -5167,6 +5401,7 @@ export const useProfileStore = defineStore('profile', {
     */
     prepareForNewRecord:  function(){
 
+      this.clearValidationState();
       this.activeProfile = {}
 
     },

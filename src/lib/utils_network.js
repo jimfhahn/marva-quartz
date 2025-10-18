@@ -2236,6 +2236,8 @@ const utilsNetwork = {
           };
         }
 
+        let interactiveFallbackMeta = null;
+
         if (validationApiBase) {
           const endpoint = `${validationApiBase.replace(/\/$/, '')}/validate`;
           console.log('[validate] Calling interactive API:', endpoint, 'template:', template);
@@ -2260,6 +2262,18 @@ const utilsNetwork = {
             if (!response.ok) {
               const errorText = await response.text();
               console.error('[validate] Interactive API error:', response.status, response.statusText, errorText);
+              const shouldFallback = [408, 500, 502, 503, 504].includes(response.status);
+              if (shouldFallback) {
+                interactiveFallbackMeta = {
+                  reason: 'interactive-error',
+                  status: response.status,
+                  statusText: response.statusText,
+                  body: errorText || null,
+                  endpoint
+                };
+                // Let the legacy endpoint try when the interactive service times out or is unavailable.
+                throw new Error(`Interactive validation unavailable: ${response.status} ${response.statusText}`);
+              }
               return {
                 error: new Error(`Validation failed: ${response.status} ${response.statusText}`),
                 provider: 'interactive',
@@ -2271,6 +2285,15 @@ const utilsNetwork = {
             return normalizeInteractiveResult(result);
           } catch (interactiveError) {
             console.warn('[validate] Interactive API call failed, falling back to legacy endpoint:', interactiveError);
+            if (!interactiveFallbackMeta) {
+              interactiveFallbackMeta = {
+                reason: 'interactive-error',
+                status: interactiveError?.status || null,
+                statusText: interactiveError?.statusText || null,
+                endpoint,
+                message: interactiveError?.message || String(interactiveError)
+              };
+            }
           }
         }
 
@@ -2306,7 +2329,14 @@ const utilsNetwork = {
         }
 
         const result = await response.json();
-        return normalizeLegacyResult(result);
+        const normalized = normalizeLegacyResult(result);
+        if (interactiveFallbackMeta) {
+          normalized.metadata = {
+            ...normalized.metadata,
+            interactiveFallback: interactiveFallbackMeta
+          };
+        }
+        return normalized;
       } catch (error) {
         console.error('[validate] Error during validation:', error);
         return {
