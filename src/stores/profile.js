@@ -84,6 +84,8 @@ export const useProfileStore = defineStore('profile', {
     activeProfilePosted: false,
     activeProfilePostedTimestamp: false,
 
+  validationSession: null,
+
     // stores the currently selected library for sublocation filtering
     selectedLibrary: null,
 
@@ -3657,12 +3659,51 @@ export const useProfileStore = defineStore('profile', {
   /**
    * Validate the reocrd
   */
-  validateRecord: async function(eid, profile){
-    //console.log("Profile store: Validating?")
-    let xml = await utilsExport.buildXML(this.activeProfile)
-    let response = await utilsNetwork.validate(xml.xlmStringBasic)
+  inferValidationTemplate(templateOverride = null) {
+    if (templateOverride) {
+      return templateOverride;
+    }
 
-    return response
+    const configStore = useConfigStore();
+    const templateMap = configStore.validationTemplateMap || {};
+
+    if (this.activeProfile) {
+      if (this.activeProfile.templateType && templateMap[this.activeProfile.templateType]) {
+        return templateMap[this.activeProfile.templateType];
+      }
+
+      if (Array.isArray(this.activeProfile.rtOrder)) {
+        for (const rt of this.activeProfile.rtOrder) {
+          if (templateMap[rt]) {
+            return templateMap[rt];
+          }
+        }
+      }
+    }
+
+    return templateMap.default || 'Monograph_Instance_Print';
+  },
+
+  validateRecord: async function(options = {}) {
+    const validationOptions = typeof options === 'object' && options !== null ? options : {};
+    const xml = await utilsExport.buildXML(this.activeProfile);
+    const template = this.inferValidationTemplate(validationOptions.template);
+    const response = await utilsNetwork.validate(
+      xml.xlmStringBasic,
+      template,
+      { ...validationOptions, template }
+    );
+
+    this.validationSession = {
+      timestamp: Date.now(),
+      template,
+      autoFix: validationOptions.autoFix !== undefined ? validationOptions.autoFix : true,
+      provider: response?.provider || null,
+      result: response,
+      originalXml: xml.xlmStringBasic
+    };
+
+    return response;
   },
 
     /**

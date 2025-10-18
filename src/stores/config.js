@@ -23,6 +23,7 @@ export const useConfigStore = defineStore('config', {
         instancepublish: "https://quartz.bibframe.app/util/publish/staging/instance",
         bfdb: "https://id.loc.gov/",
         validate: 'https://quartz.bibframe.app/validate',
+  validationApi: 'https://validate.bibframe.app',
         profiles: "/profiles.json",
         starting: "/starting.json",
         id: 'https://id.loc.gov/',
@@ -38,6 +39,7 @@ export const useConfigStore = defineStore('config', {
         utilLang  :  'https://editor.id.loc.gov/bfe2/util-lang/',
         scriptshifter: 'https://editor.id.loc.gov/bfe2/scriptshifter/',
         validate: 'https://preprod-3001.id.loc.gov/bfe2/util/validate',
+  validationApi: 'https://validate.bibframe.app',
         shelfListing: 'https://id.loc.gov/',
         // bfdb : 'https://preprod-8210.id.loc.gov/',
         bfdb : 'https://preprod-8300.id.loc.gov/',
@@ -59,6 +61,7 @@ export const useConfigStore = defineStore('config', {
         scriptshifter  :  'https://editor.id.loc.gov/bfe2/scriptshifter/',
         shelfListing: 'https://id.loc.gov/',
         validate: 'https://editor.id.loc.gov/bfe2/util/validate',
+  validationApi: 'https://validate.bibframe.app',
         bfdb : 'https://id.loc.gov/',
         bfdbGPO : 'https://preprod-8210.id.loc.gov/',
         // profiles : 'https://editor.id.loc.gov/api/listconfigs?where=index.resourceType:profile',
@@ -78,6 +81,7 @@ export const useConfigStore = defineStore('config', {
         utilLang  :  'https://bibframe.org/marva/util-lang/',
         scriptshifter  :  'https://bibframe.org/scriptshifter/',
         validate: 'https://bibframe.org/marva/util/validate',
+  validationApi: 'https://validate.bibframe.app',
         bfdb : 'https://id.loc.gov/',
         profiles : 'https://bibframe.org/marva/util/profiles/profile/prod',
         starting : 'https://bibframe.org/marva/util/profiles/starting/prod',
@@ -97,6 +101,7 @@ export const useConfigStore = defineStore('config', {
         instancepublish: "https://quartz.bibframe.app/util/publish/staging/instance",
         bfdb: "https://id.loc.gov/",
         validate: 'https://quartz.bibframe.app/validate',
+  validationApi: 'https://validate.bibframe.app',
         profiles: "https://quartz.bibframe.app/assets/profiles.json",
         starting: "https://quartz.bibframe.app/assets/starting.json",
         id: 'https://id.loc.gov/',
@@ -891,6 +896,15 @@ export const useConfigStore = defineStore('config', {
   publishUrl: "https://quartz.bibframe.app/util/publish/staging",
   workPublishUrl: "https://quartz.bibframe.app/util/publish/staging/work",
   instancePublishUrl: "https://quartz.bibframe.app/util/publish/staging/instance",
+
+  validationTemplateMap: {
+    default: 'Monograph_Instance_Print',
+    'lc:RT:bf2:Monograph:Work': 'Monograph_Work_Text',
+    'lc:RT:bf2:Monograph:Instance': 'Monograph_Instance_Print',
+    'lc:RT:bf2:Monograph:Instance:Electronic': 'Monograph_Instance_Electronic',
+    'lc:RT:bf2:Monograph:Item': 'Monograph_Instance_Print',
+    'lc:RT:bf2:Monograph:AdminMetadata': 'Monograph_AdminMetadata'
+  },
 
   }),
   getters: {

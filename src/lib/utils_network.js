@@ -2173,53 +2173,145 @@ const utilsNetwork = {
      * @param {string} profileId - the profile ID to validate against
      * @return {object} - returns validation results with conforms boolean and violations array
      */
-    validate: async function(rdfXml, profileId = null) {
+    validate: async function(rdfXml, templateHint = null, options = {}) {
+      const normalizeInteractiveResult = (result) => {
+        const status = result?.status || (result?.validation?.conforms ? 'valid' : 'invalid');
+        return {
+          provider: 'interactive',
+          status,
+          conforms: result?.validation?.conforms ?? (status === 'valid'),
+          validation: result?.validation || { results: [] },
+          metadata: result?.metadata || {},
+          correction: {
+            applied: ['fixed', 'partially_fixed'].includes(status),
+            rdf: result?.data || result?.corrected_rdf || null,
+            method: result?.method || null,
+            qualityScore: result?.quality_score ?? null
+          },
+          validationProof: result?.validation_proof || null,
+          processingTimeMs: result?.processing_time_ms ?? null,
+          raw: result
+        };
+      };
+
+      const normalizeLegacyResult = (result) => {
+        const conforms = !!result?.conforms;
+        const legacyResults = Array.isArray(result?.validation?.results)
+          ? result.validation.results
+          : Array.isArray(result?.violations)
+            ? result.violations.map((message) => ({ severity: 'ERROR', message }))
+            : [];
+        return {
+          provider: 'legacy',
+          status: conforms ? 'valid' : 'invalid',
+          conforms,
+          validation: { results: legacyResults },
+          metadata: {},
+          correction: {
+            applied: false,
+            rdf: null,
+            method: null,
+            qualityScore: null
+          },
+          validationProof: null,
+          processingTimeMs: null,
+          raw: result
+        };
+      };
+
       try {
-        const { useConfigStore } = await import('@/stores/config')
-        const returnUrls = useConfigStore().returnUrls || {};
-        
-        if (!returnUrls.validate) {
-          console.error('[validate] No validate URL configured');
+        const { useConfigStore } = await import('@/stores/config');
+        const configStore = useConfigStore();
+        const returnUrls = configStore.returnUrls || {};
+        const validationApiBase = options.baseUrl || returnUrls.validationApi;
+        const autoFix = options.autoFix !== undefined ? options.autoFix : true;
+        const controllerSignal = options.signal || undefined;
+        const templateMap = configStore.validationTemplateMap || {};
+        const template = options.template || templateHint || templateMap.default || 'Monograph_Instance_Print';
+
+        if (!rdfXml || typeof rdfXml !== 'string') {
           return {
-            conforms: false,
-            violations: ['No validation service URL configured']
+            error: new Error('Invalid RDF payload provided for validation'),
+            provider: 'client'
           };
         }
-        
-        // Use template from activeProfile, defaulting to 'monograph'
-        const templateValue = (useConfigStore().activeProfile && useConfigStore().activeProfile.templateType) || profileId || 'monograph';
-        const url = returnUrls.validate + "?template=" + templateValue;
-        console.log('[validate] Validating against:', url);
-        
+
+        if (validationApiBase) {
+          const endpoint = `${validationApiBase.replace(/\/$/, '')}/validate`;
+          console.log('[validate] Calling interactive API:', endpoint, 'template:', template);
+
+          const payload = {
+            rdf: rdfXml,
+            template,
+            auto_fix: autoFix
+          };
+
+          try {
+            const response = await fetch(endpoint, {
+              method: 'POST',
+              headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(payload),
+              signal: controllerSignal
+            });
+
+            if (!response.ok) {
+              const errorText = await response.text();
+              console.error('[validate] Interactive API error:', response.status, response.statusText, errorText);
+              return {
+                error: new Error(`Validation failed: ${response.status} ${response.statusText}`),
+                provider: 'interactive',
+                details: errorText
+              };
+            }
+
+            const result = await response.json();
+            return normalizeInteractiveResult(result);
+          } catch (interactiveError) {
+            console.warn('[validate] Interactive API call failed, falling back to legacy endpoint:', interactiveError);
+          }
+        }
+
+        if (!returnUrls.validate) {
+          console.error('[validate] No legacy validate URL configured');
+          return {
+            error: new Error('No validation service URL configured'),
+            provider: validationApiBase ? 'interactive' : 'legacy'
+          };
+        }
+
+        const url = returnUrls.validate + (template ? `?template=${encodeURIComponent(template)}` : '');
+        console.log('[validate] Falling back to legacy validation at:', url);
+
         const response = await fetch(url, {
           method: 'POST',
           headers: {
-            'Accept': 'application/json',
+            Accept: 'application/json',
             'Content-Type': 'application/rdf+xml'
           },
-          body: rdfXml
+          body: rdfXml,
+          signal: controllerSignal
         });
-        
+
         if (!response.ok) {
           const errorText = await response.text();
-          console.error(`[validate] Validation failed: ${response.status} ${response.statusText}: ${errorText}`);
+          console.error('[validate] Legacy validation error:', response.status, response.statusText, errorText);
           return {
-            conforms: false,
-            violations: [`Validation failed: ${response.status} ${response.statusText}`]
+            error: new Error(`Validation failed: ${response.status} ${response.statusText}`),
+            provider: 'legacy',
+            details: errorText
           };
         }
-        
+
         const result = await response.json();
-        console.log('[validate] Validation result:', result);
-        
-        // Return the result as-is, assuming it already has the right format
-        return result;
-        
+        return normalizeLegacyResult(result);
       } catch (error) {
         console.error('[validate] Error during validation:', error);
         return {
-          conforms: false,
-          violations: [`Validation error: ${error.message}`]
+          error,
+          provider: 'unknown'
         };
       }
     },
