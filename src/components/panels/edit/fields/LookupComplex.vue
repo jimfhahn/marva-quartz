@@ -428,20 +428,31 @@ export default {
           contextValue.type = 'Hub'
           contextValue.typeFull='http://id.loc.gov/ontologies/bibframe/Hub'
         }
+        // Preserve any bf subclass stamped by the modal (e.g., Person/Organization)
+        // Compute the type to pass BEFORE mutating contextValue
+        const stampedType = (this.structure && this.structure.propertyURI === 'http://id.loc.gov/ontologies/bibframe/genreForm'
+          ? 'http://id.loc.gov/ontologies/bibframe/GenreForm'
+          : (contextValue.typeFull || null));
 
+        // It's safe to remove the helper now (keep context clean in store)
         delete contextValue.typeFull
+
+        // Normalize marcKey from either extra.marcKey or top-level marcKey
+        const normalizedMarcKey = this.normalizeMarcKey(
+          (contextValue.extra && contextValue.extra.marcKey)
+            ? contextValue.extra.marcKey
+            : contextValue.marcKey
+        )
         this.profileStore.setValueComplex(
           this.guid,
           null,
           this.propertyPath,
           contextValue.uri,
           contextValue.title,
-          // Ensure type for genreForm so exporter emits bf:GenreForm instead of bf:Resource
-          (this.structure && this.structure.propertyURI === 'http://id.loc.gov/ontologies/bibframe/genreForm'
-            ? 'http://id.loc.gov/ontologies/bibframe/GenreForm'
-            : (contextValue.typeFull || null)),
+          // Pass through the stamped type so exporter emits specific bf subclass
+          stampedType,
           contextValue.extra,
-          this.normalizeMarcKey(contextValue.extra.marcKey)
+          normalizedMarcKey
         )
       }
         this.searchValue=''
