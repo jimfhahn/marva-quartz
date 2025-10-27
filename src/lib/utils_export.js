@@ -1307,6 +1307,32 @@ const utilsExport = {
     return assignerEl;
   },
 
+  /**
+   * Creates a bf:descriptionConventions element with nested bf:DescriptionConventions
+   * pointing to RDA and a human-readable English label.
+   *
+   * <bf:descriptionConventions>
+   *   <bf:DescriptionConventions rdf:about="http://id.loc.gov/vocabulary/descriptionConventions/rda">
+   *     <rdfs:label xml:lang="en">Resource description and access</rdfs:label>
+   *   </bf:DescriptionConventions>
+   * </bf:descriptionConventions>
+   *
+   * @return {Element} - The descriptionConventions element
+   */
+  buildDescriptionConventionsElement: function() {
+    const dcWrap = this.createElByBestNS('bf:descriptionConventions');
+    const dc = this.createElByBestNS('bf:DescriptionConventions');
+    dc.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:about', 'http://id.loc.gov/vocabulary/descriptionConventions/rda');
+
+  const lbl = this.createRdfsLabel('Resource description and access');
+  // Set English language tag on label
+  lbl.setAttribute('xml:lang', 'en');
+    dc.appendChild(lbl);
+
+    dcWrap.appendChild(dc);
+    return dcWrap;
+  },
+
   /** 
    * Clean up an assigner element to ensure it has the correct structure:
    * <bf:assigner>
@@ -3288,6 +3314,14 @@ const utilsExport = {
         // Normalize/deduplicate assigner structure
         this.deduplicateAssignersInAdminMetadata(bf_AdminMetadata);
 
+        // Ensure descriptionConventions (RDA) exists
+        try {
+          const hasDC = bf_AdminMetadata.getElementsByTagNameNS(utilsRDF.namespace.bf, 'descriptionConventions').length > 0;
+          if (!hasDC) {
+            bf_AdminMetadata.appendChild(this.buildDescriptionConventionsElement());
+          }
+        } catch (_) {}
+
         bf_adminMetadata.appendChild(bf_AdminMetadata);
         workEl.appendChild(bf_adminMetadata);
         targetAdminMetadata = bf_AdminMetadata;
@@ -3356,6 +3390,14 @@ const utilsExport = {
 
         // Ensure/normalize assigner: add default if missing and deduplicate
         this.deduplicateAssignersInAdminMetadata(targetAdminMetadata);
+
+        // Ensure descriptionConventions (RDA) exists
+        try {
+          const hasDC2 = targetAdminMetadata.getElementsByTagNameNS(utilsRDF.namespace.bf, 'descriptionConventions').length > 0;
+          if (!hasDC2) {
+            targetAdminMetadata.appendChild(this.buildDescriptionConventionsElement());
+          }
+        } catch (_) {}
       }
     }
 
@@ -3421,6 +3463,14 @@ const utilsExport = {
         // Normalize/deduplicate assigner structure
         this.deduplicateAssignersInAdminMetadata(bf_AdminMetadata);
 
+        // Ensure descriptionConventions (RDA) exists
+        try {
+          const hasDC3 = bf_AdminMetadata.getElementsByTagNameNS(utilsRDF.namespace.bf, 'descriptionConventions').length > 0;
+          if (!hasDC3) {
+            bf_AdminMetadata.appendChild(this.buildDescriptionConventionsElement());
+          }
+        } catch (_) {}
+
         bf_adminMetadata.appendChild(bf_AdminMetadata);
         instanceEl.appendChild(bf_adminMetadata);
         targetAdminMetadata = bf_AdminMetadata;
@@ -3484,6 +3534,14 @@ const utilsExport = {
 
         // Ensure/normalize assigner: add default if missing and deduplicate
         this.deduplicateAssignersInAdminMetadata(targetAdminMetadata);
+
+        // Ensure descriptionConventions (RDA) exists
+        try {
+          const hasDC4 = targetAdminMetadata.getElementsByTagNameNS(utilsRDF.namespace.bf, 'descriptionConventions').length > 0;
+          if (!hasDC4) {
+            targetAdminMetadata.appendChild(this.buildDescriptionConventionsElement());
+          }
+        } catch (_) {}
       }
     }
 
