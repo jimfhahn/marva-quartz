@@ -996,6 +996,65 @@
               }
             }
           } catch {}
+
+          // If this modal is used for a bf:agent field, stamp a specific bf:* class when we can
+          try {
+            const isAgentField = this.structure && (
+              this.structure.propertyURI === 'http://id.loc.gov/ontologies/bibframe/agent' ||
+              this.structure.propertyURI === 'bf:agent' ||
+              (typeof this.structure.propertyURI === 'string' && this.structure.propertyURI.includes('/agent'))
+            );
+
+            if (isAgentField && !contextCopy.literal) {
+              const bfMap = {
+                PersonalName: 'http://id.loc.gov/ontologies/bibframe/Person',
+                CorporateName: 'http://id.loc.gov/ontologies/bibframe/Organization',
+                FamilyName: 'http://id.loc.gov/ontologies/bibframe/Family',
+                MeetingName: 'http://id.loc.gov/ontologies/bibframe/Meeting'
+              };
+
+              // 1) Prefer rdftypes from authority hit
+              let authorityTypes = [];
+              if (contextCopy.extra && Array.isArray(contextCopy.extra.rdftypes)) {
+                authorityTypes = contextCopy.extra.rdftypes.slice();
+              }
+
+              // 2) Also consider a normalized short type like 'PersonalName'
+              if (contextCopy.type && typeof contextCopy.type === 'string') {
+                const t = contextCopy.type.replace('madsrdf:', '');
+                if (!authorityTypes.includes(t)) authorityTypes.push(t);
+              }
+
+              // 3) Determine target bf type from the above
+              let bfTypeUri = null;
+              for (const t of authorityTypes) {
+                if (bfMap[t]) { bfTypeUri = bfMap[t]; break; }
+              }
+
+              // 4) Fallback to valueDataType if available
+              if (!bfTypeUri && this.structure && this.structure.valueConstraint && this.structure.valueConstraint.valueDataType) {
+                const dt = this.structure.valueConstraint.valueDataType.dataTypeURI;
+                const allowed = [
+                  'http://id.loc.gov/ontologies/bibframe/Person',
+                  'http://id.loc.gov/ontologies/bibframe/Organization',
+                  'http://id.loc.gov/ontologies/bibframe/Family',
+                  'http://id.loc.gov/ontologies/bibframe/Meeting'
+                ];
+                if (dt && allowed.includes(dt)) {
+                  bfTypeUri = dt;
+                }
+              }
+
+              // If we found a specific bf type, set it as both @type and typeFull so downstream uses it
+              if (bfTypeUri) {
+                // Ensure @type carries the mapped bf subclass; exporter will add bf:Agent automatically
+                contextCopy['@type'] = bfTypeUri;
+                contextCopy.typeFull = bfTypeUri;
+              }
+            }
+          } catch (e) {
+            console.warn('Agent type stamping failed (non-fatal):', e);
+          }
           
           // Debug logging for Hub marcKey troubleshooting
           console.log("Emitting complex value for:", {
