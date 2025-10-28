@@ -999,13 +999,36 @@
 
           // If this modal is used for a bf:agent field, stamp a specific bf:* class when we can
           try {
+            // Check if this is an agent field by examining both the direct propertyURI 
+            // and the parent property path (since bf:agent often uses owl:sameAs as the final URI)
             const isAgentField = this.structure && (
               this.structure.propertyURI === 'http://id.loc.gov/ontologies/bibframe/agent' ||
               this.structure.propertyURI === 'bf:agent' ||
-              (typeof this.structure.propertyURI === 'string' && this.structure.propertyURI.includes('/agent'))
+              (typeof this.structure.propertyURI === 'string' && this.structure.propertyURI.includes('/agent')) ||
+              // Also check if parent property label contains "agent"
+              (this.structure.propertyLabel && typeof this.structure.propertyLabel === 'string' && 
+               this.structure.propertyLabel.toLowerCase().includes('agent'))
             );
 
+            console.log('🔍 Modal agent field check (DETAILED):', {
+              isAgentField,
+              propertyURI: this.structure?.propertyURI,
+              propertyLabel: this.structure?.propertyLabel,
+              'structure keys': this.structure ? Object.keys(this.structure) : null,
+              'structure.parent': this.structure?.parent,
+              'structure.parentId': this.structure?.parentId,
+              'full structure': this.structure
+            });
+
             if (isAgentField && !contextCopy.literal) {
+              console.log('🔍 Agent field detected, examining context for type info:', {
+                'contextCopy.type': contextCopy.type,
+                'contextCopy.extra': contextCopy.extra,
+                'contextCopy.extra.rdftypes': contextCopy.extra?.rdftypes,
+                'contextCopy.extra.type': contextCopy.extra?.type,
+                'full contextCopy keys': Object.keys(contextCopy)
+              });
+              
               const bfMap = {
                 PersonalName: 'http://id.loc.gov/ontologies/bibframe/Person',
                 CorporateName: 'http://id.loc.gov/ontologies/bibframe/Organization',
@@ -1024,6 +1047,8 @@
                 const t = contextCopy.type.replace('madsrdf:', '');
                 if (!authorityTypes.includes(t)) authorityTypes.push(t);
               }
+
+              console.log('🔍 Collected authorityTypes:', authorityTypes);
 
               // 3) Determine target bf type from the above
               let bfTypeUri = null;

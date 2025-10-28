@@ -2686,6 +2686,7 @@ export const useProfileStore = defineStore('profile', {
           // type and what it needs to be
           // don't do this for subjects, Subjects as complexValues will add extra nesting that doesn't match a subject's XML
           if (!propertyPath.some((pp) => pp.propertyURI == 'http://id.loc.gov/ontologies/bibframe/subject')){
+            console.log('🔍 Profile store setting blankNode @type to:', type, 'for URI:', URI)
             blankNode['@type'] = type
           }
 

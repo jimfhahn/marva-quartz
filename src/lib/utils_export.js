@@ -722,6 +722,8 @@ const utilsExport = {
 
       // Normalise @type so downstream code always sees the Agent type
       const rawType = userValue ? userValue['@type'] : null;
+      console.log('🔍 createBnode for agent - incoming @type:', rawType, 'for agent:', agentId)
+      
       if (!rawType) {
         userValue['@type'] = agentTypeUri;
       } else if (Array.isArray(rawType)) {
@@ -740,13 +742,67 @@ const utilsExport = {
         userValue['@type'] = [rawType, agentTypeUri];
       }
 
+      console.log('🔍 createBnode for agent - normalized @type:', userValue['@type'])
+
       let bnode = this.createElByBestNS('bf:Agent');
       if (agentId) {
         bnode.setAttributeNS(utilsRDF.namespace.rdf, 'rdf:about', agentId);
       }
 
       const typeValues = userValue['@type'];
-      const typeArray = Array.isArray(typeValues) ? typeValues : [typeValues];
+      const typeArray = Array.isArray(typeValues) ? typeValues.slice() : [typeValues];
+
+      console.log('🔍 createBnode for agent - typeArray before subclass check:', typeArray)
+
+      // Heuristic: if we only have bf:Agent and no specific subclass, try to infer from marcKey tag (100/110/111)
+      const hasSpecificSubclass = typeArray.some(t => {
+        const uri = typeof t === 'string' ? t : (t && t['@id']);
+        return uri && (
+          uri.includes('/Person') ||
+          uri.includes('/Organization') ||
+          uri.includes('/Family') ||
+          uri.includes('/Meeting')
+        );
+      });
+
+      console.log('🔍 createBnode for agent - hasSpecificSubclass:', hasSpecificSubclass)
+
+      if (!hasSpecificSubclass) {
+        // Extract a marcKey string if present (string or array or @value)
+        let mk = null;
+        const mkUri = 'http://id.loc.gov/ontologies/bflc/marcKey';
+        if (typeof userValue.marcKey === 'string') {
+          mk = userValue.marcKey;
+        } else if (Array.isArray(userValue.marcKey) && userValue.marcKey.length > 0) {
+          mk = typeof userValue.marcKey[0] === 'string' ? userValue.marcKey[0] : (userValue.marcKey[0] && userValue.marcKey[0]['@value']);
+        } else if (userValue[mkUri]) {
+          const arr = Array.isArray(userValue[mkUri]) ? userValue[mkUri] : [userValue[mkUri]];
+          if (arr[0]) {
+            mk = typeof arr[0] === 'string' ? arr[0] : (arr[0]['@value'] || null);
+          }
+        }
+
+        const tag = mk ? String(mk).trim().substring(0,3) : null;
+        let inferred = null;
+        if (tag === '100') inferred = 'http://id.loc.gov/ontologies/bibframe/Person';
+        else if (tag === '110') inferred = 'http://id.loc.gov/ontologies/bibframe/Organization';
+        else if (tag === '111') inferred = 'http://id.loc.gov/ontologies/bibframe/Meeting';
+
+        if (inferred) {
+          // Add inferred subclass alongside bf:Agent
+          if (Array.isArray(userValue['@type'])) {
+            if (!userValue['@type'].includes(inferred)) userValue['@type'].push(inferred);
+          } else if (typeof userValue['@type'] === 'string') {
+            if (userValue['@type'] !== inferred) userValue['@type'] = [userValue['@type'], inferred];
+          } else {
+            userValue['@type'] = [agentTypeUri, inferred];
+          }
+          // refresh typeArray for emission
+          while (typeArray.length) typeArray.pop();
+          const refreshed = Array.isArray(userValue['@type']) ? userValue['@type'] : [userValue['@type']];
+          for (const t of refreshed) typeArray.push(t);
+        }
+      }
       for (let t of typeArray) {
         const typeUri = typeof t === 'string' ? t : (t && t['@id']);
         if (!typeUri) {

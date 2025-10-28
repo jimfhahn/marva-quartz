@@ -417,6 +417,14 @@ export default {
     * @return {object} profile
     */
     setComplexValue: function(contextValue){
+      console.log('🔍 LookupComplex.setComplexValue received:', {
+        uri: contextValue.uri,
+        typeFull: contextValue.typeFull,
+        '@type': contextValue['@type'],
+        extra: contextValue.extra,
+        propertyURI: this.structure?.propertyURI
+      })
+      
       if (Object.keys(contextValue.extra).length == 0){
         // Intended audience mixes simple and complex lookups, so do check
         this.profileStore.setValueSimple(this.guid, null, this.propertyPath, contextValue.uri, contextValue.title[0])
@@ -430,9 +438,45 @@ export default {
         }
         // Preserve any bf subclass stamped by the modal (e.g., Person/Organization)
         // Compute the type to pass BEFORE mutating contextValue
-        const stampedType = (this.structure && this.structure.propertyURI === 'http://id.loc.gov/ontologies/bibframe/genreForm'
+        let stampedType = (this.structure && this.structure.propertyURI === 'http://id.loc.gov/ontologies/bibframe/genreForm'
           ? 'http://id.loc.gov/ontologies/bibframe/GenreForm'
           : (contextValue.typeFull || null));
+
+        // If typeFull is missing and we're in an agent path (bf:agent → owl:sameAs),
+        // derive a specific BIBFRAME subclass (Person/Organization/Family/Meeting)
+        try {
+          const pathUris = Array.isArray(this.propertyPath) ? this.propertyPath.map(p => p.propertyURI) : []
+          const isAgentPath = pathUris.includes('http://id.loc.gov/ontologies/bibframe/agent')
+          if (!stampedType && isAgentPath && contextValue && contextValue.extra) {
+            const bfMap = {
+              PersonalName: 'http://id.loc.gov/ontologies/bibframe/Person',
+              CorporateName: 'http://id.loc.gov/ontologies/bibframe/Organization',
+              FamilyName: 'http://id.loc.gov/ontologies/bibframe/Family',
+              MeetingName: 'http://id.loc.gov/ontologies/bibframe/Meeting',
+              // Sometimes rdftypes are already bf:* short labels from APIs
+              Person: 'http://id.loc.gov/ontologies/bibframe/Person',
+              Organization: 'http://id.loc.gov/ontologies/bibframe/Organization',
+              Family: 'http://id.loc.gov/ontologies/bibframe/Family',
+              Meeting: 'http://id.loc.gov/ontologies/bibframe/Meeting'
+            }
+            let rdftypes = []
+            if (Array.isArray(contextValue.extra.rdftypes)) rdftypes = contextValue.extra.rdftypes.slice()
+            // Also consider a normalized short type like 'madsrdf:PersonalName' or 'bf:Person'
+            if (typeof contextValue.extra.type === 'string') {
+              const short = contextValue.extra.type.includes(':') ? contextValue.extra.type.split(':')[1] : contextValue.extra.type
+              if (short) rdftypes.unshift(short)
+            }
+            // Try to pick the first that maps to a bf subclass
+            for (const t of rdftypes) {
+              if (bfMap[t]) { stampedType = bfMap[t]; break }
+            }
+            console.log('🔍 Agent path detected, derived stampedType from rdftypes:', rdftypes, '=>', stampedType)
+          }
+        } catch(e) {
+          console.warn('Agent subclass derivation failed (non-fatal):', e)
+        }
+
+        console.log('🔍 Computed stampedType:', stampedType, 'from typeFull:', contextValue.typeFull)
 
         // It's safe to remove the helper now (keep context clean in store)
         delete contextValue.typeFull
@@ -443,6 +487,9 @@ export default {
             ? contextValue.extra.marcKey
             : contextValue.marcKey
         )
+        
+        console.log('🔍 Calling setValueComplex with type:', stampedType)
+        
         this.profileStore.setValueComplex(
           this.guid,
           null,
