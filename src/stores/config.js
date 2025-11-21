@@ -111,6 +111,10 @@ export const useConfigStore = defineStore('config', {
 
   postUsingAlmaXmlFormat: false,
 
+    // Controls how bf:Item resources are included in published RDF/XML
+    // Options: 'full' (include all Item children), 'minimal' (keep location/sublocation/barcode/itemOf), 'none' (exclude Items)
+    publishItemsMode: 'minimal',
+
 
 
 

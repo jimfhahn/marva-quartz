@@ -1590,60 +1590,69 @@ const utilsExport = {
   * @param {object} profile - the profile to convert to XML
   * @return {Promise<object|boolean>} - XML output object or false on failure
   */ 
-  buildXML: async function(profile){
-    if (!profile || (profile && Object.keys(profile).length==0)){
+  /** 
+  * Public wrapper for XML building with optional Item exclusion.
+  * @param {object} profile - the profile to convert to XML
+  * @param {boolean} [includeItems=true] - when false, exclude bf:Item resources from final RDF and bf2Marc package
+  * @return {Promise<object|boolean>} - XML output object or false on failure
+  */ 
+  /**
+   * Public XML builder with flexible Item inclusion modes.
+   * @param {object} profile
+   * @param {boolean|string} includeItemsOrMode - legacy boolean or one of 'none'|'minimal'|'full'
+   */
+  buildXML: async function(profile, includeItemsOrMode = true){
+    if (!profile || (profile && Object.keys(profile).length === 0)) {
       console.warn("Trying to build XML with bad profile:", profile);
       return false;
     }
 
-    // if we are in dev mode let the error bubble, but otherwise catch the error and try to recover
-    if (useConfigStore().returnUrls.dev === true){
-      let result = await this.buildXMLProcess(profile);
-      // Clear processedAgents Set after ALL processing is complete
-      this.processedAgents = null;
-      return result;
-    } else {
-      try {
-        let xmlObj = await this.buildXMLProcess(profile);
-        this.lastGoodXMLBuildProfile = JSON.parse(JSON.stringify(profile));
-        this.lastGoodXMLBuildProfileTimestamp = Math.floor(Date.now() / 1000);
-        // Clear processedAgents Set after ALL processing is complete
-        this.processedAgents = null;
-        return xmlObj;
-      } catch (error) {
-        console.warn("XML Parsing Error:");
-        console.warn(error);
-        // Clear processedAgents Set on error too
-        this.processedAgents = null;
-        useProfileStore().triggerBadXMLBuildRecovery(this.lastGoodXMLBuildProfile, this.lastGoodXMLBuildProfileTimestamp);
-        let profileAsJson;
-        try {
-          profileAsJson = JSON.stringify(profile,null,2);
-        } catch {
-          profileAsJson = 'Error stringify-ing profile!';
-        }
-        let user = `${usePreferenceStore().catInitals}_${usePreferenceStore().catCode}`.replace("/\s/g",'_');
-        const filename = `${Math.floor(Date.now() / 1000)}_${user}_` + `${new Date().toDateString()}_${new Date().toTimeString()}`.replaceAll(' ','_').replaceAll(':','-') + '.txt';
-        console.warn(error);
-        let errorReport = `
-        Error: ${error}
-        ----------------
-        XML Creation Log
-        ----------------
-        ----End Creation Log----
-        ****************
-        XML Source = "";
-        ****************
-        ${(profile.xmlSource) ? profile.xmlSource : 'No Source Found'}
-        ***End Source***
-        `;
-        if (utilsNetwork && typeof utilsNetwork.sendErrorReportLog === 'function') {
-          utilsNetwork.sendErrorReportLog(errorReport,filename,profileAsJson);
-        } else {
-          console.warn('utilsNetwork.sendErrorReportLog is unavailable; skipping error report upload.');
-        }
-        return false;
+    // Normalize mode
+    let mode = 'full';
+    if (typeof includeItemsOrMode === 'boolean') {
+      mode = includeItemsOrMode ? 'full' : 'none';
+    } else if (typeof includeItemsOrMode === 'string' && ['none','minimal','full'].includes(includeItemsOrMode)) {
+      mode = includeItemsOrMode;
+    }
+
+    const emitItems = mode !== 'none';
+
+    const finalize = (xmlObj) => {
+      if (mode === 'minimal') {
+        xmlObj = this._applyMinimalItemFilter(xmlObj);
       }
+      return xmlObj;
+    };
+
+    if (useConfigStore().returnUrls.dev === true) {
+      let result = await this.buildXMLProcess(profile, emitItems);
+      this.processedAgents = null;
+      return finalize(result);
+    }
+
+    try {
+      let xmlObj = await this.buildXMLProcess(profile, emitItems);
+      xmlObj = finalize(xmlObj);
+      this.lastGoodXMLBuildProfile = JSON.parse(JSON.stringify(profile));
+      this.lastGoodXMLBuildProfileTimestamp = Math.floor(Date.now() / 1000);
+      this.processedAgents = null;
+      return xmlObj;
+    } catch (error) {
+      console.warn("XML Parsing Error:");
+      console.warn(error);
+      this.processedAgents = null;
+      useProfileStore().triggerBadXMLBuildRecovery(this.lastGoodXMLBuildProfile, this.lastGoodXMLBuildProfileTimestamp);
+      let profileAsJson;
+      try { profileAsJson = JSON.stringify(profile,null,2); } catch { profileAsJson = 'Error stringify-ing profile!'; }
+      let user = `${usePreferenceStore().catInitals}_${usePreferenceStore().catCode}`.replace("/\s/g",'_');
+      const filename = `${Math.floor(Date.now() / 1000)}_${user}_` + `${new Date().toDateString()}_${new Date().toTimeString()}`.replaceAll(' ','_').replaceAll(':','-') + '.txt';
+      let errorReport = `\nError: ${error}\n----------------\nXML Creation Log\n----------------\n----End Creation Log----\n****************\nXML Source = "";\n****************\n${(profile.xmlSource) ? profile.xmlSource : 'No Source Found'}\n***End Source***\n`;
+      if (utilsNetwork && typeof utilsNetwork.sendErrorReportLog === 'function') {
+        utilsNetwork.sendErrorReportLog(errorReport,filename,profileAsJson);
+      } else {
+        console.warn('utilsNetwork.sendErrorReportLog is unavailable; skipping error report upload.');
+      }
+      return false;
     }
   },
 
@@ -1652,7 +1661,13 @@ const utilsExport = {
   * @param {object} profile - the profile to convert to XML
   * @return {object} multiple XML strings and metadata
   */ 
-  buildXMLProcess: async function(profile){
+  /**
+  * Core XML building process.
+  * @param {object} profile - profile object
+  * @param {boolean} [includeItems=true] - controls whether bf:Item resources are emitted
+  * @return {object} multiple XML strings and metadata
+  */
+  buildXMLProcess: async function(profile, includeItems = true){
     // Add validation at the start
     if (!profile || typeof profile !== 'object') {
       console.error("buildXMLProcess: Invalid profile object", profile);
@@ -3636,11 +3651,13 @@ const utilsExport = {
       rdfBasic.appendChild(instance);
     }
 
-    // Add Items to rdfBasic - CRITICAL FOR ITEM RENDERING
-    for (let URI in tleLookup['Item']){
-      let item = (new XMLSerializer()).serializeToString(tleLookup['Item'][URI]);
-      item = xmlParser.parseFromString(item, "text/xml").children[0];
-      rdfBasic.appendChild(item);
+    // Add Items to rdfBasic only if requested
+    if (includeItems){
+      for (let URI in tleLookup['Item']){
+        let item = (new XMLSerializer()).serializeToString(tleLookup['Item'][URI]);
+        item = xmlParser.parseFromString(item, "text/xml").children[0];
+        rdfBasic.appendChild(item);
+      }
     }
 
     // Build RDF centered around instance or work based on procInfo
@@ -3740,34 +3757,28 @@ const utilsExport = {
         console.error(`Error adding Work ${URI} to RDF root:`, error);
       }
     }
-    // DIRECT ITEM HANDLING: Ensure all standalone Items are added directly to the RDF root
-    console.log("DEBUG: Processing standalone Items for direct inclusion in RDF root");
-    for (let URI in tleLookup['Item']){
-      // Skip if this URI doesn't exist or isn't an actual Item
-      if (!tleLookup['Item'][URI]) {
-        console.log(`DEBUG: Item ${URI} doesn't exist in tleLookup['Item']`);
-        continue;
-      }
-      
-      try {
-        // Ensure we have a proper Item element
-        console.log(`DEBUG: Processing Item ${URI} for inclusion`);
-        const item = tleLookup['Item'][URI].cloneNode(true); // Clone to avoid modifying original
-        
-        if (!item || !item.nodeType) {
-          console.log(`DEBUG: Item ${URI} is not a valid node`);
+    // DIRECT ITEM HANDLING gated by includeItems flag
+    if (includeItems){
+      console.log("DEBUG: Processing standalone Items for direct inclusion in RDF root");
+      for (let URI in tleLookup['Item']){
+        if (!tleLookup['Item'][URI]) {
+          console.log(`DEBUG: Item ${URI} doesn't exist in tleLookup['Item']`);
           continue;
         }
-        
-        // Verify bf:Item is properly created
-        console.log(`DEBUG: Item ${URI} nodeName = ${item.nodeName}`);
-        
-        // Append directly to RDF root - this is the critical part
-        rdf.appendChild(item);
-        console.log(`DEBUG: Successfully added Item ${URI} directly to RDF root`);
-      } catch (error) {
-        console.error(`Error adding Item ${URI} to RDF root:`, error);
+        try {
+          const item = tleLookup['Item'][URI].cloneNode(true);
+          if (!item || !item.nodeType) {
+            console.log(`DEBUG: Item ${URI} is not a valid node`);
+            continue;
+          }
+          rdf.appendChild(item);
+          console.log(`DEBUG: Successfully added Item ${URI} directly to RDF root`);
+        } catch (error) {
+          console.error(`Error adding Item ${URI} to RDF root:`, error);
+        }
       }
+    } else {
+      console.log("DEBUG: Skipping Item inclusion (includeItems=false)");
     }
     
     // Extract metadata from rdfBasic DOM for DatasetDescription
@@ -3964,7 +3975,9 @@ const utilsExport = {
     let bf2MarcXmlElRdf = this.createElByBestNS('http://www.w3.org/1999/02/22-rdf-syntax-ns#RDF');
     for (let el of rdfBasic.getElementsByTagName("bf:Work")){ bf2MarcXmlElRdf.appendChild(el); }
     for (let el of rdfBasic.getElementsByTagName("bf:Instance")){ bf2MarcXmlElRdf.appendChild(el); }
-    for (let el of rdfBasic.getElementsByTagName("bf:Item")){ bf2MarcXmlElRdf.appendChild(el); }
+    if (includeItems){
+      for (let el of rdfBasic.getElementsByTagName("bf:Item")){ bf2MarcXmlElRdf.appendChild(el); }
+    }
     
     // Deduplicate agent labels/marcKeys in BF2MARC package too
     bf2MarcXmlElRdf = this.deduplicateAgentLabels(bf2MarcXmlElRdf);
@@ -4016,6 +4029,58 @@ const utilsExport = {
       voidContributor: xmlVoidDataContributor,
       componentXmlLookup: componentXmlLookup
     };
+  },
+
+  /**
+   * Minimal Item filter: retains only bf:physicalLocation, bf:sublocation, bf:Barcode, bf:identifiedBy.
+   * Removes Items entirely if they lack usageAndAccessPolicy (needed for middleware item creation).
+   * Strips other child elements to reduce MARC noise (e.g. immediateAcquisition).
+   */
+  _applyMinimalItemFilter(xmlObj){
+    if (!xmlObj) return xmlObj;
+    // Retain a minimal, Alma-safe subset of Item children
+    // - bf:physicalLocation: needed for holdings mapping
+    // - bf:sublocation: needed for holdings mapping
+    // - bf:Barcode: sometimes emitted directly (not always under identifiedBy)
+    // - bf:identifiedBy: preserves barcode structure for middleware extraction (bf:identifiedBy/bf:Barcode/rdf:value)
+    // - bf:usageAndAccessPolicy: needed for middleware item creation (UsePolicy, AccessPolicy)
+    // - bf:itemOf: preserves linkage back to the Instance when present
+    const allowed = new Set(['bf:physicalLocation','bf:sublocation','bf:Barcode','bf:identifiedBy','bf:usageAndAccessPolicy','bf:itemOf']);
+    const scrub = (xmlStr) => {
+      if (!xmlStr || typeof xmlStr !== 'string' || !xmlStr.includes('<bf:Item')) return xmlStr;
+      const parser = returnDOMParser();
+      let doc = parser.parseFromString(xmlStr,'text/xml');
+      if (doc.getElementsByTagName('parsererror').length) return xmlStr; // fallback
+      const items = Array.from(doc.getElementsByTagName('bf:Item'));
+      const itemsToRemove = [];
+      for (const item of items){
+        // Check if item has usageAndAccessPolicy - if not, remove entire Item
+        const hasPolicy = Array.from(item.children).some(c => c.tagName === 'bf:usageAndAccessPolicy');
+        if (!hasPolicy) {
+          itemsToRemove.push(item);
+          continue;
+        }
+        // Keep item but strip non-allowed children
+        const children = Array.from(item.children);
+        for (const c of children){
+          if (!allowed.has(c.tagName)){
+            c.parentNode && c.parentNode.removeChild(c);
+          }
+        }
+      }
+      // Remove items that lack required metadata
+      for (const item of itemsToRemove) {
+        if (item.parentNode) {
+          item.parentNode.removeChild(item);
+        }
+      }
+      return new XMLSerializer().serializeToString(doc.documentElement || doc);
+    };
+    xmlObj.bf2Marc = scrub(xmlObj.bf2Marc);
+    xmlObj.xlmString = scrub(xmlObj.xlmString);
+    xmlObj.xmlStringFormatted = scrub(xmlObj.xmlStringFormatted);
+    xmlObj.xlmStringBasic = scrub(xmlObj.xlmStringBasic);
+    return xmlObj;
   },
 
   /**

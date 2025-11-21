@@ -3483,7 +3483,8 @@ export const useProfileStore = defineStore('profile', {
     * @return {string} - the MARC string of output
     */
     marcPreview: async function(){
-      let xml = await utilsExport.buildXML(this.activeProfile)
+  // Use minimal Item mode (retain location/barcode only) for MARC preview
+  let xml = await utilsExport.buildXML(this.activeProfile, 'minimal')
       let preview = null
       const wantsHtmlMarc = usePreferenceStore().returnValue('--b-edit-main-splitpane-opac-marc-html')
       preview = await utilsNetwork.marcPreview(xml.bf2Marc, wantsHtmlMarc)
@@ -3686,9 +3687,12 @@ export const useProfileStore = defineStore('profile', {
         let xml = xmlString;
         if (!xml) {
           console.log("DEBUG: No XML provided, generating from active profile");
-          const xmlObj = await utilsExport.buildXML(this.activeProfile);
+          // Use configured Item mode for publishing to reduce bf:Item noise that can break Alma MARC conversion
+          const cfg = useConfigStore();
+          const itemMode = cfg && cfg.publishItemsMode ? cfg.publishItemsMode : 'minimal';
+          const xmlObj = await utilsExport.buildXML(this.activeProfile, itemMode);
           xml = xmlObj.xmlStringFormatted;
-          console.log("DEBUG: Generated XML length:", xml ? xml.length : 0);
+          console.log("DEBUG: Generated XML length:", xml ? xml.length : 0, "(minimal Item mode)");
           
           // Log first 500 characters of XML for debugging
           if (xml) {
