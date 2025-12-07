@@ -23,6 +23,8 @@ import { usePreferenceStore } from '@/stores/preference'
 
 import { mapStores, mapState, mapWritableState } from 'pinia'
 
+import utilsParse from '@/lib/utils_parse';
+
 export default {
   components: {
     LoadingModal,
@@ -43,6 +45,7 @@ export default {
   data() {
     return {
       count: 0,
+      isEmbeddedInVSCode: false,
     }
   },
   computed: {
@@ -71,11 +74,118 @@ export default {
   methods: {
     increment() {
       this.count++
+    },
+    
+    /**
+     * Handle messages from VS Code extension (when embedded in iframe)
+     */
+    handleVSCodeMessage(event) {
+      // Only accept messages with a type property
+      if (!event.data || !event.data.type) return;
+      
+      const { type, ...payload } = event.data;
+      console.log('[Quartz Bridge] Received message:', type, payload);
+      
+      switch (type) {
+        case 'ping':
+          // VS Code is checking if we're ready
+          this.sendToVSCode('pong', { ready: this.profilesLoaded });
+          break;
+          
+        case 'loadXml':
+          // Load BIBFRAME XML into the editor
+          this.handleLoadXml(payload.xml, payload.profile);
+          break;
+          
+        case 'getFormData':
+          // Return current form data
+          this.handleGetFormData();
+          break;
+          
+        case 'navigate':
+          // Navigate to a route
+          if (payload.route) {
+            this.$router.push(payload.route);
+          }
+          break;
+      }
+    },
+    
+    /**
+     * Send a message back to VS Code extension
+     */
+    sendToVSCode(type, payload = {}) {
+      if (window.parent !== window) {
+        window.parent.postMessage({ type, ...payload }, '*');
+        console.log('[Quartz Bridge] Sent message:', type, payload);
+      }
+    },
+    
+    /**
+     * Load BIBFRAME XML into the editor
+     */
+    async handleLoadXml(xml, profileName) {
+      if (!xml) {
+        this.sendToVSCode('error', { message: 'No XML provided' });
+        return;
+      }
+      
+      try {
+        console.log('[Quartz Bridge] Loading XML, length:', xml.length);
+        
+        // Use the standard parseXml function
+        await utilsParse.parseXml(xml);
+        
+        // Find and set the appropriate profile
+        const profileStore = useProfileStore();
+        const defaultProfile = profileName || 'lc:RT:bf2:Monograph:Instance';
+        
+        for (let key in profileStore.profiles) {
+          if (profileStore.profiles[key].rtOrder.indexOf(defaultProfile) > -1) {
+            profileStore.activeProfile = JSON.parse(JSON.stringify(profileStore.profiles[key]));
+            break;
+          }
+        }
+        
+        // Navigate to edit view
+        this.$router.push({ name: 'Edit' });
+        
+        this.sendToVSCode('loadXmlComplete', { success: true });
+      } catch (error) {
+        console.error('[Quartz Bridge] Error loading XML:', error);
+        this.sendToVSCode('error', { message: `Failed to load XML: ${error.message}` });
+      }
+    },
+    
+    /**
+     * Get current form data and send back to VS Code
+     */
+    handleGetFormData() {
+      const profileStore = useProfileStore();
+      
+      // Extract basic form data from the active profile
+      const formData = {
+        hasActiveProfile: !!profileStore.activeProfile?.id,
+        profileId: profileStore.activeProfile?.id,
+        isSaved: profileStore.activeProfileSaved,
+        isPosted: profileStore.activeProfilePosted,
+        // Add more fields as needed
+      };
+      
+      this.sendToVSCode('formData', formData);
     }
   },
 
   async mounted() {
     console.log("App.vue mounted");
+    
+    // Set up VS Code message bridge if embedded in iframe
+    if (window.parent !== window) {
+      this.isEmbeddedInVSCode = true;
+      window.addEventListener('message', this.handleVSCodeMessage);
+      console.log('[Quartz Bridge] Message listener registered (embedded mode)');
+    }
+    
     try {
       const profileStoreInstance = useProfileStore();
       console.log("Profile store instance:", profileStoreInstance);
@@ -99,6 +209,11 @@ export default {
             profileStoreInstance.profilesLoaded = true;
           }
           console.log("Profile initialization complete");
+          
+          // Notify VS Code that Quartz is ready
+          if (this.isEmbeddedInVSCode) {
+            this.sendToVSCode('ready', { profilesLoaded: true });
+          }
         } catch (loadError) {
           console.error("Error during profile initialization:", loadError);
         }
@@ -111,6 +226,14 @@ export default {
 
     } catch (error) {
       console.error("Error in App.vue mounted:", error);
+    }
+  },
+  
+  beforeUnmount() {
+    // Clean up message listener
+    if (this.isEmbeddedInVSCode) {
+      window.removeEventListener('message', this.handleVSCodeMessage);
+      console.log('[Quartz Bridge] Message listener removed');
     }
   }
 }
