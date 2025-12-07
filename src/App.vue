@@ -95,6 +95,11 @@ export default {
           this.sendToVSCode('pong', { ready: this.profilesLoaded });
           break;
           
+        case 'startNew':
+          // Start a new blank record with a profile (like clicking Monograph button)
+          this.handleStartNew(payload.profileGroup, payload.metadata);
+          break;
+          
         case 'loadXml':
           // Load BIBFRAME XML into the editor
           this.handleLoadXml(payload.xml, payload.profile);
@@ -135,20 +140,32 @@ export default {
       }
       
       try {
-        console.log('[Quartz Bridge] Loading XML, length:', xml.length);
+        this.sendToVSCode('log', { message: `Loading XML, length: ${xml.length}` });
         
         // Parse the XML first (this populates utilsParse internal state)
-        await utilsParse.parseXml(xml);
+        try {
+          await utilsParse.parseXml(xml);
+          this.sendToVSCode('log', { message: 'XML parsed successfully' });
+          this.sendToVSCode('log', { message: `Found ${utilsParse.hasInstance} Instance(s), ${utilsParse.hasItem} Item(s)` });
+        } catch (parseError) {
+          this.sendToVSCode('error', { message: `XML parse failed: ${parseError.message}` });
+          return;
+        }
         
-        const profileStore = useProfileStore();
-        const usePreference = usePreferenceStore();
+        // Use this.profileStore from mapStores to get the reactive Pinia instance
+        const profileStore = this.profileStore;
+        const usePreference = this.preferenceStore;
         const defaultProfileRT = profileName || 'lc:RT:bf2:Monograph:Instance';
+        
+        this.sendToVSCode('log', { message: `Looking for profile: ${defaultProfileRT}` });
+        this.sendToVSCode('log', { message: `Available profiles: ${Object.keys(profileStore.profiles).join(', ')}` });
         
         // Find the right profile to use
         let useProfile = null;
         for (let key in profileStore.profiles) {
           if (profileStore.profiles[key].rtOrder.indexOf(defaultProfileRT) > -1) {
             useProfile = JSON.parse(JSON.stringify(profileStore.profiles[key]));
+            this.sendToVSCode('log', { message: `Found profile in: ${key}` });
             break;
           }
         }
@@ -158,6 +175,7 @@ export default {
           const firstKey = Object.keys(profileStore.profiles)[0];
           if (firstKey) {
             useProfile = JSON.parse(JSON.stringify(profileStore.profiles[firstKey]));
+            this.sendToVSCode('log', { message: `Using fallback profile: ${firstKey}` });
           }
         }
         
@@ -190,13 +208,39 @@ export default {
           useProfile.status = 'unposted';
         }
         
-        // Transform and merge the parsed RDF with the profile
-        const profileDataMerge = await utilsParse.transformRts(useProfile);
-        profileStore.activeProfile = profileDataMerge;
-        profileStore.activeProfilePosted = false;
-        profileStore.activeProfilePostedTimestamp = false;
+        this.sendToVSCode('log', { message: `Profile ready, eId: ${useProfile.eId}, transforming...` });
         
-        console.log('[Quartz Bridge] Profile set, eId:', useProfile.eId);
+        // Transform and merge the parsed RDF with the profile
+        try {
+          const profileDataMerge = await utilsParse.transformRts(useProfile);
+          // Mark as loaded from VS Code so Edit.vue won't reload from backend
+          profileDataMerge.loadedFromVSCode = true;
+          
+          // Log profile data for debugging
+          const rtKeys = Object.keys(profileDataMerge.rt || {});
+          this.sendToVSCode('log', { 
+            message: `Profile data after transform - rt keys: ${rtKeys.length}, rtOrder: ${(profileDataMerge.rtOrder || []).join(', ')}` 
+          });
+          
+          // Log which RTs have data populated
+          for (const rtKey of rtKeys) {
+            const rt = profileDataMerge.rt[rtKey];
+            if (rtKey.includes(':Work') || rtKey.includes(':Instance')) {
+              const ptCount = Object.keys(rt.pt || {}).length;
+              this.sendToVSCode('log', { 
+                message: `  RT ${rtKey}: URI=${rt.URI || 'NONE'}, @type=${rt['@type'] || 'none'}, pts=${ptCount}` 
+              });
+            }
+          }
+          
+          profileStore.activeProfile = profileDataMerge;
+          profileStore.activeProfilePosted = false;
+          profileStore.activeProfilePostedTimestamp = false;
+          this.sendToVSCode('log', { message: 'Transform complete, navigating to edit view' });
+        } catch (transformError) {
+          this.sendToVSCode('error', { message: `Transform failed: ${transformError.message}` });
+          return;
+        }
         
         // Navigate to edit view with the generated eId
         this.$router.push(`/edit/${useProfile.eId}`);
@@ -224,6 +268,115 @@ export default {
       };
       
       this.sendToVSCode('formData', formData);
+    },
+    
+    /**
+     * Start a new blank record with a specific profile
+     * Follows the pattern from Load.vue loadUrl() when urlToLoad is empty
+     * @param {string} profileGroup - The profile group name (e.g., 'Monograph', 'Serial')
+     * @param {Object} metadata - Optional metadata to pre-populate (title, author, etc.)
+     */
+    async handleStartNew(profileGroup = 'Monograph', metadata = {}) {
+      try {
+        // Use this.profileStore from mapStores to get the reactive Pinia instance
+        const profileStore = this.profileStore;
+        const usePreference = this.preferenceStore;
+        
+        console.log('[Quartz Bridge] Starting new record with profile:', profileGroup);
+        console.log('[Quartz Bridge] Available profiles:', Object.keys(profileStore.profiles));
+        console.log('[Quartz Bridge] Starting points:', JSON.stringify(profileStore.startingPoints));
+        
+        // Get the starting point for this profile group
+        const startingPoint = profileStore.startingPoints[profileGroup];
+        if (!startingPoint) {
+          // Try to find a matching profile by checking if any profile contains the group name
+          const availableGroups = Object.keys(profileStore.startingPoints);
+          console.log('[Quartz Bridge] Available starting points:', availableGroups);
+          this.sendToVSCode('error', { 
+            message: `Profile group '${profileGroup}' not found. Available: ${availableGroups.join(', ')}` 
+          });
+          return;
+        }
+        
+        const instanceProfileRT = startingPoint.instance;
+        if (!instanceProfileRT) {
+          this.sendToVSCode('error', { message: `No instance profile found in starting point for ${profileGroup}` });
+          return;
+        }
+        
+        console.log('[Quartz Bridge] Using instance profile:', instanceProfileRT);
+        
+        // Find the full profile that contains this instance RT
+        let useProfile = null;
+        for (let key in profileStore.profiles) {
+          if (profileStore.profiles[key].rtOrder.indexOf(instanceProfileRT) > -1) {
+            useProfile = JSON.parse(JSON.stringify(profileStore.profiles[key]));
+            break;
+          }
+        }
+        
+        if (!useProfile) {
+          this.sendToVSCode('error', { message: `Could not find profile containing ${instanceProfileRT}` });
+          return;
+        }
+        
+        // Set up log and metadata (following Load.vue pattern)
+        if (!useProfile.log) {
+          useProfile.log = [];
+        }
+        useProfile.log.push({ action: 'startNewFromVSCode', from: 'chat', metadata });
+        useProfile.procInfo = 'new record';
+        
+        // Generate a unique ID for this record
+        if (!useProfile.eId) {
+          let uuid = 'e' + decimalTranslator.new();
+          uuid = uuid.substring(0, 8);
+          useProfile.eId = uuid;
+          useProfile.neweId = true;
+        }
+        
+        // Set user info
+        if (!useProfile.user) {
+          useProfile.user = usePreference.returnUserNameForSaving || 'vscode-user';
+        }
+        
+        if (!useProfile.status) {
+          useProfile.status = 'unposted';
+        }
+        
+        // For a NEW record (no XML to load), use linkInstancesWorks instead of transformRts
+        // This links the Work and Instance together properly
+        useProfile = utilsParse.linkInstancesWorks(useProfile);
+        
+        // Set the active profile
+        profileStore.activeProfile = useProfile;
+        profileStore.activeProfilePosted = false;
+        profileStore.activeProfilePostedTimestamp = false;
+        
+        // Set up ad-hoc mode for all elements (following Load.vue pattern)
+        for (let rt in profileStore.activeProfile.rt) {
+          profileStore.emptyComponents[rt] = [];
+          for (let element in profileStore.activeProfile.rt[rt].pt) {
+            profileStore.addToAdHocMode(rt, element);
+          }
+        }
+        
+        console.log('[Quartz Bridge] New record ready, eId:', useProfile.eId);
+        
+        // Navigate to edit view
+        this.$router.push(`/edit/${useProfile.eId}`);
+        
+        this.sendToVSCode('startNewComplete', { 
+          success: true, 
+          eId: useProfile.eId,
+          profileGroup,
+          metadata 
+        });
+        
+      } catch (error) {
+        console.error('[Quartz Bridge] Error starting new record:', error);
+        this.sendToVSCode('error', { message: `Failed to start new record: ${error.message}` });
+      }
     }
   },
 

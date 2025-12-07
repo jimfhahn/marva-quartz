@@ -178,10 +178,28 @@
 
       console.log("Mounted called", this.$route.params.action, this.$route.params.recordId )
       console.log(this.$route.params)
+      
+      // Send logs to VS Code if embedded
+      const sendToVSCode = (msg) => {
+        if (window.parent !== window) {
+          window.parent.postMessage({ type: 'log', message: `[Edit.vue] ${msg}` }, '*');
+        }
+      };
+      
+      sendToVSCode(`Mounted - profilesLoaded: ${this.profilesLoaded}, hasActiveProfile: ${!!this.activeProfile}`);
+      
       this.profileStore.resetLocalComponentCache()
       if (this.profilesLoaded && this.activeProfile){
+        
+        sendToVSCode(`activeProfile.loadedFromVSCode: ${this.activeProfile.loadedFromVSCode}, activeProfile.eId: ${this.activeProfile.eId}`);
 
-        if (this.activeProfile.neweId){
+        if (this.activeProfile.loadedFromVSCode){
+          // Profile was already loaded and transformed from VS Code extension
+          // Clear the flag and don't reload from backend
+          console.log("Record loaded from VS Code, skipping backend load")
+          sendToVSCode('Skipping backend load - profile already set from VS Code');
+          this.activeProfile.loadedFromVSCode = false
+        }else if (this.activeProfile.neweId){
           // if they just created a new record then we should save the record to back end first thing so it is recorded
           this.profileStore.saveRecord()
           this.activeProfile.neweId = false

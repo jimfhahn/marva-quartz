@@ -744,6 +744,14 @@ const utilsParse = {
         continue
       }
 
+      // Debug: log what we found
+      console.log(`[transformRts] Processing ${tle} for ${pkey}:`, {
+        tagName: xml.tagName,
+        hasRdfAbout: !!xml.attributes['rdf:about'],
+        rdfAbout: xml.attributes['rdf:about']?.value,
+        hasRdfResource: !!xml.attributes['rdf:resource'],
+        parentTagName: xml.parentNode?.tagName
+      });
 
       // does this tle have a URI or a type?
       if (xml.attributes['rdf:resource']){

@@ -62,3 +62,8 @@ body {
   -moz-osx-font-smoothing: grayscale;
   height: 100vh;
 }
+
+/* Ensure full height when embedded in iframe */
+html {
+  height: 100%;
+}
