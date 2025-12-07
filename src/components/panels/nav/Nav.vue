@@ -504,11 +504,7 @@
                     this.showPostModal = true;
                     this.$nextTick(() => {
                       this.$refs.postmodal.postType = 'default';
-                      this.$refs.postmodal.post();
-                      if (this.activeProfile) {
-                        this.profileStore.saveRecord();
-                        this.activeProfilePosted = true;
-                      }
+                      // Don't auto-post - let user enter Wikibase credentials first
                     });
                   }
                 },
@@ -518,11 +514,7 @@
                     this.showPostModal = true;
                     this.$nextTick(() => {
                       this.$refs.postmodal.postType = 'work';
-                      this.$refs.postmodal.post();
-                      if (this.activeProfile) {
-                        this.profileStore.saveRecord();
-                        this.activeProfilePosted = true;
-                      }
+                      // Don't auto-post - let user enter Wikibase credentials first
                     });
                   }
                 },
@@ -532,11 +524,7 @@
                     this.showPostModal = true;
                     this.$nextTick(() => {
                       this.$refs.postmodal.postType = 'instance';
-                      this.$refs.postmodal.post();
-                      if (this.activeProfile) {
-                        this.profileStore.saveRecord();
-                        this.activeProfilePosted = true;
-                      }
+                      // Don't auto-post - let user enter Wikibase credentials first
                     });
                   }
                 }

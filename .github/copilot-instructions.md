@@ -1,18 +1,20 @@
 # Copilot Instructions: Marva Quartz (Penn Libraries Fork)
 
 ## Overview
-- **Product**: Web-based BIBFRAME RDF/XML editor used by Penn Libraries for Alma-integrated cataloging.
-- **Source**: Fork of the Library of Congress "Marva Quartz" project with Penn-specific search, publishing, and workflow customizations.
+- **Product**: Web-based BIBFRAME RDF/XML editor with Wikibase publishing support.
+- **Source**: Fork of the Library of Congress "Marva Quartz" project with customized search, publishing, and workflow features.
 - **Primary Goals**:
   1. Load and edit Work/Instance (and optional Item) descriptions that follow the LC BIBFRAME ontology and profile definitions.
-  2. Support Penn catalogers by accepting Alma MMSIDs and POD identifiers in addition to LCCNs and raw URLs.
-  3. Publish edited descriptions back to Alma/Penn infrastructure with options to send Work + Instance, Work-only, or Instance-only payloads.
+  2. Support catalogers by accepting Alma MMSIDs, POD identifiers, LCCNs, and raw URLs.
+  3. **Publish BIBFRAME records to Wikibase** (https://vibe.bibframe.wiki) for building linked data knowledge bases.
+  4. Validate records using SHACL shapes via mcp4rdf-core.
 
 ## Key User Stories
 - *As a cataloger*, I can search for a record by MMSID, POD, LCCN, or direct RDF URL and load it into the editor.
 - *As a cataloger*, I can preview, edit, and validate BIBFRAME descriptions using profiles that group fields the way LC does.
-- *As a cataloger*, I can export/publish the exact portion of a description that my Alma workflow expects (Instance-only, Work+Instance, etc.).
-- *As a systems librarian*, I can point the UI at public LC endpoints for demos or at Penn endpoints for production by editing config values.
+- *As a cataloger*, I can publish BIBFRAME records to my Wikibase instance to build a linked data knowledge base.
+- *As a cataloger*, I can validate my records against SHACL shapes before publishing.
+- *As a systems librarian*, I can configure Wikibase URL and property mappings to match my Wikibase schema.
 
 ## Technology Stack
 - **Framework**: Vue 3 (SFCs, mix of Options API + Composition helpers) bundled with Vite.
@@ -40,9 +42,11 @@ src/
 │   ├── profile.js          # Core editor state, transformations, export payload assembly
 │   └── preference.js       # Layout/theme settings, local storage helpers
 ├── lib/
-│   ├── utils_network.js    # Fetch BIBFRAME packages, MMSID/POD search, saved record APIs
+│   ├── utils_network.js    # Fetch BIBFRAME packages, MMSID/POD search, saved record APIs, validation
 │   ├── utils_parse.js      # XML → profile transformation, blank node handling, Item merging
 │   ├── utils_export.js     # Profile → XML serialization, Work/Instance split logic
+│   ├── wikibase-transform.js # BIBFRAME RDF/XML → Wikibase entity transformation
+│   ├── wikibase-publish.js   # Wikibase API client for publishing entities
 │   └── ...                 # Additional RDF helpers, Dewey/LCC mappings, i18n strings
 ├── assets/                 # Static assets (logo, fonts)
 └── router/index.js         # Route definitions (Load, Edit, Multi-edit)
@@ -51,6 +55,9 @@ public/
 ├── profiles*.json          # Ship with LC profile snapshots; swap to target custom profiles
 ├── starting.json           # Profile instances available from the UI
 └── test_files/*.xml        # Local sample records for testing without hitting network
+
+docs/
+└── WIKIBASE_PUBLISHING.md  # Comprehensive Wikibase integration guide
 ```
 
 ## Data & Workflow Notes
@@ -61,9 +68,13 @@ public/
   - URLs → direct fetch
   - Fallback → LC LCCN search via `utils_network.searchInstanceByLCCN`
 - **Parsing**: `utils_parse.transformRts()` merges incoming RDF/XML with profile definitions, generates per-RT components, and sets up Items when present.
-- **Publishing**: Configurable endpoints (`publish`, `workpublish`, `instancepublish`) per environment. UI allows selecting scope (Work+Instance, Work only, Instance only) in `PostModal.vue`.
+- **Publishing**: 
+  - **Wikibase** (default): Publishes to configured Wikibase instance (https://vibe.bibframe.wiki). Uses `wikibase-transform.js` and `wikibase-publish.js`.
+  - **Alma** (legacy): Configurable endpoints (`publish`, `workpublish`, `instancepublish`) - currently disabled.
+  - UI allows selecting destination and scope (Work+Instance, Work only, Instance only) in `PostModal.vue`.
 - **Saved Records**: Requires back-end (see [`marva-backend`](https://github.com/lcnetdev/marva-backend)). Front-end gracefully handles absence by showing empty states.
-- **Validation & Scriptshifter**: Optional services toggled through config flags; expect them to be unreachable in pure local dev.
+- **Validation**: Uses mcp4rdf-core (Docker) at `http://localhost:5050/validate` for SHACL validation. Proxied via Vite config.
+- **Scriptshifter**: Optional transliteration service toggled through config flags.
 
 ## Environment & Configuration
 - `useConfigStore` determines which `regionUrls` block to use based on hostname (dev/staging/production/bibframe.org/quartz).
@@ -72,7 +83,11 @@ public/
 - Feature flags:
   - `publicEndpoints` toggles whether load/publish should expose public LC services
   - `displayLCOnlyFeatures` controls visibility of LC-specific operations
-  - `postUsingAlmaXmlFormat` reserved for Penn Alma-specific serialization tweaks
+  - `publishDestination` controls default publish target ('wikibase' or 'alma')
+- Wikibase config (`regionUrls.dev.wikibase`):
+  - `url`: Wikibase instance URL (https://vibe.bibframe.wiki)
+  - `propertyMappings`: Map BIBFRAME concepts to Wikibase property IDs
+  - `typeItems`: QIDs for BIBFRAME Work/Instance type items
 
 ## Coding Guidelines for Agents
 1. **Match existing patterns**: Use Vue SFCs with `<script setup>` only where the repo already does; otherwise stick to Options API for consistency.
@@ -91,9 +106,10 @@ public/
 
 ## Common Tasks for Copilot
 - **Add new identifier types**: Update `detectSearchType`, extend network helpers, add UI affordances in `Load.vue`.
-- **Extend publishing options**: Touch `PostModal.vue`, `utils_export.js`, and relevant config endpoints.
+- **Extend Wikibase publishing**: Touch `wikibase-transform.js`, `wikibase-publish.js`, `PostModal.vue`, and config.js property mappings.
+- **Add Wikibase properties**: Update `propertyMappings` in config when new Wikibase properties are created.
 - **Customize profiles**: Modify JSON under `public/` and ensure `profileStore` handles new RT suffixes.
-- **Enhance validation**: Integrate additional backend responses without blocking UI if the service is unavailable.
+- **Enhance validation**: Integrate mcp4rdf-core responses; handle service unavailability gracefully.
 - **Improve accessibility**: Audit components in `components/panels/edit/` for ARIA attributes, keyboard interactions.
 
 ## Testing & Quality Gates

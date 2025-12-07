@@ -2168,6 +2168,9 @@ const utilsNetwork = {
 
     /**
      * Validates RDF/XML against SHACL shapes
+     * Supports two backends:
+     * - mcp4rdf-core (local): POST JSON { rdf, template, options }
+     * - quartz.bibframe.app: POST raw RDF/XML with template query param
      * @async
      * @param {string} rdfXml - the RDF/XML to validate
      * @param {string} profileId - the profile ID to validate against
@@ -2188,17 +2191,42 @@ const utilsNetwork = {
         
         // Use template from activeProfile, defaulting to 'monograph'
         const templateValue = (useConfigStore().activeProfile && useConfigStore().activeProfile.templateType) || profileId || 'monograph';
-        const url = returnUrls.validate + "?template=" + templateValue;
-        console.log('[validate] Validating against:', url);
         
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/rdf+xml'
-          },
-          body: rdfXml
-        });
+        // Determine which format to use based on config
+        const useMcp4rdf = returnUrls.validateFormat === 'mcp4rdf';
+        
+        let response;
+        if (useMcp4rdf) {
+          // mcp4rdf-core format: POST JSON body
+          const url = returnUrls.validate;
+          console.log('[validate] Validating via mcp4rdf-core:', url, 'template:', templateValue);
+          
+          response = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              rdf: rdfXml,
+              template: templateValue,
+              options: {}
+            })
+          });
+        } else {
+          // Original quartz.bibframe.app format: raw RDF/XML with query param
+          const url = returnUrls.validate + "?template=" + templateValue;
+          console.log('[validate] Validating against:', url);
+          
+          response = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/rdf+xml'
+            },
+            body: rdfXml
+          });
+        }
         
         if (!response.ok) {
           const errorText = await response.text();
@@ -2212,7 +2240,45 @@ const utilsNetwork = {
         const result = await response.json();
         console.log('[validate] Validation result:', result);
         
-        // Return the result as-is, assuming it already has the right format
+        // Normalize mcp4rdf-core response to expected format
+        if (useMcp4rdf && result.validation) {
+          // mcp4rdf-core returns { validation: { conforms, results }, status, ... }
+          const violations = result.validation.results || [];
+          
+          // Build results_text for UI display
+          let results_text = '';
+          if (result.validation.conforms) {
+            results_text = '✓ Validation passed - no issues found.';
+          } else if (typeof result.validation.results === 'string') {
+            results_text = result.validation.results;
+          } else if (Array.isArray(violations) && violations.length > 0) {
+            results_text = violations.map((v, i) => {
+              if (typeof v === 'string') return `${i+1}. ${v}`;
+              return `${i+1}. ${v.message || v.resultMessage || JSON.stringify(v)}`;
+            }).join('\n');
+          } else {
+            results_text = result.status === 'valid' ? '✓ Valid' : 'Validation completed with issues.';
+          }
+          
+          // Add quality score info
+          if (result.quality_score !== undefined) {
+            results_text += `\n\nQuality Score: ${result.quality_score}%`;
+          }
+          
+          return {
+            conforms: result.validation.conforms,
+            violations: violations,
+            results_text: results_text,
+            // Pass through extra mcp4rdf-core data for AI correction
+            status: result.status,
+            quality_score: result.quality_score,
+            data: result.data,  // fixed RDF if available
+            ai_explanation: result.ai_explanation,
+            raw: result
+          };
+        }
+        
+        // Return the result as-is for other backends
         return result;
         
       } catch (error) {

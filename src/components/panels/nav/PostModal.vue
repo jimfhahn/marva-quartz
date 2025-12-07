@@ -3,6 +3,7 @@
   import { useConfigStore } from '@/stores/config'
   import utilsNetwork from '@/lib/utils_network'
   import short from 'short-uuid' // Add this import
+  import { publishToWikibase, configureWikibase, isWikibaseConfigured } from '@/lib/wikibase-publish'
 
   import {  mapStores, mapState, mapWritableState } from 'pinia'
   import { VueFinalModal } from 'vue-final-modal'
@@ -30,7 +31,15 @@
           { value: 'work', label: 'Work Only' },
           { value: 'instance', label: 'Instance Only' }
         ],
+        // Destination will be set from config in created()
+        destination: 'wikibase',
         showDropdown: false,
+        showDestinationDropdown: false,
+        // Wikibase-specific state
+        wikibaseResults: null,
+        wikibaseUrl: '',  // User can input their Wikibase URL
+        wikibaseBotUsername: '',  // Bot username (e.g., 'Username@BotName')
+        wikibaseBotPassword: '',  // Bot password from Special:BotPasswords
 
         initalHeight: 400,
         initalLeft: (window.innerWidth / 2) - 450,
@@ -46,6 +55,45 @@
       selectedOptionLabel() {
         const option = this.postOptions.find(opt => opt.value === this.postType);
         return option ? option.label : 'Work + Instance';
+      },
+      selectedDestinationLabel() {
+        const option = this.destinationOptions.find(opt => opt.value === this.destination);
+        return option ? option.label : '🌐 Wikibase';
+      },
+      // Build destination options based on what's configured
+      destinationOptions() {
+        const config = useConfigStore();
+        const urls = config.returnUrls || {};
+        const options = [];
+        
+        // Add Alma option only if publish endpoint is configured
+        if (urls.publish) {
+          options.push({ value: 'alma', label: '📚 Alma/Default' });
+        }
+        
+        // Add Wikibase option if enabled
+        if (urls.wikibase?.enabled !== false) {
+          options.push({ value: 'wikibase', label: '🌐 Wikibase' });
+        }
+        
+        // Fallback if nothing configured
+        if (options.length === 0) {
+          options.push({ value: 'wikibase', label: '🌐 Wikibase' });
+        }
+        
+        return options;
+      },
+      // Check if only one destination is available (hide selector)
+      singleDestination() {
+        return this.destinationOptions.length === 1;
+      },
+      isWikibaseEnabled() {
+        const config = useConfigStore();
+        return config.returnUrls?.wikibase?.enabled || false;
+      },
+      wikibaseConfig() {
+        const config = useConfigStore();
+        return config.returnUrls?.wikibase || {};
       },
       normalizedInstanceIds() {
         // Simplified to only handle nested format under name.instance
@@ -76,33 +124,98 @@
       }
     },
 
+    created() {
+      this.initializeWikibaseSettings();
+    },
+
+    watch: {
+      // Re-initialize when modal is shown
+      showPostModal(newVal) {
+        if (newVal) {
+          this.initializeWikibaseSettings();
+        }
+      }
+    },
+
     methods: {
+      initializeWikibaseSettings() {
+        // Initialize wikibase settings from config if set
+        const config = useConfigStore();
+        const wikibaseConfig = config.returnUrls?.wikibase;
+        console.log('[PostModal] Initializing Wikibase settings:', wikibaseConfig);
+        
+        if (wikibaseConfig?.url) {
+          this.wikibaseUrl = wikibaseConfig.url;
+        }
+        // Load bot credentials from config (for dev) or localStorage
+        if (wikibaseConfig?.botUsername) {
+          this.wikibaseBotUsername = wikibaseConfig.botUsername;
+        }
+        if (wikibaseConfig?.botPassword) {
+          this.wikibaseBotPassword = wikibaseConfig.botPassword;
+        }
+        // Try to load from localStorage for convenience (optional)
+        const savedUsername = localStorage.getItem('wikibase_bot_username');
+        if (savedUsername && !this.wikibaseBotUsername) {
+          this.wikibaseBotUsername = savedUsername;
+        }
+        
+        console.log('[PostModal] Wikibase URL:', this.wikibaseUrl);
+        console.log('[PostModal] Bot Username:', this.wikibaseBotUsername);
+        console.log('[PostModal] Bot Password set:', !!this.wikibaseBotPassword);
+      },
+
       done: function() {
         this.showPostModal = false;
         this.showDropdown = false;
+        this.showDestinationDropdown = false;
+        this.wikibaseResults = null;
       },
 
       toggleDropdown: function() {
         this.showDropdown = !this.showDropdown;
-        console.log("Dropdown toggled:", this.showDropdown); // Add logging
+        this.showDestinationDropdown = false;
+        console.log("Dropdown toggled:", this.showDropdown);
+      },
+
+      toggleDestinationDropdown: function() {
+        this.showDestinationDropdown = !this.showDestinationDropdown;
+        this.showDropdown = false;
+        console.log("Destination dropdown toggled:", this.showDestinationDropdown);
       },
 
       selectOption: function(option) {
         this.postType = option.value;
-        console.log("Option selected:", option.label); // Add logging
+        console.log("Option selected:", option.label);
         this.showDropdown = false;
+      },
+
+      selectDestination: function(option) {
+        this.destination = option.value;
+        console.log("Destination selected:", option.label);
+        this.showDestinationDropdown = false;
       },
 
       async post() {
         this.$refs.errorHolder.style.height = this.initalHeight + 'px';
         this.posting = true;
         this.showDropdown = false;
+        this.showDestinationDropdown = false;
         this.postResults = {};
-        this.holdingInfo = null; // Reset holding info
+        this.wikibaseResults = null;
+        this.holdingInfo = null;
         
         try {
           // Generate the XML
           const xmlString = await this.generateXML(this.activeProfile);
+          
+          // Route based on destination
+          if (this.destination === 'wikibase') {
+            await this.postToWikibase(xmlString);
+            return;
+          }
+          
+          // Default: Post to Alma
           
           let response;
           // Create request payload with the right data
@@ -146,6 +259,84 @@
           console.error("Error during post:", error);
           this.postResults = {
             publish: { status: 'error', message: error.message || 'An unknown error occurred' }
+          };
+        } finally {
+          this.posting = false;
+        }
+      },
+
+      /**
+       * Post to Wikibase instance
+       */
+      async postToWikibase(xmlString) {
+        try {
+          console.log('[PostModal] Publishing to Wikibase...');
+          console.log('[PostModal] Current values - URL:', this.wikibaseUrl, 'Username:', this.wikibaseBotUsername, 'Password set:', !!this.wikibaseBotPassword);
+          
+          // Get Wikibase URL from config or user input
+          const wikibaseUrl = this.wikibaseUrl || this.wikibaseConfig?.url;
+          
+          if (!wikibaseUrl) {
+            throw new Error('Please enter your Wikibase URL');
+          }
+          
+          // Check for bot credentials
+          if (!this.wikibaseBotUsername || !this.wikibaseBotPassword) {
+            console.log('[PostModal] Missing credentials - Username:', this.wikibaseBotUsername, 'Password empty:', !this.wikibaseBotPassword);
+            throw new Error('Please enter your bot username and password. Create them at Special:BotPasswords on your Wikibase.');
+          }
+          
+          // Save username to localStorage for convenience (never save password)
+          localStorage.setItem('wikibase_bot_username', this.wikibaseBotUsername);
+          
+          // Configure the Wikibase publisher with bot credentials
+          configureWikibase({
+            wikibaseUrl: wikibaseUrl,
+            apiPath: this.wikibaseConfig?.apiPath || '/w/api.php',
+            propertyMappings: this.wikibaseConfig?.propertyMappings || {},
+            typeItems: this.wikibaseConfig?.typeItems || {},
+            credentials: {
+              username: this.wikibaseBotUsername,
+              password: this.wikibaseBotPassword
+            },
+            useSession: false,  // Use bot credentials instead of session
+            dryRun: false
+          });
+          
+          // Publish to Wikibase
+          const results = await publishToWikibase(xmlString, {
+            propertyMappings: this.wikibaseConfig?.propertyMappings,
+            typeItems: this.wikibaseConfig?.typeItems
+          });
+          
+          console.log('[PostModal] Wikibase publish results:', results);
+          
+          this.wikibaseResults = results;
+          
+          if (results.success) {
+            this.postResults = {
+              publish: { status: 'published' },
+              wikibase: {
+                works: results.works,
+                instances: results.instances,
+                items: results.items,
+                url: wikibaseUrl
+              }
+            };
+          } else {
+            this.postResults = {
+              publish: { 
+                status: 'error', 
+                message: results.errors.map(e => e.error).join('; ') || 'Wikibase publishing failed'
+              },
+              wikibase: results
+            };
+          }
+          
+        } catch (error) {
+          console.error('[PostModal] Wikibase error:', error);
+          this.postResults = {
+            publish: { status: 'error', message: error.message || 'Wikibase publishing failed' }
           };
         } finally {
           this.posting = false;
@@ -393,21 +584,94 @@
       <div v-if="!posting && Object.keys(postResults).length === 0">
         <h2>Post Options</h2>
         
-        <div class="post-type-selector">
-          <div class="dropdown-wrapper" @click.stop="toggleDropdown">
-            <div class="selected-option">{{ selectedOptionLabel }}</div>
-            <div class="dropdown-arrow">▼</div>
-            
-            <div v-if="showDropdown" class="bar-menu menu">
-              <div class="extended-hover-zone"></div>
-              <div class="bar-menu-items">
-                <div 
-                  v-for="option in postOptions" 
-                  :key="option.value" 
-                  class="bar-menu-item"
-                  @click.stop="selectOption(option)"
-                >
-                  <span class="label">{{ option.label }}</span>
+        <!-- Destination Selector (hidden if only one destination) -->
+        <div v-if="!singleDestination" class="option-row">
+          <label class="option-label">Destination:</label>
+          <div class="post-type-selector">
+            <div class="dropdown-wrapper" @click.stop="toggleDestinationDropdown">
+              <div class="selected-option">{{ selectedDestinationLabel }}</div>
+              <div class="dropdown-arrow">▼</div>
+              
+              <div v-if="showDestinationDropdown" class="bar-menu menu">
+                <div class="extended-hover-zone"></div>
+                <div class="bar-menu-items">
+                  <div 
+                    v-for="option in destinationOptions" 
+                    :key="option.value" 
+                    class="bar-menu-item"
+                    @click.stop="selectDestination(option)"
+                  >
+                    <span class="label">{{ option.label }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Single destination indicator (when only one option) -->
+        <div v-else class="option-row">
+          <label class="option-label">Destination:</label>
+          <div class="single-destination-label">{{ selectedDestinationLabel }}</div>
+        </div>
+        
+        <!-- Wikibase credentials - always show since Wikibase is the only destination -->
+        <div class="wikibase-config">
+          <div class="option-row">
+            <label class="option-label">Wikibase URL:</label>
+            <input 
+              v-model="wikibaseUrl" 
+              type="url" 
+              placeholder="https://your-wikibase.example.com"
+              class="wikibase-url-input"
+            />
+          </div>
+          
+          <!-- Bot credentials section -->
+          <div class="credentials-section">
+            <div class="option-row">
+              <label class="option-label">Bot Username:</label>
+              <input 
+                v-model="wikibaseBotUsername" 
+                type="text" 
+                placeholder="Username@BotName"
+                class="wikibase-url-input"
+              />
+            </div>
+            <div class="option-row">
+              <label class="option-label">Bot Password:</label>
+              <input 
+                v-model="wikibaseBotPassword" 
+                type="password" 
+                placeholder="Bot password from Special:BotPasswords"
+                class="wikibase-url-input"
+              />
+            </div>
+            <p class="wikibase-hint">
+              🔐 Create bot credentials at <a :href="wikibaseUrl + '/wiki/Special:BotPasswords'" target="_blank">Special:BotPasswords</a>
+            </p>
+          </div>
+        </div>
+        
+        <!-- Post Type Selector (Work/Instance) -->
+        <div class="option-row">
+          <label class="option-label">Content:</label>
+          <div class="post-type-selector">
+            <div class="dropdown-wrapper" @click.stop="toggleDropdown">
+              <div class="selected-option">{{ selectedOptionLabel }}</div>
+              <div class="dropdown-arrow">▼</div>
+              
+              <div v-if="showDropdown" class="bar-menu menu">
+                <div class="extended-hover-zone"></div>
+                <div class="bar-menu-items">
+                  <div 
+                    v-for="option in postOptions" 
+                    :key="option.value" 
+                    class="bar-menu-item"
+                    @click.stop="selectOption(option)"
+                  >
+                    <span class="label">{{ option.label }}</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -415,13 +679,46 @@
         </div>
         
         <div class="button-container">
-          <button @click="post" class="post-button">Post</button>
+          <button @click="post" class="post-button">
+            {{ destination === 'wikibase' ? '🌐 Post to Wikibase' : '📚 Post' }}
+          </button>
           <button @click="done" class="cancel-button">Cancel</button>
         </div>
       </div>
 
       <div v-if="!posting && Object.keys(postResults).length !== 0">
-        <div v-if="postResults.publish && postResults.publish.status === 'published'" style="margin: 0.5em 0; background-color: #90ee9052; padding: 0.5em; border-radius: 0.25em;">
+        <!-- Wikibase Success -->
+        <div v-if="postResults.wikibase && postResults.publish?.status === 'published'" style="margin: 0.5em 0; background-color: #90ee9052; padding: 0.5em; border-radius: 0.25em;">
+          <h3>🌐 Published to Wikibase!</h3>
+          <p>Records created at {{ postResults.wikibase.url }}</p>
+          
+          <div v-if="postResults.wikibase.works?.length">
+            <strong>Works:</strong>
+            <ul>
+              <li v-for="work in postResults.wikibase.works" :key="work.id">
+                <a :href="postResults.wikibase.url + '/wiki/' + work.id" target="_blank">
+                  {{ work.id }}
+                </a>
+                - {{ work.label }}
+              </li>
+            </ul>
+          </div>
+          
+          <div v-if="postResults.wikibase.instances?.length">
+            <strong>Instances:</strong>
+            <ul>
+              <li v-for="instance in postResults.wikibase.instances" :key="instance.id">
+                <a :href="postResults.wikibase.url + '/wiki/' + instance.id" target="_blank">
+                  {{ instance.id }}
+                </a>
+                - {{ instance.label }}
+              </li>
+            </ul>
+          </div>
+        </div>
+        
+        <!-- Alma/Default Success -->
+        <div v-else-if="postResults.publish && postResults.publish.status === 'published'" style="margin: 0.5em 0; background-color: #90ee9052; padding: 0.5em; border-radius: 0.25em;">
           The record was accepted by the system.
           <div v-if="hasMMSIDs">
             MMS IDs:
@@ -662,5 +959,76 @@
 
   .detail-value {
     color: #333;
+  }
+  
+  /* Wikibase specific styles */
+  .option-row {
+    display: flex;
+    align-items: center;
+    gap: 1em;
+    margin: 1em 0;
+  }
+  
+  .option-label {
+    min-width: 100px;
+    font-weight: bold;
+  }
+  
+  .wikibase-config {
+    background-color: #f0f7ff;
+    border: 1px solid #b3d4fc;
+    border-radius: 6px;
+    padding: 1em;
+    margin: 1em 0;
+  }
+  
+  .wikibase-url-input {
+    flex: 1;
+    padding: 0.5em;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 1em !important;
+    min-width: 300px;
+  }
+  
+  .wikibase-hint {
+    font-size: 0.85em;
+    color: #666;
+    margin-top: 0.5em;
+    margin-bottom: 0;
+  }
+  
+  .wikibase-results a {
+    color: #0366d6;
+    text-decoration: none;
+  }
+  
+  .wikibase-results a:hover {
+    text-decoration: underline;
+  }
+  
+  .single-destination-label {
+    font-weight: 500;
+    color: #333;
+    padding: 0.5em 0;
+  }
+  
+  .credentials-section {
+    margin-top: 1em;
+    padding-top: 1em;
+    border-top: 1px solid #e0e0e0;
+  }
+  
+  .credentials-section .option-row {
+    margin-bottom: 0.75em;
+  }
+  
+  .credentials-section a {
+    color: #0366d6;
+    text-decoration: none;
+  }
+  
+  .credentials-section a:hover {
+    text-decoration: underline;
   }
 </style>

@@ -18,18 +18,71 @@ export const useConfigStore = defineStore('config', {
         utilLang: "https://quartz.bibframe.app/util-lang/",
   // Use local proxy to avoid CORS in dev
   scriptshifter  :  '/scriptshifter/',
-        publish: "https://quartz.bibframe.app/util/publish/staging",
-        workpublish: "https://quartz.bibframe.app/util/publish/staging/work",
-        instancepublish: "https://quartz.bibframe.app/util/publish/staging/instance",
+        // Publishing disabled for Alma - using Wikibase instead
+        publish: null,
+        workpublish: null,
+        instancepublish: null,
+        // Default publish destination
+        publishDestination: 'wikibase',
         bfdb: "https://id.loc.gov/",
-        validate: 'https://quartz.bibframe.app/validate',
+        // Use local mcp4rdf-core for validation (run: docker-compose up in mcp4rdf-core)
+        validate: '/mcp4rdf/validate',
+        validateFormat: 'mcp4rdf',  // signals to use JSON format
         profiles: "/profiles.json",
         starting: "/starting.json",
         id: 'https://id.loc.gov/',
         env: "staging",
         publicEndpoints: true,
-        displayLCOnlyFeatures: false
+        displayLCOnlyFeatures: false,
+        
+        // Wikibase publishing configuration
+        wikibase: {
+          enabled: true,
+          url: 'https://vibe.bibframe.wiki',  // Wikibase Cloud hosted instance
+          apiPath: '/w/api.php',
+          // Bot credentials for dev testing (in production, use environment variables)
+          botUsername: 'Jimfhahn@marva-quartz-vibe',
+          botPassword: '1dq7ibnuii72h1vh95j8jag0qu3in2em',  // TODO: Move to env var for production
+          // Property mappings - BIBFRAME concepts to Wikibase properties
+          // Properties in vibe.bibframe.wiki:
+          propertyMappings: {
+            // Core type properties
+            instanceOf: 'P5',           // "instance of" - for typing items as Work/Instance
+            subclassOf: 'P6',           // "subclass of" - for type hierarchies
+            
+            // Basic bibliographic properties (string datatypes)
+            title: 'P7',                // title (BIBFRAME bf:mainTitle)
+            subtitle: 'P28',            // subtitle
+            author: 'P8',               // author (BIBFRAME bf:contribution - primary) - string for now
+            // contributor: 'P30',      // TODO: wikibase-item type, need Q-items for agents first
+            
+            // Identifiers (external-id datatypes)
+            isbn: 'P9',                 // ISBN (BIBFRAME bf:Isbn)
+            lccn: 'P10',                // LCCN (BIBFRAME bf:Lccn)
+            lcWorkId: 'P21',            // Library of Congress BIBFRAME Work ID (like Wikidata P13714)
+            lcInstanceId: 'P22',        // Library of Congress BIBFRAME Instance ID
+            lcHubId: 'P25',             // Library of Congress BIBFRAME Hub ID (like Wikidata P11859)
+            
+            // Publication info (string datatypes)
+            publicationDate: 'P11',     // publication date (BIBFRAME bf:provisionActivity)
+            publisher: 'P12',           // publisher (BIBFRAME bf:provisionActivity agent)
+            publicationStatement: 'P31', // full publication statement
+            
+            // Subject/content - DISABLED until we create Q-items for subjects/languages
+            // These properties are wikibase-item type and need Q-IDs, not strings
+            // subject: 'P26',          // main subject (like Wikidata P921) - wikibase-item type
+            // language: 'P27',         // language of work (like Wikidata P407) - wikibase-item type
+            
+            // Linking properties - DISABLED until we can link Work/Instance
+            // workOf: 'P29',           // Instance → Work link - wikibase-item type
+          },
+          // QIDs for BIBFRAME type items
+          typeItems: {
+            bibframeWork: 'Q7',     // "BIBFRAME Work" item
+            bibframeInstance: 'Q8', // "BIBFRAME Instance" item
+          },
         },
+      },
 
       staging:{
 
@@ -92,9 +145,9 @@ export const useConfigStore = defineStore('config', {
         util: "https://quartz.bibframe.app/util/",
         utilLang: "https://quartz.bibframe.app/util-lang/",
         scriptshifter  :  'https://quartz.bibframe.app/scriptshifter/',
-        publish: "https://quartz.bibframe.app/util/publish/staging",
-        workpublish: "https://quartz.bibframe.app/util/publish/staging/work",
-        instancepublish: "https://quartz.bibframe.app/util/publish/staging/instance",
+        //publish: "https://quartz.bibframe.app/util/publish/staging",
+        // workpublish: "https://quartz.bibframe.app/util/publish/staging/work",
+        //instancepublish: "https://quartz.bibframe.app/util/publish/staging/instance",
         bfdb: "https://id.loc.gov/",
         validate: 'https://quartz.bibframe.app/validate',
         profiles: "https://quartz.bibframe.app/assets/profiles.json",
