@@ -24,6 +24,9 @@ import { usePreferenceStore } from '@/stores/preference'
 import { mapStores, mapState, mapWritableState } from 'pinia'
 
 import utilsParse from '@/lib/utils_parse';
+import short from 'short-uuid';
+
+const decimalTranslator = short("0123456789");
 
 export default {
   components: {
@@ -123,6 +126,7 @@ export default {
     
     /**
      * Load BIBFRAME XML into the editor
+     * Follows the same pattern as Load.vue loadUrl()
      */
     async handleLoadXml(xml, profileName) {
       if (!xml) {
@@ -133,24 +137,71 @@ export default {
       try {
         console.log('[Quartz Bridge] Loading XML, length:', xml.length);
         
-        // Use the standard parseXml function
+        // Parse the XML first (this populates utilsParse internal state)
         await utilsParse.parseXml(xml);
         
-        // Find and set the appropriate profile
         const profileStore = useProfileStore();
-        const defaultProfile = profileName || 'lc:RT:bf2:Monograph:Instance';
+        const usePreference = usePreferenceStore();
+        const defaultProfileRT = profileName || 'lc:RT:bf2:Monograph:Instance';
         
+        // Find the right profile to use
+        let useProfile = null;
         for (let key in profileStore.profiles) {
-          if (profileStore.profiles[key].rtOrder.indexOf(defaultProfile) > -1) {
-            profileStore.activeProfile = JSON.parse(JSON.stringify(profileStore.profiles[key]));
+          if (profileStore.profiles[key].rtOrder.indexOf(defaultProfileRT) > -1) {
+            useProfile = JSON.parse(JSON.stringify(profileStore.profiles[key]));
             break;
           }
         }
         
-        // Navigate to edit view
-        this.$router.push({ name: 'Edit' });
+        if (!useProfile) {
+          // Fallback to first available profile
+          const firstKey = Object.keys(profileStore.profiles)[0];
+          if (firstKey) {
+            useProfile = JSON.parse(JSON.stringify(profileStore.profiles[firstKey]));
+          }
+        }
         
-        this.sendToVSCode('loadXmlComplete', { success: true });
+        if (!useProfile) {
+          this.sendToVSCode('error', { message: 'No profile available' });
+          return;
+        }
+        
+        // Set up the log
+        if (!useProfile.log) {
+          useProfile.log = [];
+        }
+        useProfile.log.push({ action: 'loadFromVSCode', from: 'chat' });
+        useProfile.procInfo = 'update instance';
+        
+        // Generate a unique ID for this record
+        if (!useProfile.eId) {
+          let uuid = 'e' + decimalTranslator.new();
+          uuid = uuid.substring(0, 8);
+          useProfile.eId = uuid;
+          useProfile.neweId = true;
+        }
+        
+        // Set user info
+        if (!useProfile.user) {
+          useProfile.user = usePreference.returnUserNameForSaving || 'vscode-user';
+        }
+        
+        if (!useProfile.status) {
+          useProfile.status = 'unposted';
+        }
+        
+        // Transform and merge the parsed RDF with the profile
+        const profileDataMerge = await utilsParse.transformRts(useProfile);
+        profileStore.activeProfile = profileDataMerge;
+        profileStore.activeProfilePosted = false;
+        profileStore.activeProfilePostedTimestamp = false;
+        
+        console.log('[Quartz Bridge] Profile set, eId:', useProfile.eId);
+        
+        // Navigate to edit view with the generated eId
+        this.$router.push(`/edit/${useProfile.eId}`);
+        
+        this.sendToVSCode('loadXmlComplete', { success: true, eId: useProfile.eId });
       } catch (error) {
         console.error('[Quartz Bridge] Error loading XML:', error);
         this.sendToVSCode('error', { message: `Failed to load XML: ${error.message}` });
